@@ -18,6 +18,7 @@ public:
     advance();
   }
 
+  Lexer() = default;
   Lexer(Lexer &&) = default;
   Lexer(const Lexer &) = default;
   Lexer &operator=(Lexer &&) = default;

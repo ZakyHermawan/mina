@@ -1,5 +1,6 @@
 #include "Token.hpp"
 #include "Lexer.hpp"
+#include "Parser.hpp"
 
 int main (int argc, char *argv[]) {
   Token token(INTEGER, "", 32, 1);
@@ -7,6 +8,9 @@ int main (int argc, char *argv[]) {
   Token t(STRING, tmp, tmp, 2);
   std::cout << token << std::endl;
   std::cout << t << std::endl;
+
+  Parser p("true");
+  std::cout << p.getCurrToken() << std::endl;
 
   return 0;
 }
