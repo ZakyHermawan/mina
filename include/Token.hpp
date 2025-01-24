@@ -26,13 +26,14 @@ enum TokenType {
   COMMA,
 
   // Multi cahracter tokens
-  EQUAL_COLON,
+  COLON_EQUAL,
   LESS_EQUAL,
   GREATER_EQUAL,
+  BANG_EQUAL,
 
   // Literals
-  IDENTIFIER, STRING, NUMBER, BOOL,
-  
+  IDENTIFIER, STRING, NUMBER, BOOL, // BOOL literal can only be "true" or "false"
+
   // Keywords
   IF,
   THEN,
@@ -44,8 +45,6 @@ enum TokenType {
   EXIT,
   PUT,
   GET,
-  TRUE,
-  FALSE,
   VAR,
   FUNC,
   PROC,
@@ -53,7 +52,8 @@ enum TokenType {
   INTEGER,
   SKIP,
 
-  _EOF
+  TOK_BEGIN, // just an initial value, not a keyword or anything
+  TOK_EOF
 };
 
 std::string tokenTypeToString(TokenType type) {
@@ -78,9 +78,10 @@ std::string tokenTypeToString(TokenType type) {
     case AMPERSAND: return "AMPERSAND";
     case TILDE: return "TILDE";
     case COMMA: return "COMMA";
-    case EQUAL_COLON: return "EQUAL_COLON";
+    case COLON_EQUAL: return "COLON_EQUAL";
     case LESS_EQUAL: return "LESS_EQUAL";
     case GREATER_EQUAL: return "GREATER_EQUAL";
+    case BANG_EQUAL: return "BANG_EQUAL";
     case IDENTIFIER: return "IDENTIFIER";
     case STRING: return "STRING";
     case NUMBER: return "NUMBER";
@@ -95,30 +96,26 @@ std::string tokenTypeToString(TokenType type) {
     case EXIT: return "EXIT";
     case PUT: return "PUT";
     case GET: return "GET";
-    case TRUE: return "TRUE";
-    case FALSE: return "FALSE";
     case VAR: return "VAR";
     case FUNC: return "FUNC";
     case PROC: return "PROC";
     case BOOLEAN: return "BOOLEAN";
     case INTEGER: return "INTEGER";
     case SKIP: return "SKIP";
-    case _EOF: return "EOF";
+    case TOK_BEGIN: return "TOK_BEGIN";
+    case TOK_EOF: return "TOK_EOF";
     default: return "UNKNOWN";
   }
 }
 
 class Token {
-private:
-  TokenType m_tokenType;
-  std::string m_lexme;
-  std::any m_literal;
-  int m_line;
-
 public:
-  Token(TokenType type, const std::string& lexme, const std::any& literal, int line)
-    : m_tokenType{type}, m_lexme{lexme}, m_literal{literal}, m_line{line}
+  // make sure Token initialization is done  with all argument using temporary objects (r-value)
+  Token(TokenType type, std::string lexme, std::any literal, int line)
+    : m_tokenType{type}, m_lexme{std::move(lexme)}, m_literal{std::move(literal)}, m_line{line}
   {}
+
+  Token() = default;
   Token(Token &&) = default;
   Token(const Token &) = default;
   Token &operator=(Token &&) = default;
@@ -155,9 +152,16 @@ public:
       out << std::any_cast<std::string>(token.m_literal);
     }
     else {
+      std::cout << token.m_literal.type().name() << std::endl;
       throw std::runtime_error("Literal value is not printable\n");
     }
     return out;
   }
+
+private:
+  TokenType m_tokenType;
+  std::string m_lexme;
+  std::any m_literal;
+  int m_line;
 };
 

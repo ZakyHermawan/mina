@@ -1,4 +1,5 @@
 #include "Token.hpp"
+#include "Lexer.hpp"
 
 #include <cassert>
 
@@ -23,8 +24,34 @@ void tests_token()
   std::cout << "TESTS TOKEN SUCCESS\n";
 }
 
+void tests_lexer()
+{
+  std::string source = "{}  false !=true";
+  Lexer lexer(source);
+
+  assert(lexer.getCurrToken().getTokenType() == LEFT_BRACE);
+
+  lexer.advance();
+  assert(lexer.getCurrToken().getTokenType() == RIGHT_BRACE);
+
+  lexer.advance();
+  assert(lexer.getCurrToken().getTokenType() == BOOL);
+
+  lexer.advance();
+  assert(lexer.getCurrToken().getTokenType() == BANG_EQUAL);
+
+  lexer.advance();
+  assert(lexer.getCurrToken().getTokenType() == BOOL);
+
+  Lexer l{std::move(std::string())};
+  assert(l.getCurrToken().getTokenType() == TOK_BEGIN);
+
+  std::cout << "TESTS LEXER SUCCESS\n";
+}
+
 int main (int argc, char *argv[]) {
   tests_token();
+  tests_lexer();
 
   return 0;
 }
