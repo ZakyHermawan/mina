@@ -190,6 +190,8 @@ class Token
 
   std::any getLiteral() const { return m_literal; }
 
+  int getLine() const { return m_line; }
+
   friend std::ostream &operator<<(std::ostream &out, const Token &token)
   {
     out << tokenTypeToString(token.m_tokenType) << " " << token.m_lexme << " ";

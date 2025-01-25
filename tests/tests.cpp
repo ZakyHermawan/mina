@@ -8,6 +8,7 @@ void tests_token()
   Token token(INTEGER, "", 32, 1);
   assert(token.getTokenType() == TokenType::INTEGER);
   assert(std::any_cast<int>(token.getLiteral()) == 32);
+  assert(token.getLine() == 1);
 
   Token t(STRING, "", std::string("asdasd"), 2);
   assert(t.getTokenType() == TokenType::STRING);
