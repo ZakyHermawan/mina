@@ -1,7 +1,7 @@
-#include "Token.hpp"
-#include "Lexer.hpp"
-
 #include <cassert>
+
+#include "Lexer.hpp"
+#include "Token.hpp"
 
 void tests_token()
 {
@@ -12,7 +12,7 @@ void tests_token()
   Token t(STRING, "", std::string("asdasd"), 2);
   assert(t.getTokenType() == TokenType::STRING);
   assert(std::any_cast<std::string>(t.getLiteral()) == std::string("asdasd"));
-  
+
   Token t2(BOOL, "", true, 3);
   assert(t2.getTokenType() == TokenType::BOOL);
   assert(std::any_cast<bool>(t2.getLiteral()) == true);
@@ -49,7 +49,8 @@ void tests_lexer()
   std::cout << "TESTS LEXER SUCCESS\n";
 }
 
-int main (int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
   tests_token();
   tests_lexer();
 

@@ -1,8 +1,9 @@
-#include "Token.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
+#include "Token.hpp"
 
-int main (int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
   Token token(INTEGER, "", 32, 1);
   std::string tmp = "asdad";
   Token t(STRING, tmp, tmp, 2);

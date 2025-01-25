@@ -1,14 +1,11 @@
 #include "Lexer.hpp"
 
-class Parser {
-public:
-  Parser(std::string val)
-    : m_lexer{std::move(val)}
-  {}
+class Parser
+{
+ public:
+  Parser(std::string val) : m_lexer{std::move(val)} {}
 
-  Parser()
-    : m_lexer{}
-  {}
+  Parser() : m_lexer{} {}
 
   Parser(Parser &&) = default;
   Parser(const Parser &) = default;
@@ -16,13 +13,8 @@ public:
   Parser &operator=(const Parser &) = default;
   ~Parser() = default;
 
-  Token getCurrToken() const
-  {
-    return m_lexer.getCurrToken();
-  }
+  Token getCurrToken() const { return m_lexer.getCurrToken(); }
 
-private:
+ private:
   Lexer m_lexer;
 };
-
-
