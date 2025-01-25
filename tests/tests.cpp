@@ -88,6 +88,10 @@ void tests_token()
   Token be(BANG_EQUAL, "", "", 1);
   assert(be.getTokenType() == BANG_EQUAL);
 
+  Token id(IDENTIFIER, "sample_id", "", 1);
+  assert(id.getTokenType() == IDENTIFIER);
+  assert(id.getLexme() == std::string("sample_id"));
+
   Token t(STRING, "", std::string("asdasd"), 2);
   assert(t.getTokenType() == TokenType::STRING);
   assert(std::any_cast<std::string>(t.getLiteral()) == std::string("asdasd"));

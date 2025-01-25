@@ -194,9 +194,8 @@ class Lexer
       }
       else
       {
-        std::string errMsg = "Error, at line " + std::to_string(m_currLine) +
-                             "\nUnknown identifier: " + identifier;
-        throw std::runtime_error(errMsg);
+        m_currToken =
+            Token(IDENTIFIER, std::move(identifier), std::string(), m_currLine);
       }
     }
     else if (m_currChar == '"')
