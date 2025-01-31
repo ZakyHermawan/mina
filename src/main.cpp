@@ -2,14 +2,38 @@
 #include "Parser.hpp"
 #include "Token.hpp"
 
+void repl()
+{
+  while (1)
+  {
+    std::string source;
+    std::cout << "repl> ";
+    getline(std::cin, source);
+    if (std::cin.eof())
+    {
+      break;
+    }
+    Parser parser(std::move(source));
+    std::cout << parser.getCurrToken() << std::endl;
+  }
+}
+
+void runFile() {}
+
 int main(int argc, char *argv[])
 {
-  Token token(INTEGER, "", 32, 1);
-  std::string tmp = "asdad";
-  Token t(STRING, tmp, tmp, 2);
-  std::cout << token << std::endl;
-  std::cout << t << std::endl;
-
+  if (argc == 1)
+  {
+    repl();
+  }
+  else if (argc == 2)
+  {
+    runFile();
+  }
+  else
+  {
+    std::cerr << "Usage: ./mina [path]\n";
+  }
   Parser p("true");
   std::cout << p.getCurrToken() << std::endl;
 
