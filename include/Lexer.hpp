@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cctype>
+#include <memory>
 #include <stdexcept>
 
 #include "Token.hpp"
@@ -35,7 +36,18 @@ class Lexer
     advance();
   }
 
+  bool isFinished() const
+  {
+    if (m_currToken == TOK_EOF)
+    {
+      return true;
+    }
+    return false;
+  }
+
   Token getCurrToken() const { return m_currToken; }
+
+  unsigned int getCurrLine() const { return m_currLine; }
 
   void skipWhitespace()
   {
