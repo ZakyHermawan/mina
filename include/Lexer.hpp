@@ -29,6 +29,12 @@ class Lexer
   Lexer &operator=(const Lexer &) = default;
   ~Lexer() = default;
 
+  void read_file(std::string source)
+  {
+    m_source = std::move(source);
+    advance();
+  }
+
   Token getCurrToken() const { return m_currToken; }
 
   void skipWhitespace()
@@ -57,14 +63,17 @@ class Lexer
     while (isdigit(m_currChar))
     {
       result = result * 10 + m_currChar - '0';
-      m_currIdx++;
       if (m_currIdx >= m_source.length())
       {
         break;
       }
-      m_currChar = m_source[m_currIdx];
+      m_currChar = m_source[m_currIdx++];
     }
 
+    // because m_currIdx always point to the next character,
+    // currently m_currIdx pointing to the next next character
+    // since m_currChar is not digit
+    --m_currIdx;
     return result;
   }
 
@@ -200,10 +209,9 @@ class Lexer
     }
     else if (m_currChar == '"')
     {
-      std::string identifier;
+      std::string raw_str;
       while (1)
       {
-        ++m_currIdx;
         if (m_currIdx >= m_source.length())
         {
           std::string errMsg = "Error, at line " + std::to_string(m_currLine) +
@@ -215,9 +223,10 @@ class Lexer
         {
           break;
         }
-        identifier += m_source[m_currIdx];
+        raw_str += m_source[m_currIdx++];
       }
-      m_currToken = Token(STRING, std::string(), identifier, m_currLine);
+      m_currToken = Token(STRING, std::string(), raw_str, m_currLine);
+      ++m_currIdx;
     }
     else if (m_currChar == '{')
     {
@@ -353,6 +362,7 @@ class Lexer
 
     if (m_currIdx >= m_source.length())
     {
+      m_currToken = Token(TOK_EOF, std::string(), std::string(), m_currLine);
       return;
     }
     m_currChar = m_source[m_currIdx++];
@@ -363,5 +373,5 @@ class Lexer
   Token m_currToken;
   char m_currChar;
   unsigned int m_currLine;
-  unsigned int m_currIdx;
+  unsigned int m_currIdx;  // always point to the next character
 };

@@ -15,6 +15,9 @@ class Parser
 
   Token getCurrToken() const { return m_lexer.getCurrToken(); }
 
+  // temporary
+  void advance() { m_lexer.advance(); }
+
  private:
   Lexer m_lexer;
 };

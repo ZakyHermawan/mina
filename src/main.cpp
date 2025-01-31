@@ -1,3 +1,6 @@
+#include <fstream>
+#include <sstream>
+
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include "Token.hpp"
@@ -14,13 +17,40 @@ void repl()
       break;
     }
     Parser parser(std::move(source));
-    std::cout << parser.getCurrToken() << std::endl;
+    Token currToken;
+
+    do
+    {
+      currToken = parser.getCurrToken();
+      std::cout << currToken << std::endl;
+      parser.advance();
+    } while (currToken.getTokenType() != TOK_EOF);
   }
 }
 
-void runFile() {}
+void runFile(const char* fileName)
+{
+  std::ifstream fileStream;
+  fileStream.open(fileName);
+  std::string source;
+  if (fileStream.is_open())
+  {
+    std::stringstream ss;
+    ss << fileStream.rdbuf();
+    source = ss.str();
+  }
+  Parser parser(std::move(source));
+  Token currToken;
 
-int main(int argc, char *argv[])
+  do
+  {
+    currToken = parser.getCurrToken();
+    std::cout << currToken << std::endl;
+    parser.advance();
+  } while (currToken.getTokenType() != TOK_EOF);
+}
+
+int main(int argc, char* argv[])
 {
   if (argc == 1)
   {
@@ -28,14 +58,12 @@ int main(int argc, char *argv[])
   }
   else if (argc == 2)
   {
-    runFile();
+    runFile(argv[1]);
   }
   else
   {
     std::cerr << "Usage: ./mina [path]\n";
   }
-  Parser p("true");
-  std::cout << p.getCurrToken() << std::endl;
 
   return 0;
 }
