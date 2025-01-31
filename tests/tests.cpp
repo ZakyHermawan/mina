@@ -100,7 +100,6 @@ void tests_token()
   assert(t1.getTokenType() == TokenType::NUMBER);
   assert(std::any_cast<int>(t1.getLiteral()) == 1234);
 
-
   Token t2(BOOL, "", true, 3);
   assert(t2.getTokenType() == TokenType::BOOL);
   assert(std::any_cast<bool>(t2.getLiteral()) == true);
