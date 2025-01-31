@@ -96,13 +96,88 @@ void tests_token()
   assert(t.getTokenType() == TokenType::STRING);
   assert(std::any_cast<std::string>(t.getLiteral()) == std::string("asdasd"));
 
+  Token t1(NUMBER, "", 1234, 1);
+  assert(t1.getTokenType() == TokenType::NUMBER);
+  assert(std::any_cast<int>(t1.getLiteral()) == 1234);
+
+
   Token t2(BOOL, "", true, 3);
   assert(t2.getTokenType() == TokenType::BOOL);
   assert(std::any_cast<bool>(t2.getLiteral()) == true);
 
-  Token t3(VAR, "var", std::string(), 4);
-  assert(t3.getTokenType() == TokenType::VAR);
-  assert(std::any_cast<std::string>(t3.getLexme()) == std::string("var"));
+  Token t3(IF, "if", "", 1);
+  assert(t3.getTokenType() == TokenType::IF);
+  assert(t3.getLexme() == "if");
+
+  Token t4(THEN, "then", "", 1);
+  assert(t4.getTokenType() == TokenType::THEN);
+  assert(t4.getLexme() == "then");
+
+  Token t5(ELSE, "else", "", 1);
+  assert(t5.getTokenType() == TokenType::ELSE);
+  assert(t5.getLexme() == "else");
+
+  Token t6(END, "end", "", 1);
+  assert(t6.getTokenType() == TokenType::END);
+  assert(t6.getLexme() == "end");
+
+  Token t7(REPEAT, "repeat", "", 1);
+  assert(t7.getTokenType() == TokenType::REPEAT);
+  assert(t7.getLexme() == "repeat");
+
+  Token t8(UNTIL, "until", "", 1);
+  assert(t8.getTokenType() == TokenType::UNTIL);
+  assert(t8.getLexme() == "until");
+
+  Token t9(LOOP, "loop", "", 1);
+  assert(t9.getTokenType() == TokenType::LOOP);
+  assert(t9.getLexme() == "loop");
+
+  Token t10(EXIT, "exit", "", 1);
+  assert(t10.getTokenType() == TokenType::EXIT);
+  assert(t10.getLexme() == "exit");
+
+  Token t11(UNTIL, "until", "", 1);
+  assert(t11.getTokenType() == TokenType::UNTIL);
+  assert(t11.getLexme() == "until");
+
+  Token t12(PUT, "put", "", 1);
+  assert(t12.getTokenType() == TokenType::PUT);
+  assert(t12.getLexme() == "put");
+
+  Token t13(GET, "get", "", 1);
+  assert(t13.getTokenType() == TokenType::GET);
+  assert(t13.getLexme() == "get");
+
+  Token t14(VAR, "var", std::string(), 4);
+  assert(t14.getTokenType() == TokenType::VAR);
+  assert(std::any_cast<std::string>(t14.getLexme()) == std::string("var"));
+
+  Token t15(FUNC, "func", "", 1);
+  assert(t15.getTokenType() == TokenType::FUNC);
+  assert(t15.getLexme() == "func");
+
+  Token t16(PROC, "proc", "", 1);
+  assert(t16.getTokenType() == TokenType::PROC);
+  assert(t16.getLexme() == "proc");
+
+  Token t17(BOOLEAN, "boolean", "", 1);
+  assert(t17.getTokenType() == TokenType::BOOLEAN);
+  assert(t17.getLexme() == "boolean");
+
+  Token t18(INTEGER, "integer", "", 1);
+  assert(t18.getTokenType() == TokenType::INTEGER);
+  assert(t18.getLexme() == "integer");
+
+  Token t19(SKIP, "skip", "", 1);
+  assert(t19.getTokenType() == TokenType::SKIP);
+  assert(t19.getLexme() == "skip");
+
+  Token t20(TOK_BEGIN, "", "", 1);
+  assert(t20.getTokenType() == TokenType::TOK_BEGIN);
+
+  Token t21(TOK_EOF, "", "", 1);
+  assert(t21.getTokenType() == TokenType::TOK_EOF);
 
   std::cout << "TESTS TOKEN SUCCESS\n";
 }
