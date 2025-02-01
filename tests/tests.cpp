@@ -26,12 +26,12 @@ void tests_token()
   assert(rp.getTokenType() == RIGHT_PAREN);
   assert(rp.getLine() == 4);
 
-  Token la(LEFT_ANGLE, "", "", 5);
-  assert(la.getTokenType() == LEFT_ANGLE);
+  Token la(LEFT_SQUARE, "", "", 5);
+  assert(la.getTokenType() == LEFT_SQUARE);
   assert(la.getLine() == 5);
 
-  Token ra(RIGHT_ANGLE, "", "", 6);
-  assert(ra.getTokenType() == RIGHT_ANGLE);
+  Token ra(RIGHT_SQUARE, "", "", 6);
+  assert(ra.getTokenType() == RIGHT_SQUARE);
   assert(ra.getLine() == 6);
 
   Token col(COLON, "", "", 1);

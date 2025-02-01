@@ -23,7 +23,8 @@ void repl()
     {
       currToken = parser.getCurrToken();
       std::cout << currToken << std::endl;
-      parser.advance();
+      // parser.advance();
+      parser.program();
     } while (currToken.getTokenType() != TOK_EOF);
   }
 }
@@ -41,13 +42,16 @@ void runFile(const char* fileName)
   }
   Parser parser(std::move(source));
   Token currToken;
+  parser.program();
 
+  /*
   do
   {
     currToken = parser.getCurrToken();
     std::cout << currToken << std::endl;
     parser.advance();
   } while (currToken.getTokenType() != TOK_EOF);
+  */
 }
 
 int main(int argc, char* argv[])

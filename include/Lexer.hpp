@@ -20,6 +20,7 @@ class Lexer
     {
       return;
     }
+    m_source += '\n';
     advance();
   }
 
@@ -38,7 +39,7 @@ class Lexer
 
   bool isFinished() const
   {
-    if (m_currToken == TOK_EOF)
+    if (getCurrTokenType() == TOK_EOF)
     {
       return true;
     }
@@ -46,6 +47,8 @@ class Lexer
   }
 
   Token getCurrToken() const { return m_currToken; }
+
+  TokenType getCurrTokenType() const { return m_currToken.getTokenType(); }
 
   unsigned int getCurrLine() const { return m_currLine; }
 
@@ -125,13 +128,11 @@ class Lexer
 
       if (identifier == "true")
       {
-        m_currToken =
-            Token(BOOL, std::string(), std::move(identifier), m_currIdx);
+        m_currToken = Token(BOOL, std::string(), true, m_currIdx);
       }
       else if (identifier == "false")
       {
-        m_currToken =
-            Token(BOOL, std::string(), std::move(identifier), m_currIdx);
+        m_currToken = Token(BOOL, std::string(), false, m_currIdx);
       }
       else if (identifier == "if")
       {
@@ -260,12 +261,13 @@ class Lexer
     }
     else if (m_currChar == '[')
     {
-      m_currToken = Token(LEFT_ANGLE, std::string(), std::string(), m_currLine);
+      m_currToken =
+          Token(LEFT_SQUARE, std::string(), std::string(), m_currLine);
     }
     else if (m_currChar == ']')
     {
       m_currToken =
-          Token(RIGHT_ANGLE, std::string(), std::string(), m_currLine);
+          Token(RIGHT_SQUARE, std::string(), std::string(), m_currLine);
     }
     else if (m_currChar == ':')
     {

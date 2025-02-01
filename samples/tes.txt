@@ -6,7 +6,7 @@
   b := 0
   if a > b then
      c := true
-  else 
+  else
      c := false
   end if
   { var a : integer;

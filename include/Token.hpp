@@ -8,14 +8,14 @@
 enum TokenType
 {
   // Single character tokens
-  LEFT_BRACE,
+  LEFT_BRACE,  // '{'
   RIGHT_BRACE,
-  LEFT_PAREN,
+  LEFT_PAREN,  // '('
   RIGHT_PAREN,
-  LEFT_ANGLE,
-  RIGHT_ANGLE,
+  LEFT_SQUARE,  // '['
+  RIGHT_SQUARE,
   COLON,
-  SEMI,
+  SEMI,  // this can be called as ENDSTMT
   EQUAL,
   HASH,
   LESS,
@@ -30,19 +30,19 @@ enum TokenType
   COMMA,
 
   // Multi cahracter tokens
-  COLON_EQUAL,
+  COLON_EQUAL,  // 20
   LESS_EQUAL,
   GREATER_EQUAL,
   BANG_EQUAL,
 
   // Literals
-  IDENTIFIER,
+  IDENTIFIER,  // 24
   STRING,
   NUMBER,
   BOOL,  // BOOL literal can only be "true" or "false"
 
   // Keywords
-  IF,
+  IF,  // 28
   THEN,
   ELSE,
   END,
@@ -75,10 +75,10 @@ std::string tokenTypeToString(TokenType type)
       return "LEFT_PAREN";
     case RIGHT_PAREN:
       return "RIGHT_PAREN";
-    case LEFT_ANGLE:
-      return "LEFT_ANGLE";
-    case RIGHT_ANGLE:
-      return "RIGHT_ANGLE";
+    case LEFT_SQUARE:
+      return "LEFT_SQUARE";
+    case RIGHT_SQUARE:
+      return "RIGHT_SQURE";
     case COLON:
       return "COLON";
     case SEMI:
