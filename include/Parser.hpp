@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 #include "Lexer.hpp"
+#include "Semantic.hpp"
 
 class Parser
 {
@@ -67,7 +68,7 @@ class Parser
   }
 
   /*
-   * scope              ::= LEFT_BRACE C0 R1 declarations C1 R3 SEMI statements
+   * scope              ::= LEFT_BRACE S0 R1 declarations S1 R3 SEMI statements
    C2 R5 RIGHT_BRACE |   LEFT_BRACE SEMI statements RIGHT_BRACE;
    * */
   void scope()
@@ -77,6 +78,7 @@ class Parser
       exitParse("Expected '{'");
     }
 
+    m_sema.S0();
     advance();
 
     // Parse: LEFT_BRACE SEMI statements RIGHT_BRACE
@@ -95,6 +97,7 @@ class Parser
     }
 
     declarations(SEMI);
+    m_sema.S1();
 
     if (getCurrTokenType() != SEMI)
     {
@@ -144,7 +147,7 @@ class Parser
   }
 
   /*
-   * statement          ::= IDENTIFIER C6 assignOrCall
+   * statement          ::= IDENTIFIER S6 assignOrCall
                    |   IF expression C13 C11 R8 THEN statements optElse END IF
                    |   REPEAT R11 statements UNTIL expression C13 C11 R18 R8 R12
    R10 |   LOOP R11 R53 statements R12 END LOOP R51 |   EXIT R52 |   PUT outputs
@@ -155,6 +158,7 @@ class Parser
   {
     if (getCurrTokenType() == IDENTIFIER)
     {
+      m_sema.S6();
       advance();
       assignOrCall();
     }
@@ -950,4 +954,5 @@ class Parser
  private:
   Lexer m_lexer;
   bool m_isError;
+  Semantic m_sema;
 };
