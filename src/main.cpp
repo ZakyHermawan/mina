@@ -19,13 +19,7 @@ void repl()
     Parser parser(std::move(source));
     Token currToken;
 
-    do
-    {
-      currToken = parser.getCurrToken();
-      std::cout << currToken << std::endl;
-      // parser.advance();
-      parser.program();
-    } while (currToken.getTokenType() != TOK_EOF);
+    parser.program();    
   }
 }
 
@@ -40,22 +34,16 @@ void runFile(const char* fileName)
     ss << fileStream.rdbuf();
     source = ss.str();
   }
+
   Parser parser(std::move(source));
   Token currToken;
   parser.program();
-
-  /*
-  do
-  {
-    currToken = parser.getCurrToken();
-    std::cout << currToken << std::endl;
-    parser.advance();
-  } while (currToken.getTokenType() != TOK_EOF);
-  */
 }
 
 int main(int argc, char* argv[])
 {
+  // uncomment this line and comment the line before return statement if you dont want to hardcode the source code location.
+  /*
   if (argc == 1)
   {
     repl();
@@ -68,6 +56,7 @@ int main(int argc, char* argv[])
   {
     std::cerr << "Usage: ./mina [path]\n";
   }
-
+  */
+  runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes.txt");
   return 0;
 }

@@ -105,3 +105,69 @@ class Symbol
   Type m_type;
   Kind m_kind;
 };
+
+
+class Bucket
+{
+ public:
+  Bucket() : m_intVal{0}, m_arr{std::vector<int>()}, m_stackAddr{0} {}
+  ~Bucket() = default;
+
+  Bucket(int val, int stackAddr) : m_arr{std::vector<int>()}, m_intVal{val}, m_stackAddr{stackAddr} {}
+  Bucket(std::vector<int> &arr, int stackAddr)
+      : m_arr{arr}, m_intVal{0}, m_stackAddr{stackAddr}
+  {
+  }
+  Bucket(std::vector<int> &&arr, int stackAddr)
+      : m_arr{std::move(arr)}, m_intVal{0}, m_stackAddr{stackAddr}
+  {
+  }
+
+  void setArrSize(unsigned int size)
+  {
+      m_arr.resize(size);
+  }
+
+  void setIntVal(int val)
+  {
+      m_intVal = val;
+  }
+
+  void setArr(std::vector<int>& arr)
+  {
+      m_arr = arr;
+  }
+
+  void setArrAtIdx(unsigned int idx, int val)
+  {
+    validateIdx(idx);
+    m_arr[idx] = val;
+  }
+
+  int getArrAtIdx(unsigned int idx)
+  { 
+    validateIdx(idx);
+    return m_arr[idx];
+  }
+
+  int getStackAddr() const { return m_stackAddr; }
+
+  int getVal() const
+  { 
+      return m_intVal;
+  }
+
+private:
+  void validateIdx(int idx)
+  {
+    if (idx < 0 || idx > (m_arr.size() - 1))
+    {
+      throw std::runtime_error("index on bucket is out of bound");
+    }
+  }
+
+private:
+  int m_intVal;
+  int m_stackAddr;
+  std::vector<int> m_arr;
+};

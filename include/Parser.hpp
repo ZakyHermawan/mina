@@ -1,16 +1,35 @@
 #pragma once
 #include <iostream>
 #include <stdexcept>
+#include <unordered_map>
+#include <cassert>
 
 #include "Lexer.hpp"
 #include "Semantic.hpp"
+#include "vm.hpp"
 
 class Parser
 {
  public:
-  Parser(std::string source) : m_lexer{std::move(source)}, m_isError(false) {}
+  Parser(std::string source)
+      : m_lexer{std::move(source)},
+        m_isError(false),
+        m_currScope{0},
+        m_ip{0},
+        m_sp{-1},
+        m_numVar{0}
+  {
+  }
 
-  Parser() : m_lexer{} {}
+  Parser()
+      : m_lexer{},
+        m_isError(false),
+        m_currScope{0},
+        m_ip{0},
+        m_sp{-1},
+        m_numVar{0}
+  {
+  }
 
   Parser(Parser &&) = default;
   Parser(const Parser &) = default;
@@ -51,20 +70,141 @@ class Parser
    * */
   void program()
   {
-    try
+    ++m_sp;
+    //try
+    //{
+    //  scope();
+    //}
+    //catch (const std::runtime_error &)
+    //{
+    //  // parse: error scope
+    //  if (m_isError && !isFinished())
+    //  {
+    //    scope();
+    //  }
+    //}
+
+    scope();
+    assert(m_sp == 0);
+    std::cout << "Finish parsing\n";
+
+    m_instructions.push_back(HALT);
+    //std::cout << "Instructions:\n";
+
+    //printInstructions();
+
+    int *sc = (int *)malloc(sizeof(int) * m_instructions.size());
+    if (sc == nullptr)
     {
-      scope();
+      std::cout << "FAILED\n";
     }
-    catch (const std::runtime_error &)
+    for (unsigned int i = 0; i < m_instructions.size(); ++i)
     {
-      // parse: error scope
-      if (m_isError && !isFinished())
-      {
-        scope();
-      }
+      sc[i] = m_instructions[i];
+    }
+    VM *vm = vm_create(sc, m_instructions.size(), 0);
+    if (vm == nullptr)
+    {
+      std::cout << "VM FAILED\n";
     }
 
-    std::cout << "Finish parsing\n";
+    vm_exec(vm, 0, false);
+    //vm_free(vm);
+  }
+
+  void printInstructions()
+  {
+    int ip = 0;
+    while (ip < m_instructions.size())
+    {
+      printf("%04d:  ", ip);
+      switch (m_instructions[ip])
+      {
+        case NOOP:
+          std::cout << "noop\n";
+          break;
+        case IADD:
+          std::cout << "iadd\n";
+          break;
+        case ISUB:
+          std::cout << "isub\n";
+          break;
+        case IMUL:
+          std::cout << "imul\n";
+          break;
+        case IDIV:
+          std::cout << "idiv\n";
+          break;
+        case IOR:
+          std::cout << "ior\n";
+          break;
+        case IAND:
+          std::cout << "iand\n";
+          break;
+        case INOT:
+          std::cout << "inot\n";
+          break;
+        case ILT:
+          std::cout << "ilt\n";
+          break;
+        case IGT:
+          std::cout << "igt\n";
+          break;
+        case IEQ:
+          std::cout << "ieq\n";
+          break;
+        case BR:
+          std::cout << "br " << m_instructions[++ip] << std::endl;
+          break;
+        case BRT:
+          std::cout << "brt " << m_instructions[++ip] << std::endl;
+          break;
+        case BRF:
+          std::cout << "brf " << m_instructions[++ip] << std::endl;
+          break;
+        case ICONST:
+          std::cout << "iconst " << m_instructions[++ip] << std::endl;
+          break;
+        case LOAD:  // load local or arg
+          std::cout << "load " << m_instructions[++ip] << std::endl;
+          break;
+        case GLOAD:  // load from global memory
+          std::cout << "gload " << m_instructions[++ip] << std::endl;
+          break;
+        case STORE:
+          std::cout << "store " << m_instructions[++ip] << std::endl;
+          break;
+        case GSTORE:
+          std::cout << "gstore " << m_instructions[++ip] << std::endl;
+          break;
+        case PRINT:
+          std::cout << "print\n";
+          break;
+        case PRINTC:
+          std::cout << "printc\n";
+          break;
+        case READINT:
+          std::cout << "readint\n";
+          break;
+        case POP:
+          std::cout << "pop\n";
+          break;
+        case CALL:
+          printf("call %d %d %d\n", m_instructions[++ip], m_instructions[++ip],
+                 m_instructions[++ip]);
+          break;
+        case RET:
+          std::cout << "ret\n";
+          break;
+        case HALT:
+          std::cout << "halt\n";
+          break;
+        default:
+          printf("invalid opcode: %d at ip=%d\n", m_instructions[ip], (ip - 1));
+          exit(1);
+      }
+      ++ip;
+    }
   }
 
   /*
@@ -73,12 +213,14 @@ class Parser
    * */
   void scope()
   {
+    int oldNumVar = m_numVar;
+    m_numVar = 0;
     if (getCurrTokenType() != LEFT_BRACE)
     {
       exitParse("Expected '{'");
     }
 
-    m_sema.S0();
+    //std::unordered_map<std::string, Bucket> prevSymTab = m_symTab;
     advance();
 
     // Parse: LEFT_BRACE SEMI statements RIGHT_BRACE
@@ -97,7 +239,6 @@ class Parser
     }
 
     declarations(SEMI);
-    m_sema.S1();
 
     if (getCurrTokenType() != SEMI)
     {
@@ -113,6 +254,8 @@ class Parser
     }
 
     advance();
+    m_sp -= m_numVar;
+    m_numVar = oldNumVar;
   }
 
   /*
@@ -134,14 +277,16 @@ class Parser
       return;
     }
 
-    try
-    {
-      statement();
-    }
-    catch (const std::runtime_error &)
-    {
-      m_isError = true;
-    }
+    //try
+    //{
+    //  statement();
+    //}
+    //catch (const std::runtime_error &)
+    //{
+    //  m_isError = true;
+    //}
+
+    statement();
 
     statements(stopToken, secondStopToken);
   }
@@ -158,9 +303,9 @@ class Parser
   {
     if (getCurrTokenType() == IDENTIFIER)
     {
-      m_sema.S6();
+      auto identifier = getCurrToken().getLexme();
       advance();
-      assignOrCall();
+      assignOrCall(identifier);
     }
     else if (getCurrTokenType() == IF)
     {
@@ -172,8 +317,21 @@ class Parser
         exitParse("Expected 'then' after if expression");
       }
 
+      m_instructions.push_back(BRF);
+      m_instructions.push_back(-1);
+
+      auto rewriteAddr = m_instructions.size() - 1;
+
       advance();
       statements(ELSE, END);
+
+      m_instructions.push_back(BR);
+      m_instructions.push_back(-1);
+
+      auto latestAddr = m_instructions.size() - 1;
+      m_instructions[rewriteAddr] = latestAddr + 1;
+
+      rewriteAddr = latestAddr;
       optElse();
 
       if (getCurrTokenType() != END)
@@ -189,10 +347,15 @@ class Parser
       }
 
       advance();
+
+      latestAddr = m_instructions.size() - 1;
+      m_instructions[rewriteAddr] = latestAddr + 1;
+
     }
     else if (getCurrTokenType() == REPEAT)
     {
       advance();
+      auto repeatStartingInstAddr = m_instructions.size();
       statements(UNTIL);
 
       if (getCurrTokenType() != UNTIL)
@@ -202,6 +365,9 @@ class Parser
 
       advance();
       expression();
+
+      m_instructions.push_back(BRF);
+      m_instructions.push_back(repeatStartingInstAddr);
     }
     else if (getCurrTokenType() == LOOP)
     {
@@ -264,7 +430,7 @@ class Parser
                    |   LEFT_SQUARE C21 R40 subscript RIGHT_SQUARE EQUAL
   assignExpression ;
   * */
-  void assignOrCall()
+  void assignOrCall(std::string& identifier)
   {
     if (getCurrTokenType() == LEFT_PAREN)
     {
@@ -280,8 +446,18 @@ class Parser
     }
     else if (getCurrTokenType() == COLON_EQUAL)
     {
+      auto it = m_symTab.find(identifier);
+      if (it == m_symTab.end())
+      {
+        throw std::runtime_error("symbol " + identifier + " does not exist!");
+      }
+
       advance();
       assignExpression();
+
+      // push result value
+      m_instructions.push_back(GSTORE);
+      m_instructions.push_back((it->second).getStackAddr());
     }
     else if (getCurrTokenType() == LEFT_SQUARE)
     {
@@ -328,7 +504,7 @@ class Parser
    * optRelation        ::=
                    |   EQUAL simpleExpression C14 C11 C11 C10 R21
                    |   BANG_EQUAL simpleExpression C14 C11 C11 C10 R22
-                   |   LESS uusimpleExpression C15 C11 C11 C10 R23
+                   |   LESS simpleExpression C15 C11 C11 C10 R23
                    |   GREATER simpleExpression C15 C11 C11 C10 R25
                    |   GREATER_EQUAL simpleExpression C15 C11 C11 C10 R26
                    |   LESS_EQUAL simpleExpression C15 C11 C11 C10 R24 ;
@@ -339,31 +515,42 @@ class Parser
     {
       advance();
       simpleExpression();
+      m_instructions.push_back(IEQ);
+
     }
     else if (getCurrTokenType() == BANG_EQUAL)
     {
       advance();
       simpleExpression();
+
+      m_instructions.push_back(IEQ);
+      m_instructions.push_back(INOT);
     }
     else if (getCurrTokenType() == LESS)
     {
       advance();
       simpleExpression();
+      m_instructions.push_back(ILT);
     }
     else if (getCurrTokenType() == GREATER)
     {
       advance();
       simpleExpression();
+      m_instructions.push_back(IGT);
     }
     else if (getCurrTokenType() == GREATER_EQUAL)
     {
       advance();
       simpleExpression();
+      m_instructions.push_back(ILT);
+      m_instructions.push_back(INOT);
     }
     else if (getCurrTokenType() == LESS_EQUAL)
     {
       advance();
       simpleExpression();
+      m_instructions.push_back(IGT);
+      m_instructions.push_back(INOT);
     }
   }
 
@@ -373,14 +560,16 @@ class Parser
    * */
   void simpleExpression()
   {
-    try
-    {
-      term();
-    }
-    catch (const std::runtime_error &)
-    {
-      m_isError = true;
-    }
+    //try
+    //{
+    //  term();
+    //}
+    //catch (const std::runtime_error &)
+    //{
+    //  m_isError = true;
+    //}
+
+    term();
 
     moreTerms();
   }
@@ -397,18 +586,21 @@ class Parser
     {
       advance();
       term();
+      m_instructions.push_back(IADD);
       moreTerms();
     }
     else if (getCurrTokenType() == MIN)
     {
       advance();
       term();
+      m_instructions.push_back(ISUB);
       moreTerms();
     }
     else if (getCurrTokenType() == PIPE)
     {
       advance();
       term();
+      m_instructions.push_back(IOR);
       moreTerms();
     }
   }
@@ -434,21 +626,23 @@ class Parser
     {
       advance();
       factor();
+      m_instructions.push_back(IMUL);
       moreFactors();
     }
     else if (getCurrTokenType() == SLASH)
     {
       advance();
       factor();
+      m_instructions.push_back(IDIV);
       moreFactors();
     }
     else if (getCurrTokenType() == AMPERSAND)
     {
       advance();
       factor();
+      m_instructions.push_back(IAND);
       moreFactors();
     }
-    // TODO:: implement SLASH (div) operator
   }
 
   /*
@@ -468,11 +662,15 @@ class Parser
     {
       advance();
       factor();
+      m_instructions.push_back(ICONST);
+      m_instructions.push_back(-1);
+      m_instructions.push_back(IMUL);
     }
     else if (getCurrTokenType() == TILDE)
     {
       advance();
       factor();
+      m_instructions.push_back(INOT);
     }
     else
     {
@@ -492,16 +690,24 @@ class Parser
   {
     if (getCurrTokenType() == NUMBER)
     {
+      int num = std::any_cast<int>(getCurrToken().getLiteral());
+      m_instructions.push_back(ICONST);
+      m_instructions.push_back(num);
       advance();
     }
     else if (getCurrTokenType() == BOOL)
     {
       if (std::any_cast<bool>(getCurrToken().getLiteral()) == true)
       {
+        m_instructions.push_back(ICONST);
+        m_instructions.push_back(1);
+
         advance();
       }
       else
       {
+        m_instructions.push_back(ICONST);
+        m_instructions.push_back(0);
         advance();
       }
     }
@@ -539,6 +745,15 @@ class Parser
     }
     else if (getCurrTokenType() == IDENTIFIER)
     {
+      auto varName = getCurrToken().getLexme();
+      auto it = m_symTab.find(varName);
+      if (it == m_symTab.end())
+      {
+        throw std::runtime_error("symbol " + varName + " does not exist!");
+      }
+
+      m_instructions.push_back(GLOAD);
+      m_instructions.push_back((it->second).getStackAddr());
       advance();
       subsOrCall();
     }
@@ -615,14 +830,16 @@ class Parser
       return;
     }
 
-    try
-    {
-      declaration();
-    }
-    catch (const std::runtime_error &)
-    {
-      m_isError = true;
-    }
+    //try
+    //{
+    //  declaration();
+    //}
+    //catch (const std::runtime_error &)
+    //{
+    //  m_isError = true;
+    //}
+
+    declaration();
 
     moreDeclarations(stopToken);
   }
@@ -652,14 +869,24 @@ class Parser
     if (getCurrTokenType() == VAR)
     {
       advance();
-
+      
       if (getCurrTokenType() != IDENTIFIER)
       {
         exitParse("Expected identifier");
       }
 
+      auto currToken = getCurrToken();
+      auto varName = currToken.getLexme();
+
+      // make sure the symbol does not exist
+      std::unordered_map<std::string, Bucket> oldSymTab;
+      if (m_symTab.find(varName) != m_symTab.end())
+      {
+        //throw std::runtime_error("symbol " + varName + " already exist!");
+      }
+
       advance();
-      optArrayBound();
+      int optArr = optArrayBound();
 
       if (getCurrTokenType() != COLON)
       {
@@ -668,6 +895,40 @@ class Parser
 
       advance();
       type();
+
+
+      if (optArr)
+      {
+        // allocating 1000 int for array, this is the current limitation of the current implementation
+        // the array max size is 1000, we need to do constant folding to make this dynamically allocated
+        // store the first stack address of the array
+        m_symTab[varName] = Bucket(std::vector<int>(1000), m_sp);
+        for (unsigned int i = 0; i < 1000; ++i)
+        {
+          m_instructions.push_back(ICONST);
+          m_instructions.push_back(0);
+
+          m_instructions.push_back(GSTORE);
+          m_instructions.push_back(m_sp);
+
+          ++m_sp;
+          ++m_numVar;
+        }
+      }
+      else
+      {
+        m_symTab[varName] = Bucket(0, m_sp);
+
+        m_instructions.push_back(ICONST);
+        m_instructions.push_back(0);
+
+        m_instructions.push_back(GSTORE);
+        m_instructions.push_back(m_sp);
+
+        ++m_sp;
+        ++m_numVar;
+      }
+
     }
     else if (getCurrTokenType() == PROC)
     {
@@ -677,6 +938,26 @@ class Parser
       {
         exitParse("Expected identifier");
       }
+
+      auto currToken = getCurrToken();
+      auto varName = currToken.getLexme();
+
+      // make sure the symbol does not exist
+      if (m_symTab.find(varName) != m_symTab.end())
+      {
+        //throw std::runtime_error("symbol " + varName + " already exist!");
+      }
+      
+      m_symTab[varName] = Bucket(0, m_sp);
+
+      m_instructions.push_back(ICONST);
+      m_instructions.push_back(0);
+
+      m_instructions.push_back(GSTORE);
+      m_instructions.push_back(m_sp);
+
+      ++m_sp;
+      ++m_numVar;
 
       advance();
       procBody();
@@ -697,8 +978,26 @@ class Parser
         exitParse("Expected identifier");
       }
 
+      auto currToken = getCurrToken();
+      auto varName = currToken.getLexme();
+
+      // make sure the symbol does not exist
+      if (m_symTab.find(varName) != m_symTab.end())
+      {
+        //throw std::runtime_error("symbol " + varName + " already exist!");
+      }
+
+      m_symTab[varName] = Bucket(0, m_sp + 1);
+
       advance();
       funcBody();
+
+      m_instructions.push_back(GSTORE);
+      m_instructions.push_back(m_sp);
+
+      ++m_sp;
+      ++m_numVar;
+
     }
   }
 
@@ -786,18 +1085,21 @@ class Parser
                    |   LEFT_SQUARE simpleExpression C12 C11 R39 RIGHT_SQUARE
    C19;
    * */
-  void optArrayBound()
+  int optArrayBound()
   {
     if (getCurrTokenType() == LEFT_SQUARE)
     {
       advance();
       simpleExpression();
 
-      if (getCurrTokenType() == RIGHT_SQUARE)
+      if (getCurrTokenType() != RIGHT_SQUARE)
       {
-        advance();
+        throw std::runtime_error("Expected ']'");
       }
+      advance();
+      return true;
     }
+    return false;
   }
 
   /*
@@ -868,6 +1170,19 @@ class Parser
   {
     if (getCurrTokenType() == STRING)
     {
+      auto stringLiteral = std::any_cast<std::string>(getCurrToken().getLiteral());
+
+      for (unsigned int i = 0; i < stringLiteral.length(); ++i)
+      {
+        m_instructions.push_back(ICONST);
+        m_instructions.push_back((int)stringLiteral[i]);
+        m_instructions.push_back(PRINTC);
+      }
+
+      // automatically add newline
+      m_instructions.push_back(ICONST);
+      m_instructions.push_back((int)'\n');
+      m_instructions.push_back(PRINTC);
       advance();
     }
     else if (getCurrTokenType() == SKIP)
@@ -877,6 +1192,7 @@ class Parser
     else
     {
       expression();
+      m_instructions.push_back(PRINT);
     }
   }
 
@@ -926,6 +1242,16 @@ class Parser
     {
       exitParse("Expected identifier");
     }
+    auto varName = getCurrToken().getLexme();
+    auto it = m_symTab.find(varName);
+    if (it == m_symTab.end())
+    {
+      throw std::runtime_error("symbol " + varName + " does not exist!");
+    }
+    m_instructions.push_back(READINT);
+
+    m_instructions.push_back(GSTORE);
+    m_instructions.push_back((it->second).getStackAddr());
 
     advance();
     optSubscript();
@@ -955,4 +1281,10 @@ class Parser
   Lexer m_lexer;
   bool m_isError;
   Semantic m_sema;
+  unsigned int m_currScope;
+  unsigned int m_ip; // instruction pointer
+  int m_sp; // stack pointer
+  unsigned int m_numVar; // number of variable being declared in current scope
+  std::unordered_map<std::string, Bucket> m_symTab; // symbol table
+  std::vector<int> m_instructions;
 };

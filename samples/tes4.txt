@@ -1,0 +1,6 @@
+{
+  var A   : integer;
+
+  A := 2
+  put A
+}

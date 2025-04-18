@@ -1,16 +1,9 @@
-
 #include "vm.hpp"
 
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-#define MAX_GLOBALS 1024
-#define STACK_SIZE 1024
-#define FALSE 0
-#define TRUE 1
-
-#define SAFE_MODE 1
+#include <cstdbool>
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
 
 typedef struct
 {
@@ -18,238 +11,205 @@ typedef struct
   int nargs;
 } VM_INSTRUCTION;
 
-VM_INSTRUCTION vm_instructions[] = {
-    {"noop", 0},   {"iadd", 0}, {"isub", 0},  {"imul", 0},  {"ilt", 0},
-    {"ieq", 0},    {"ret", 0},  {"br", 1},    {"brt", 1},   {"brf", 1},
-    {"iconst", 1}, {"load", 1}, {"gload", 1}, {"store", 1}, {"gstore", 1},
-    {"print", 0},  {"pop", 0},  {"halt", 0}};
+static VM_INSTRUCTION vm_instructions[] = {
+    {"noop", 0},    // 0
+    {"iadd", 0},    // 1
+    {"isub", 0},    // 2
+    {"imul", 0},    // 3
+    {"idiv", 0},  // 4
+    {"ior", 0},  // 5
+    {"iand", 0},  // 6
+    {"inot", 0},   // 7
+    {"ilt", 0},     // 4
+    {"igt", 0},   // 4
+    {"ieq", 0},     // 5
+    {"br", 1},      // 7
+    {"brt", 1},     // 8
+    {"brf", 1},     // 9
+    {"iconst", 1},  // 10
+    {"load", 1},   {"gload", 1}, {"store", 1}, {"gstore", 1}, {"print", 0},
+    {"princ", 0}, {"readint", 0},
+    {"pop", 0},    {"call", 3},  {"ret", 0},   {"halt", 0}};
 
-static void vm_print_instr(int *code, int ip);
-static void vm_print_stack(int *stack, int count);
-static void vm_print_data(int *globals, int count);
-static void vm_panic(const char *format, ...);
+void vm_init(VM *vm, int *code, int code_size, int nglobals)
+{
+  vm->code = code;
+  vm->code_size = code_size;
+  vm->globals = (int*)calloc(nglobals, sizeof(int));
+  vm->nglobals = nglobals;
+}
 
-void vm_exec(int *code, int count, int startip, int nglobals, int trace)
+void vm_free(VM *vm)
+{
+  free(vm->globals);
+  free(vm);
+}
+
+VM *vm_create(int *code, int code_size, int nglobals)
+{
+  VM *vm = (VM*)calloc(1, sizeof(VM));
+  vm_init(vm, code, code_size, nglobals);
+  return vm;
+}
+
+void vm_exec(VM *vm, int startip, bool trace)
 {
   // registers
-  int ip = 0;   // instruction pointer register
-  int sp = -1;  // stack pointer register
-  int fp = -1;  // frame pointer register
+  int ip;      // instruction pointer register
+  int sp;      // stack pointer register
+  int callsp;  // call stack pointer register
 
-  int opcode = code[ip];
   int a = 0;
   int b = 0;
   int addr = 0;
   int offset = 0;
 
-  // global variable space
-  int globals[MAX_GLOBALS];
-
-  // Operand stack, grows upwards
-  int stack[STACK_SIZE];
-
-  while (opcode != HALT && ip < count)
+  ip = startip;
+  sp = -1;
+  callsp = -1;
+  int opcode = vm->code[ip];
+  int nlocals;
+  int nargs;
+  while (opcode != HALT && ip < vm->code_size)
   {
-    if (trace) vm_print_instr(code, ip);
+    if (trace) vm_print_instr(vm->code, ip);
+
     ip++;  // jump to next instruction or to operand
     switch (opcode)
     {
       case IADD:
-#ifdef SAFE_MODE
-        if (sp < 1)
-        {
-          vm_panic("IADD stack underflow: %d\n", sp);
-        }
-#endif
-        b = stack[sp--];      // 2nd opnd at top of stack
-        a = stack[sp--];      // 1st opnd 1 below top
-        stack[++sp] = a + b;  // push result
+        b = vm->stack[sp--];      // 2nd opnd at top of stack
+        a = vm->stack[sp--];      // 1st opnd 1 below top
+        vm->stack[++sp] = a + b;  // push result
         break;
       case ISUB:
-#ifdef SAFE_MODE
-        if (sp < 1)
-        {
-          vm_panic("ISUB stack underflow: %d\n", sp);
-        }
-#endif
-        b = stack[sp--];
-        a = stack[sp--];
-        stack[++sp] = a - b;
+        b = vm->stack[sp--];
+        a = vm->stack[sp--];
+        vm->stack[++sp] = a - b;
         break;
       case IMUL:
-#ifdef SAFE_MODE
-        if (sp < 1)
-        {
-          vm_panic("IMUL stack underflow: %d\n", sp);
-        }
-#endif
-        b = stack[sp--];
-        a = stack[sp--];
-        stack[++sp] = a * b;
+        b = vm->stack[sp--];
+        a = vm->stack[sp--];
+        vm->stack[++sp] = a * b;
+        break;
+      case IDIV:
+        b = vm->stack[sp--];
+        a = vm->stack[sp--];
+        vm->stack[++sp] = a / b;
+        break;
+      case IOR:
+        b = vm->stack[sp--];
+        a = vm->stack[sp--];
+        vm->stack[++sp] = a || b;
+        break;
+      case IAND:
+        b = vm->stack[sp--];
+        a = vm->stack[sp--];
+        vm->stack[++sp] = a && b;
+        break;
+      case INOT:
+        a = vm->stack[sp--];
+        vm->stack[++sp] = !a;
         break;
       case ILT:
-#ifdef SAFE_MODE
-        if (sp < 1)
-        {
-          vm_panic("ILT stack underflow: %d\n", sp);
-        }
-#endif
-        b = stack[sp--];
-        a = stack[sp--];
-        stack[++sp] = (a < b) ? TRUE : FALSE;
+        b = vm->stack[sp--];
+        a = vm->stack[sp--];
+        vm->stack[++sp] = (a < b) ? true : false;
+        break;
+      case IGT:
+        b = vm->stack[sp--];
+        a = vm->stack[sp--];
+        vm->stack[++sp] = (a > b) ? true : false;
         break;
       case IEQ:
-#ifdef SAFE_MODE
-        if (sp < 1)
-        {
-          vm_panic("IEQ stack underflow: %d\n", sp);
-        }
-#endif
-        b = stack[sp--];
-        a = stack[sp--];
-        stack[++sp] = (a == b) ? TRUE : FALSE;
+        b = vm->stack[sp--];
+        a = vm->stack[sp--];
+        vm->stack[++sp] = (a == b) ? true : false;
         break;
       case BR:
-#ifdef SAFE_MODE
-        if (ip >= count)
-        {
-          vm_panic("BR target out of range: %d\n", ip);
-        }
-#endif
-        ip = code[ip];
+        ip = vm->code[ip];
         break;
       case BRT:
-#ifdef SAFE_MODE
-        if (ip + 1 >= count)
-        {
-          vm_panic("BRT target out of range: %d\n", ip);
-        }
-        if (sp < 0)
-        {
-          vm_panic("BRT stack underflow: %d\n", sp);
-        }
-#endif
-        addr = code[ip++];
-        if (stack[sp--] == TRUE) ip = addr;
+        addr = vm->code[ip++];
+        if (vm->stack[sp--]) ip = addr;
         break;
       case BRF:
-#ifdef SAFE_MODE
-        if (ip + 1 >= count)
-        {
-          vm_panic("BRF target out of range: %d\n", ip);
-        }
-        if (sp < 0)
-        {
-          vm_panic("BRF stack underflow: %d\n", sp);
-        }
-#endif
-        addr = code[ip++];
-        if (stack[sp--] == FALSE) ip = addr;
+        addr = vm->code[ip++];
+        if (!(vm->stack[sp--])) ip = addr;
         break;
       case ICONST:
-#ifdef SAFE_MODE
-        if (ip + 1 >= count)
-        {
-          vm_panic("ICONST target out of range: %d\n", ip);
-        }
-        if (sp + 1 >= STACK_SIZE)
-        {
-          vm_panic("ICONST stack overflow: %d\n", sp);
-        }
-#endif
-        stack[++sp] = code[ip++];  // push operand
+        vm->stack[++sp] = vm->code[ip++];  // push operand
         break;
-      case LOAD:  // load local or arg; 1st local is fp+1, args are fp-3, fp-4,
-                  // fp-5, ...
-#ifdef SAFE_MODE
-        if (ip + 1 >= count)
-        {
-          vm_panic("LOAD target out of range: %d\n", ip);
-        }
-        if (fp + offset < 0 || fp + offset >= STACK_SIZE)
-        {
-          vm_panic("LOAD stack out of range: %d\n", fp + offset);
-        }
-        if (sp + 1 >= STACK_SIZE)
-        {
-          vm_panic("LOAD destination stack overflow: %d\n", sp);
-        }
-#endif
-        offset = code[ip++];
-        stack[++sp] = stack[fp + offset];
+      case LOAD:  // load local or arg
+        offset = vm->code[ip++];
+        vm->stack[++sp] = vm->call_stack[callsp].locals[offset];
         break;
       case GLOAD:  // load from global memory
-#ifdef SAFE_MODE
-        if (ip + 1 >= count)
-        {
-          vm_panic("GLOAD target out of range: %d\n", ip);
-        }
-        if (sp + 1 >= STACK_SIZE)
-        {
-          vm_panic("GLOAD stack overflow: %d\n", sp);
-        }
-#endif
-        addr = code[ip++];
-        stack[++sp] = globals[addr];
+        addr = vm->code[ip++];
+        vm->stack[++sp] = vm->globals[addr];
         break;
       case STORE:
-#ifdef SAFE_MODE
-        if (ip + 1 >= count)
-        {
-          vm_panic("STORE target out of range: %d\n", ip);
-        }
-        if (fp + offset < 0 || fp + offset >= STACK_SIZE)
-        {
-          vm_panic("STORE stack out of range: %d\n", fp + offset);
-        }
-#endif
-        offset = code[ip++];
-        stack[fp + offset] = stack[sp--];
+        offset = vm->code[ip++];
+        vm->call_stack[callsp].locals[offset] = vm->stack[sp--];
         break;
       case GSTORE:
-#ifdef SAFE_MODE
-        if (ip + 1 >= count)
-        {
-          vm_panic("GSTORE target out of range: %d\n", ip);
-        }
-        if (sp < 0)
-        {
-          vm_panic("GSTORE stack underflow: %d\n", sp);
-        }
-#endif
-        addr = code[ip++];
-        globals[addr] = stack[sp--];
+        addr = vm->code[ip++];
+        vm->globals[addr] = vm->stack[sp--];
         break;
       case PRINT:
-#ifdef SAFE_MODE
-        if (sp < 0)
-        {
-          vm_panic("PRINT stack underflow: %d\n", sp);
-        }
-#endif
-        printf("%d\n", stack[sp--]);
+        printf("%d\n", vm->stack[sp--]);
+        break;
+      case PRINTC:
+        printf("%c", (char)vm->stack[sp--]);
+        break;
+      case READINT:
+        int tmp;
+        scanf("%d", &tmp);
+        //std::cout << tmp << std
+        vm->stack[++sp] = tmp;
         break;
       case POP:
-#ifdef SAFE_MODE
-        if (sp < 1)
-        {
-          vm_panic("POP stack underflow: %d\n", sp);
-        }
-#endif
         --sp;
         break;
+      case CALL:
+        // expects all args on stack
+        addr = vm->code[ip++];         // index of target function
+        nargs = vm->code[ip++];    // how many args got pushed
+        nlocals = vm->code[ip++];  // how many locals to allocate
+        ++callsp;  // bump stack pointer to reveal space for this call
+        vm_context_init(&vm->call_stack[callsp], ip, nargs + nlocals);
+        // copy args into new context
+        for (int i = 0; i < nargs; i++)
+        {
+          vm->call_stack[callsp].locals[i] = vm->stack[sp - i];
+        }
+        sp -= nargs;
+        ip = addr;  // jump to function
+        break;
+      case RET:
+        ip = vm->call_stack[callsp].returnip;
+        callsp--;  // pop context
+        break;
       default:
-        vm_panic("invalid opcode: %d at ip=%d\n", opcode, (ip - 1));
+        printf("invalid opcode: %d at ip=%d\n", opcode, (ip - 1));
+        exit(1);
     }
-    if (trace) vm_print_stack(stack, sp);
-    opcode = code[ip];
+    if (trace) vm_print_stack(vm->stack, sp);
+    opcode = vm->code[ip];
   }
-  if (trace) vm_print_instr(code, ip);
-  if (trace) vm_print_stack(stack, sp);
-  if (trace) vm_print_data(globals, nglobals);
+  if (trace) vm_print_data(vm->globals, vm->nglobals);
 }
 
-static void vm_print_instr(int *code, int ip)
+static void vm_context_init(Context *ctx, int ip, int nlocals)
+{
+  if (nlocals > DEFAULT_NUM_LOCALS)
+  {
+    fprintf(stderr, "too many locals requested: %d\n", nlocals);
+  }
+  ctx->returnip = ip;
+}
+
+void vm_print_instr(int *code, int ip)
 {
   int opcode = code[ip];
   VM_INSTRUCTION *inst = &vm_instructions[opcode];
@@ -258,14 +218,20 @@ static void vm_print_instr(int *code, int ip)
     case 0:
       printf("%04d:  %-20s", ip, inst->name);
       break;
-
     case 1:
       printf("%04d:  %-10s%-10d", ip, inst->name, code[ip + 1]);
+      break;
+    case 2:
+      printf("%04d:  %-10s%d,%10d", ip, inst->name, code[ip + 1], code[ip + 2]);
+      break;
+    case 3:
+      printf("%04d:  %-10s%d,%d,%-6d", ip, inst->name, code[ip + 1],
+             code[ip + 2], code[ip + 3]);
       break;
   }
 }
 
-static void vm_print_stack(int *stack, int count)
+void vm_print_stack(int *stack, int count)
 {
   printf("stack=[");
   for (int i = 0; i <= count; i++)
@@ -275,20 +241,11 @@ static void vm_print_stack(int *stack, int count)
   printf(" ]\n");
 }
 
-static void vm_print_data(int *globals, int count)
+void vm_print_data(int *globals, int count)
 {
   printf("Data memory:\n");
   for (int i = 0; i < count; i++)
   {
     printf("%04d: %d\n", i, globals[i]);
   }
-}
-
-static void vm_panic(const char *format, ...)
-{
-  va_list args;
-  va_start(args, format);
-  vfprintf(stderr, format, args);
-  va_end(args);
-  exit(1);
 }
