@@ -106,20 +106,42 @@ class Symbol
   Kind m_kind;
 };
 
+enum class DataType
+{
+  INT,
+  ARRAY,
+  UNKNOWN
+};
+
 
 class Bucket
 {
  public:
-  Bucket() : m_intVal{0}, m_arr{std::vector<int>()}, m_stackAddr{0} {}
+  Bucket()
+      : m_intVal{0},
+        m_arr{std::vector<int>()},
+        m_stackAddr{0},
+        m_dataType{DataType::UNKNOWN}
+  {
+  }
   ~Bucket() = default;
 
-  Bucket(int val, int stackAddr) : m_arr{std::vector<int>()}, m_intVal{val}, m_stackAddr{stackAddr} {}
+  Bucket(int val, int stackAddr)
+      : m_arr{std::vector<int>()},
+        m_intVal{val},
+        m_stackAddr{stackAddr},
+        m_dataType{DataType::INT}
+  {
+  }
   Bucket(std::vector<int> &arr, int stackAddr)
-      : m_arr{arr}, m_intVal{0}, m_stackAddr{stackAddr}
+      : m_arr{arr}, m_intVal{0}, m_stackAddr{stackAddr}, m_dataType{DataType::ARRAY}
   {
   }
   Bucket(std::vector<int> &&arr, int stackAddr)
-      : m_arr{std::move(arr)}, m_intVal{0}, m_stackAddr{stackAddr}
+      : m_arr{std::move(arr)},
+        m_intVal{0},
+        m_stackAddr{stackAddr},
+        m_dataType{DataType::ARRAY}
   {
   }
 
@@ -169,5 +191,6 @@ private:
 private:
   int m_intVal;
   int m_stackAddr;
+  DataType m_dataType;
   std::vector<int> m_arr;
 };

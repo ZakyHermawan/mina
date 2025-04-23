@@ -57,6 +57,6 @@ int main(int argc, char* argv[])
     std::cerr << "Usage: ./mina [path]\n";
   }
   */
-  runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes.txt");
+  runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes4.txt");
   return 0;
 }

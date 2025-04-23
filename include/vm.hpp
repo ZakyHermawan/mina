@@ -7,9 +7,9 @@ extern "C"
 {
 #endif
 
-#define DEFAULT_STACK_SIZE 1000
+#define DEFAULT_STACK_SIZE 200000
 #define DEFAULT_CALL_STACK_SIZE 100
-#define DEFAULT_NUM_LOCALS 10
+#define DEFAULT_NUM_LOCALS 10000
 
   typedef enum
   {
@@ -26,19 +26,21 @@ extern "C"
     IEQ = 10,     // int equal
     BR = 11,      // branch
     BRT = 12,     // branch if true
-    BRF = 13,     // branch if true
+    BRF = 13,     // branch if false
     ICONST = 14,  // push constant integer
     LOAD = 15,    // load from local context
     GLOAD = 16,   // load from global memory
     STORE = 17,   // store in local context
     GSTORE = 18,  // store in global memory
-    PRINT = 19,   // print stack top
-    PRINTC = 20,  // print char from stack top
-    READINT = 21, // get int from std input and put it into top of the stack
-    POP = 22,     // throw away top of stack
-    CALL = 23,    // call function at address with nargs,nlocals
-    RET = 24,     // return value from function
-    HALT = 25
+    ASTORE = 19,  // store for array
+    ALOAD = 20,   // load for array
+    PRINT = 21,   // print stack top
+    PRINTC = 22,  // print char from stack top
+    READINT = 23, // get int from std input and put it into top of the stack
+    POP = 24,     // throw away top of stack
+    CALL = 25,    // call function at address with nargs,nlocals
+    RET = 26,     // return value from function
+    HALT = 27
   } VM_CODE;
 
   typedef struct

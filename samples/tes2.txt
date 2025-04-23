@@ -1,6 +1,6 @@
 {
   var A     : integer
-  var B[10] : integer;
+  var B[10+5+2*1] : integer;
 
   A := 0
   repeat

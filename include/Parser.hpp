@@ -63,27 +63,11 @@ class Parser
    * */
 
   /*
-   * program            ::= scope R38 R0
-                   |   scope error
-                   |   error scope
-                   |   error ;
+   * program            ::= scope ;
    * */
   void program()
   {
     ++m_sp;
-    //try
-    //{
-    //  scope();
-    //}
-    //catch (const std::runtime_error &)
-    //{
-    //  // parse: error scope
-    //  if (m_isError && !isFinished())
-    //  {
-    //    scope();
-    //  }
-    //}
-
     scope();
     assert(m_sp == 0);
     std::cout << "Finish parsing\n";
@@ -112,6 +96,7 @@ class Parser
     //vm_free(vm);
   }
 
+  // for debugging purpose
   void printInstructions()
   {
     int ip = 0;
@@ -177,6 +162,12 @@ class Parser
         case GSTORE:
           std::cout << "gstore " << m_instructions[++ip] << std::endl;
           break;
+        case ASTORE:
+          std::cout << "astore " << m_instructions[++ip] << std::endl;
+          break;
+        case ALOAD:
+          std::cout << "aload " << m_instructions[++ip] << std::endl;
+          break;
         case PRINT:
           std::cout << "print\n";
           break;
@@ -208,8 +199,8 @@ class Parser
   }
 
   /*
-   * scope              ::= LEFT_BRACE S0 R1 declarations S1 R3 SEMI statements
-   C2 R5 RIGHT_BRACE |   LEFT_BRACE SEMI statements RIGHT_BRACE;
+   * scope              ::= LEFT_BRACE declarations SEMI statements RIGHT_BRACE
+                        |   LEFT_BRACE SEMI statements RIGHT_BRACE ;
    * */
   void scope()
   {
@@ -220,7 +211,7 @@ class Parser
       exitParse("Expected '{'");
     }
 
-    //std::unordered_map<std::string, Bucket> prevSymTab = m_symTab;
+    std::unordered_map<std::string, Bucket> prevSymTab = m_symTab;
     advance();
 
     // Parse: LEFT_BRACE SEMI statements RIGHT_BRACE
@@ -256,12 +247,12 @@ class Parser
     advance();
     m_sp -= m_numVar;
     m_numVar = oldNumVar;
+    m_symTab = prevSymTab;
   }
 
   /*
    * statements         ::=
-                   |   statement statements
-                   |   error statements ;
+                   |   statement statements ;
    * */
   void statements(TokenType stopToken = TOK_EOF,
                   TokenType secondStopToken = TOK_EOF)
@@ -292,10 +283,10 @@ class Parser
   }
 
   /*
-   * statement          ::= IDENTIFIER S6 assignOrCall
-                   |   IF expression C13 C11 R8 THEN statements optElse END IF
-                   |   REPEAT R11 statements UNTIL expression C13 C11 R18 R8 R12
-   R10 |   LOOP R11 R53 statements R12 END LOOP R51 |   EXIT R52 |   PUT outputs
+   * statement          ::= IDENTIFIER assignOrCall
+                   |   IF expression THEN statements optElse END IF
+                   |   REPEAT statements UNTIL expression 
+                   |   LOOP statements END LOOP |  EXIT |   PUT outputs
                    |   GET inputs
                    |   scope ;
    * */
@@ -409,8 +400,8 @@ class Parser
   }
 
   /*
-   * optElse            ::= R10
-                   |   ELSE R7 R10 statements R9 ;
+   * optElse            ::=
+                   |   ELSE statements ;
    * Because else statement will always end with END statement,
    * put END as stopToken for statements
    * */
@@ -424,11 +415,10 @@ class Parser
   }
 
   /*
-   * assignOrCall       ::= R45 R44 C7
-                   |   LEFT_PAREN R45 arguments RIGHT_PAREN R44 C7
-                   |   COLON_EQUAL C20 R31 assignExpression
-                   |   LEFT_SQUARE C21 R40 subscript RIGHT_SQUARE EQUAL
-  assignExpression ;
+   * assignOrCall       ::=
+                   |   LEFT_PAREN arguments RIGHT_PAREN
+                   |   COLON_EQUAL assignExpression
+                   |   LEFT_SQUARE subscript RIGHT_SQUARE EQUAL assignExpression ;
   * */
   void assignOrCall(std::string& identifier)
   {
@@ -461,6 +451,15 @@ class Parser
     }
     else if (getCurrTokenType() == LEFT_SQUARE)
     {
+      auto it = m_symTab.find(identifier);
+      if (it == m_symTab.end())
+      {
+        throw std::runtime_error("symbol " + identifier + " does not exist!");
+      }
+
+      m_instructions.push_back(ICONST);
+      m_instructions.push_back((it->second).getStackAddr());
+
       advance();
       subscript();
 
@@ -477,17 +476,19 @@ class Parser
       }
 
       advance();
+
       assignExpression();
+      m_instructions.push_back(ASTORE);
     }
   }
 
   /*
-   * assignExpression   ::= expression C16 C11 R33 C7 ;
+   * assignExpression   ::= expression ;
    * */
   void assignExpression() { expression(); }
 
   /*
-   * subscript          ::= simpleExpression C12 C11 R41 ;
+   * subscript          ::= simpleExpression ;
    * */
   void subscript() { simpleExpression(); }
 
@@ -502,12 +503,12 @@ class Parser
 
   /*
    * optRelation        ::=
-                   |   EQUAL simpleExpression C14 C11 C11 C10 R21
-                   |   BANG_EQUAL simpleExpression C14 C11 C11 C10 R22
-                   |   LESS simpleExpression C15 C11 C11 C10 R23
-                   |   GREATER simpleExpression C15 C11 C11 C10 R25
-                   |   GREATER_EQUAL simpleExpression C15 C11 C11 C10 R26
-                   |   LESS_EQUAL simpleExpression C15 C11 C11 C10 R24 ;
+                   |   EQUAL simpleExpression
+                   |   BANG_EQUAL simpleExpression
+                   |   LESS simpleExpression
+                   |   GREATER simpleExpression
+                   |   GREATER_EQUAL simpleExpression
+                   |   LESS_EQUAL simpleExpression ;
    * */
   void optRelation()
   {
@@ -560,25 +561,15 @@ class Parser
    * */
   void simpleExpression()
   {
-    //try
-    //{
-    //  term();
-    //}
-    //catch (const std::runtime_error &)
-    //{
-    //  m_isError = true;
-    //}
-
     term();
-
     moreTerms();
   }
 
   /*
    * moreTerms          ::=
-                   |   PLUS C12 C11 term C12 R14 moreTerms
-                   |   MIN C12 C11 term C12 R15 moreTerms
-                   |   PIPE C13 C11 term C13 R20 moreTerms
+                   |   PLUS term moreTerms
+                   |   MIN term moreTerms
+                   |   PIPE term moreTerms
    * */
   void moreTerms()
   {
@@ -616,9 +607,9 @@ class Parser
 
   /*
    * moreFactors        ::=
-                   |   STAR C12 C11 factor C12 R16 moreFactors
-                   |   SLASH C12 C11 factor C12 R17 moreFactors
-                   |   AMPERSAND C13 C11 factor C13 R19 moreFactors ;
+                   |   STAR factor moreFactors
+                   |   SLASH factor moreFactors
+                   |   AMPERSAND factor moreFactors ;
    * */
   void moreFactors()
   {
@@ -647,9 +638,9 @@ class Parser
 
   /*
    * factor             ::= primary
-                   |   PLUS factor C12
-                   |   MIN factor C12 R13
-                   |   TILDE factor C13 R18 ;
+                   |   PLUS factor
+                   |   MIN factor
+                   |   TILDE factor ;
    * */
   void factor()
   {
@@ -679,12 +670,12 @@ class Parser
   }
 
   /*
-   * primary            ::= NUMBER C9 R36
-                   |   TRUE C10 R35
-                   |   FALSE C10 R34
+   * primary            ::= NUMBER
+                   |   TRUE
+                   |   FALSE
                    |   LPAREN expression RPAREN
-                   |   LEFT_BRACE C0 R2 declarations C1 R3 SEMI statements SEMI
-   expression C2 R6 RIGHT_BRACE |   IDENTIFIER C6 subsOrCall ;
+                   |   LEFT_BRACE declarations SEMI statements SEMI expression RIGHT_BRACE 
+                   |   IDENTIFIER subsOrCall ;
    * */
   void primary()
   {
@@ -752,10 +743,8 @@ class Parser
         throw std::runtime_error("symbol " + varName + " does not exist!");
       }
 
-      m_instructions.push_back(GLOAD);
-      m_instructions.push_back((it->second).getStackAddr());
       advance();
-      subsOrCall();
+      subsOrCall(varName);
     }
     else
     {
@@ -764,11 +753,11 @@ class Parser
   }
 
   /*
-   * subsOrCall         ::= R49 C8 R50 C7
-                   |   LEFT_PAREN R46 arguments RIGHT_PAREN C8 R47 C7
-                   |   LEFT_SQUARE C21 R40 subscript RIGHT_SQUARE C8 R32 C7 ;
+   * subsOrCall         ::= 
+                   |   LEFT_PAREN arguments RIGHT_PAREN
+                   |   LEFT_SQUARE subscript RIGHT_SQUARE ;
    * */
-  void subsOrCall()
+  void subsOrCall(std::string &identifier)
   {
     if (getCurrTokenType() == LEFT_PAREN)
     {
@@ -785,19 +774,41 @@ class Parser
     else if (getCurrTokenType() == LEFT_SQUARE)
     {
       advance();
+
+      auto it = m_symTab.find(identifier);
+      if (it == m_symTab.end())
+      {
+        throw std::runtime_error("symbol " + identifier + " does not exist!");
+      }
+      // base addr
+      m_instructions.push_back(ICONST);
+      m_instructions.push_back((it->second).getStackAddr());
+
       subscript();
 
       if (getCurrTokenType() != RIGHT_SQUARE)
       {
         exitParse("Expected ']'");
       }
-
       advance();
+      m_instructions.push_back(ALOAD);
+    }
+    else
+    {
+      // just an identifier
+      auto it = m_symTab.find(identifier);
+      if (it == m_symTab.end())
+      {
+        throw std::runtime_error("symbol " + identifier + " does not exist!");
+      }
+
+      m_instructions.push_back(GLOAD);
+      m_instructions.push_back((it->second).getStackAddr());
     }
   }
 
   /*
-   * arguments          ::= expression C11 R48 moreArguments ;
+   * arguments          ::= expression moreArguments ;
    * */
   void arguments()
   {
@@ -807,7 +818,7 @@ class Parser
 
   /*
    * moreArguments      ::=
-                   |   COMMA expression C11 R48 moreArguments ;
+                   |   COMMA expression moreArguments ;
    * */
   void moreArguments()
   {
@@ -830,15 +841,6 @@ class Parser
       return;
     }
 
-    //try
-    //{
-    //  declaration();
-    //}
-    //catch (const std::runtime_error &)
-    //{
-    //  m_isError = true;
-    //}
-
     declaration();
 
     moreDeclarations(stopToken);
@@ -860,9 +862,9 @@ class Parser
   }
 
   /*
-   * declaration        ::= VAR IDENTIFIER C3 C4 optArrayBound AS type C5 C11 C7
-                   |   type FUNC IDENTIFIER C3 R7 C5 C0 R2 funcBody
-                   |   PROC IDENTIFIER C3 R7 C0 R1 procBody ;
+   * declaration        ::= VAR IDENTIFIER optArrayBound COLON type
+                   |   type FUNC IDENTIFIER funcBody
+                   |   PROC IDENTIFIER procBody ;
    * */
   void declaration()
   {
@@ -878,15 +880,8 @@ class Parser
       auto currToken = getCurrToken();
       auto varName = currToken.getLexme();
 
-      // make sure the symbol does not exist
-      std::unordered_map<std::string, Bucket> oldSymTab;
-      if (m_symTab.find(varName) != m_symTab.end())
-      {
-        //throw std::runtime_error("symbol " + varName + " already exist!");
-      }
-
       advance();
-      int optArr = optArrayBound();
+      int optArr = optArrayBound(varName);
 
       if (getCurrTokenType() != COLON)
       {
@@ -899,11 +894,10 @@ class Parser
 
       if (optArr)
       {
-        // allocating 1000 int for array, this is the current limitation of the current implementation
-        // the array max size is 1000, we need to do constant folding to make this dynamically allocated
-        // store the first stack address of the array
-        m_symTab[varName] = Bucket(std::vector<int>(1000), m_sp);
-        for (unsigned int i = 0; i < 1000; ++i)
+        // allocating array
+        // store the first stack address for the array
+        m_symTab[varName] = Bucket(m_arrSymTab[varName], m_sp);
+        for (unsigned int i = 0; i < m_arrSymTab[varName].size(); ++i)
         {
           m_instructions.push_back(ICONST);
           m_instructions.push_back(0);
@@ -1002,9 +996,8 @@ class Parser
   }
 
   /*
-   * funcBody           ::= EQ R4 expression R33 C11 C11 C2 R6 R43 R9 C7
-                   |   LEFT_PAREN parameters C1 RIGHT_PAREN EQ expression C11
-   C11 R6 R43 R9 C7 ;
+   * funcBody           ::= EQ expression
+                   |   LEFT_PAREN parameters RIGHT_PAREN EQ expression ;
    * */
   void funcBody()
   {
@@ -1036,8 +1029,8 @@ class Parser
   }
 
   /*
-   * procBody           ::= scope C2 R5 R42 R9 C7
-                   |   LEFT_PAREN parameters C1 RIGHT_PAREN scope R5 R42 R9 C7 ;
+   * procBody           ::= scope
+                   |   LEFT_PAREN parameters RIGHT_PAREN scope ;
    * */
   void procBody()
   {
@@ -1061,8 +1054,8 @@ class Parser
   }
 
   /*
-   * type               ::= INTEGER C9
-                   |   BOOLEAN C10;
+   * type               ::= INTEGER
+                   |   BOOLEAN ;
    * */
   void type()
   {
@@ -1081,29 +1074,167 @@ class Parser
   }
 
   /*
-   * optArrayBound      ::= C18 R37
-                   |   LEFT_SQUARE simpleExpression C12 C11 R39 RIGHT_SQUARE
-   C19;
+   * optArrayBound      ::=
+                   |   LEFT_SQUARE constantsExpression RIGHT_SQUARE ;
    * */
-  int optArrayBound()
+  int optArrayBound(std::string& varName)
   {
     if (getCurrTokenType() == LEFT_SQUARE)
     {
       advance();
-      simpleExpression();
+      int arrSize = constantsExpression();
 
       if (getCurrTokenType() != RIGHT_SQUARE)
       {
-        throw std::runtime_error("Expected ']'");
+        exitParse("Expected ']'");
       }
+
+      m_arrSymTab[varName] = std::vector<int>(arrSize);
+
       advance();
       return true;
     }
     return false;
   }
 
+  int evalRPN(const std::string &expr)
+  {
+    std::istringstream iss(expr);
+    std::stack<int> stack;
+    std::string token;
+
+    while (iss >> token)
+    {
+      if (std::isdigit(token[0]) ||
+          (token.size() > 1 && token[0] == '-' && std::isdigit(token[1])))
+      {
+        stack.push(std::stoi(token));
+      }
+      else
+      {
+        int b = stack.top();
+        stack.pop();
+        int a = stack.top();
+        stack.pop();
+        if (token == "+")
+          stack.push(a + b);
+        else if (token == "-")
+          stack.push(a - b);
+        else if (token == "*")
+          stack.push(a * b);
+        else if (token == "/")
+          stack.push(a / b);
+      }
+    }
+
+    return stack.top();
+  }
+
+  std::string infixToPostfix(const std::string &infix)
+  {
+    std::istringstream iss(infix);
+    std::stack<std::string> ops;
+    std::ostringstream out;
+    std::string token;
+
+    auto prec = [](const std::string &op)
+    {
+      if (op == "+" || op == "-") return 1;
+      if (op == "*" || op == "/") return 2;
+      return 0;
+    };
+
+    while (iss >> token)
+    {
+      if (std::isdigit(token[0]))
+      {
+        out << token << " ";
+      }
+      else if (token == "(")
+      {
+        ops.push(token);
+      }
+      else if (token == ")")
+      {
+        while (!ops.empty() && ops.top() != "(")
+        {
+          out << ops.top() << " ";
+          ops.pop();
+        }
+        ops.pop();  // pop '('
+      }
+      else
+      {  // operator
+        while (!ops.empty() && prec(ops.top()) >= prec(token))
+        {
+          out << ops.top() << " ";
+          ops.pop();
+        }
+        ops.push(token);
+      }
+    }
+
+    while (!ops.empty())
+    {
+      out << ops.top() << " ";
+      ops.pop();
+    }
+
+    return out.str();
+  }
+
+
+  int calculateConstantExpr(std::string& expr)
+  {
+    auto postfixExpr = infixToPostfix(expr);
+    return evalRPN(postfixExpr);
+  }
+
   /*
-   * parameters         ::= IDENTIFIER C3 C4 AS type C5 C11 C7 moreParameters ;
+   * constantsExpression is just arithmethics expressions while all of the operands are constants
+   * */
+  int constantsExpression() 
+  {
+      std::string expr;
+      while (1)
+      {
+          if (getCurrTokenType() == NUMBER)
+          {
+            int intVal = std::any_cast<int>(getCurrToken().getLiteral());
+            expr += std::to_string(intVal);
+          }
+          else if (getCurrTokenType() == STAR)
+          {
+            expr += " + ";
+          }
+          else if (getCurrTokenType() == SLASH)
+          {
+            expr += " / ";
+          }
+          else if (getCurrTokenType() == PLUS)
+          {
+            expr += " + ";
+          }
+          else if (getCurrTokenType() == MIN)
+          {;
+            expr += " - ";
+          }
+          else if (getCurrTokenType() == RIGHT_SQUARE)
+          {
+            break;
+          }
+          else
+          {
+            exitParse("Expected arithmethic expression");
+          }
+          advance();
+      }
+
+      return calculateConstantExpr(expr);
+  }
+
+  /*
+   * parameters         ::= IDENTIFIER COLON type moreParameters ;
    * */
   void parameters()
   {
@@ -1126,7 +1257,7 @@ class Parser
 
   /*
    * moreParameters     ::=
-                   |   COMMA IDENTIFIER C3 C4 AS type C5 C11 C7 moreParameters ;
+                   |   COMMA IDENTIFIER COLON type moreParameters ;
    * */
   void moreParameters()
   {
@@ -1153,7 +1284,7 @@ class Parser
   }
 
   /*
-   * outputs            ::= output moreOutput R30 ;
+   * outputs            ::= output moreOutput ;
    * */
   void outputs()
   {
@@ -1162,9 +1293,9 @@ class Parser
   }
 
   /*
-   * output             ::= expression C12 C11 R28
-                   |   STRING R29
-                   |   SKIP R30 ;
+   * output             ::= expression
+                   |   STRING
+                   |   SKIP ;
    * */
   void output()
   {
@@ -1234,7 +1365,7 @@ class Parser
   }
 
   /*
-   * input              ::= IDENTIFIER C6 optSubscript C17 R27 C7 ;
+   * input              ::= IDENTIFIER optSubscript ;
    * */
   void input()
   {
@@ -1258,8 +1389,8 @@ class Parser
   }
 
   /*
-   * optSubscript       ::= C20 R31
-                   |   LEFT_SQUARE C21 R40 subscript RIGHT_SQUARE ;
+   * optSubscript       ::=
+                   |   LEFT_SQUARE subscript RIGHT_SQUARE ;
    * */
   void optSubscript()
   {
@@ -1286,5 +1417,6 @@ class Parser
   int m_sp; // stack pointer
   unsigned int m_numVar; // number of variable being declared in current scope
   std::unordered_map<std::string, Bucket> m_symTab; // symbol table
+  std::unordered_map<std::string, std::vector<int>> m_arrSymTab; // array symbol table
   std::vector<int> m_instructions;
 };

@@ -16,20 +16,20 @@ static VM_INSTRUCTION vm_instructions[] = {
     {"iadd", 0},    // 1
     {"isub", 0},    // 2
     {"imul", 0},    // 3
-    {"idiv", 0},  // 4
-    {"ior", 0},  // 5
-    {"iand", 0},  // 6
-    {"inot", 0},   // 7
+    {"idiv", 0},    // 4
+    {"ior", 0},     // 5
+    {"iand", 0},    // 6
+    {"inot", 0},    // 7
     {"ilt", 0},     // 4
-    {"igt", 0},   // 4
+    {"igt", 0},     // 4
     {"ieq", 0},     // 5
     {"br", 1},      // 7
     {"brt", 1},     // 8
     {"brf", 1},     // 9
     {"iconst", 1},  // 10
-    {"load", 1},   {"gload", 1}, {"store", 1}, {"gstore", 1}, {"print", 0},
-    {"princ", 0}, {"readint", 0},
-    {"pop", 0},    {"call", 3},  {"ret", 0},   {"halt", 0}};
+    {"load", 1},   {"gload", 1}, {"store", 1}, {"gstore", 1},  {"astore", 0},
+    {"aload", 0},  {"print", 0}, {"princ", 0}, {"readint", 0}, {"pop", 0},
+    {"call", 3},   {"ret", 0},   {"halt", 0}};
 
 void vm_init(VM *vm, int *code, int code_size, int nglobals)
 {
@@ -63,6 +63,10 @@ void vm_exec(VM *vm, int startip, bool trace)
   int b = 0;
   int addr = 0;
   int offset = 0;
+
+  int index = 0;
+  int base = 0;
+  int value = 0;
 
   ip = startip;
   sp = -1;
@@ -156,6 +160,17 @@ void vm_exec(VM *vm, int startip, bool trace)
         addr = vm->code[ip++];
         vm->globals[addr] = vm->stack[sp--];
         break;
+      case ALOAD:
+        index = vm->stack[sp--];
+        base = vm->stack[sp--];
+        vm->stack[++sp] = vm->globals[base + index];
+        break;
+      case ASTORE:
+        value = vm->stack[sp--];
+        index = vm->stack[sp--];
+        base = vm->stack[sp--];
+        vm->globals[base + index] = value;
+        break;
       case PRINT:
         printf("%d\n", vm->stack[sp--]);
         break;
@@ -165,7 +180,6 @@ void vm_exec(VM *vm, int startip, bool trace)
       case READINT:
         int tmp;
         scanf("%d", &tmp);
-        //std::cout << tmp << std
         vm->stack[++sp] = tmp;
         break;
       case POP:
