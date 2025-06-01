@@ -18,5 +18,9 @@ Features:
 * Conditional
 * Loop
 * Array
+* Function
 * Console Input
 * Console Output
+
+Now Mina Programming language has an Intermediate Representation!
+![image](https://github.com/user-attachments/assets/2bb52e34-2542-40cb-8ad3-d9989bc41b6f)
