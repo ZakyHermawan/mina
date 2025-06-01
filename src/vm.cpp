@@ -20,15 +20,17 @@ static VM_INSTRUCTION vm_instructions[] = {
     {"ior", 0},     // 5
     {"iand", 0},    // 6
     {"inot", 0},    // 7
-    {"ilt", 0},     // 4
-    {"igt", 0},     // 4
-    {"ieq", 0},     // 5
-    {"br", 1},      // 7
-    {"brt", 1},     // 8
-    {"brf", 1},     // 9
-    {"iconst", 1},  // 10
-    {"load", 1},   {"gload", 1}, {"store", 1}, {"gstore", 1},  {"astore", 0},
-    {"aload", 0},  {"print", 0}, {"princ", 0}, {"readint", 0}, {"pop", 0},
+    {"ilt", 0},     // 8
+    {"igt", 0},     // 9
+    {"ieq", 0},     // 10
+    {"br", 1},      // 11
+    {"brt", 1},     // 12
+    {"brf", 1},     // 13
+    {"iconst", 1},  // 14
+    {"load", 1},   {"lload", 0},  {"sload", 1},   {"gload", 1},
+    {"store", 1}, {"lstore", 0}, {"sstore", 1}, {"gstore", 1},
+    {"astore", 0}, {"aload", 0},
+    {"print", 0}, {"princ", 0}, {"readint", 0}, {"pop", 0},
     {"call", 3},   {"ret", 0},   {"halt", 0}};
 
 void vm_init(VM *vm, int *code, int code_size, int nglobals)
@@ -74,6 +76,8 @@ void vm_exec(VM *vm, int startip, bool trace)
   int opcode = vm->code[ip];
   int nlocals;
   int nargs;
+  vm->return_value = 0;
+
   while (opcode != HALT && ip < vm->code_size)
   {
     if (trace) vm_print_instr(vm->code, ip);
@@ -148,6 +152,15 @@ void vm_exec(VM *vm, int startip, bool trace)
         offset = vm->code[ip++];
         vm->stack[++sp] = vm->call_stack[callsp].locals[offset];
         break;
+      case LLOAD:  // load local or arg
+        index = vm->stack[sp--];
+        base = vm->stack[sp--];
+        vm->stack[++sp] = vm->call_stack[callsp].locals[base + index];
+        break;
+      case SLOAD:
+        offset = vm->code[ip++];
+        vm->stack[++sp] = vm->stack[offset];
+        break;
       case GLOAD:  // load from global memory
         addr = vm->code[ip++];
         vm->stack[++sp] = vm->globals[addr];
@@ -156,6 +169,16 @@ void vm_exec(VM *vm, int startip, bool trace)
         offset = vm->code[ip++];
         vm->call_stack[callsp].locals[offset] = vm->stack[sp--];
         break;
+      case LSTORE:
+        value = vm->stack[sp--];
+        index = vm->stack[sp--];
+        base = vm->stack[sp--];
+        vm->call_stack[callsp].locals[base + index] = value;
+        break;
+      case SSTORE:
+        offset = vm->code[ip++];
+        vm->stack[offset] = vm->stack[sp--];
+        break;
       case GSTORE:
         addr = vm->code[ip++];
         vm->globals[addr] = vm->stack[sp--];
@@ -163,16 +186,16 @@ void vm_exec(VM *vm, int startip, bool trace)
       case ALOAD:
         index = vm->stack[sp--];
         base = vm->stack[sp--];
-        vm->stack[++sp] = vm->globals[base + index];
+        vm->stack[++sp] = vm->stack[base + index];
         break;
       case ASTORE:
         value = vm->stack[sp--];
         index = vm->stack[sp--];
         base = vm->stack[sp--];
-        vm->globals[base + index] = value;
+        vm->stack[base + index] = value;
         break;
       case PRINT:
-        printf("%d\n", vm->stack[sp--]);
+        printf("%d", vm->stack[sp--]);
         break;
       case PRINTC:
         printf("%c", (char)vm->stack[sp--]);
@@ -195,7 +218,12 @@ void vm_exec(VM *vm, int startip, bool trace)
         // copy args into new context
         for (int i = 0; i < nargs; i++)
         {
-          vm->call_stack[callsp].locals[i] = vm->stack[sp - i];
+          //vm->call_stack[callsp].locals[i] = vm->stack[sp - i];
+
+          // for example, a function have parameters: (a, b)
+          // then, before call, it will push a then push b
+          // so the vm will take b first, and put it from the end of the local array
+          vm->call_stack[callsp].locals[nargs - i - 1] = vm->stack[sp - i];
         }
         sp -= nargs;
         ip = addr;  // jump to function

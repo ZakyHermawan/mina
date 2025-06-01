@@ -1,196 +1,105 @@
 #pragma once
 
+#include "Types.hpp"
+
 #include <string>
+#include "arena_alloc.hpp"
+#include <vector>
+#include <unordered_map>
+#include <stdexcept>
 
-enum class Type
-{
-  INTEGER,
-  BOOLEAN,
-  UNDEFINED
-};
+using arenaVectorInt = std::vector<int, arena::Allocator<int>>;
 
-enum class Kind
-{
-  SCALAR,
-  ARRAY,
-  PROCEDURE,
-  FUNCTION,
-  UNDEFINED
-};
-
-std::string typeToStr(Type type)
-{
-  switch (type)
-  {
-    case Type::INTEGER:
-      return "integer";
-    case Type::BOOLEAN:
-      return "boolean";
-    case Type::UNDEFINED:
-      return "undefined";
-    default:
-      break;
-  }
-}
-
-std::string kindToStr(Kind kind)
-{
-  switch (kind)
-  {
-    case Kind::SCALAR:
-      return "scalar";
-    case Kind::ARRAY:
-      return "array";
-    case Kind::PROCEDURE:
-      return "procedure";
-    case Kind::FUNCTION:
-      return "function";
-    default:
-      return "";
-      break;
-  }
-}
 class Symbol
 {
+private:
+    std::string m_name;
+    int m_lexicalLevel;
+    int m_orderNum;
+    Type m_type;
+
  public:
-  Symbol(std::string name)
-      : m_name{std::move(name)},
-        m_lexicalLevel{-1},
-        m_orderNum{-1},
-        m_type{Type::UNDEFINED},
-        m_kind{Kind::UNDEFINED}
-  {
-  }
+    Symbol(std::string name); 
+    Symbol() = default;
+    Symbol(Symbol &&) = default;
+    Symbol(const Symbol &) = default;
+    Symbol &operator=(Symbol &&) = default;
+    Symbol &operator=(const Symbol &) = default;
+    ~Symbol() = default;
+    
+    void setName(std::string name);
+    void setLexicalLevel(int ll);
+    
+    // set lexical level and order number
+    void setLLON(int ll, int on);
+    void setType(Type type);
+    std::string getName() const;
+    int getLexicalLevel() const;
+    int getOrderNum() const;
+    std::string getTypeStr() const;
 
-  Symbol() = default;
-  Symbol(Symbol &&) = default;
-  Symbol(const Symbol &) = default;
-  Symbol &operator=(Symbol &&) = default;
-  Symbol &operator=(const Symbol &) = default;
-  ~Symbol() = default;
-
-  void setName(std::string name) { m_name = std::move(name); }
-
-  void setLexicalLevel(int ll) { m_lexicalLevel = ll; }
-
-  // set lexical level and order number
-  void setLLON(int ll, int on)
-  {
-    m_lexicalLevel = ll;
-    m_orderNum = on;
-  }
-
-  void setType(Type type) { m_type = type; }
-
-  void setKind(Kind kind) { m_kind = kind; }
-
-  std::string getName() const { return m_name; }
-
-  int getLexicalLevel() const { return m_lexicalLevel; }
-
-  int getOrderNum() const { return m_orderNum; }
-
-  Type getType() const { return m_type; }
-
-  Kind getKind() const { return m_kind; }
-
-  std::string getTypeStr() const { return typeToStr(m_type); }
-
-  std::string getKindStr() const { return kindToStr(m_kind); }
-
- private:
-  std::string m_name;
-  int m_lexicalLevel;
-  int m_orderNum;
-  Type m_type;
-  Kind m_kind;
 };
-
-enum class DataType
-{
-  INT,
-  ARRAY,
-  UNKNOWN
-};
-
 
 class Bucket
 {
- public:
-  Bucket()
-      : m_intVal{0},
-        m_arr{std::vector<int>()},
-        m_stackAddr{0},
-        m_dataType{DataType::UNKNOWN}
-  {
-  }
-  ~Bucket() = default;
-
-  Bucket(int val, int stackAddr)
-      : m_arr{std::vector<int>()},
-        m_intVal{val},
-        m_stackAddr{stackAddr},
-        m_dataType{DataType::INT}
-  {
-  }
-  Bucket(std::vector<int> &arr, int stackAddr)
-      : m_arr{arr}, m_intVal{0}, m_stackAddr{stackAddr}, m_dataType{DataType::ARRAY}
-  {
-  }
-  Bucket(std::vector<int> &&arr, int stackAddr)
-      : m_arr{std::move(arr)},
-        m_intVal{0},
-        m_stackAddr{stackAddr},
-        m_dataType{DataType::ARRAY}
-  {
-  }
-
-  void setArrSize(unsigned int size)
-  {
-      m_arr.resize(size);
-  }
-
-  void setIntVal(int val)
-  {
-      m_intVal = val;
-  }
-
-  void setArr(std::vector<int>& arr)
-  {
-      m_arr = arr;
-  }
-
-  void setArrAtIdx(unsigned int idx, int val)
-  {
-    validateIdx(idx);
-    m_arr[idx] = val;
-  }
-
-  int getArrAtIdx(unsigned int idx)
-  { 
-    validateIdx(idx);
-    return m_arr[idx];
-  }
-
-  int getStackAddr() const { return m_stackAddr; }
-
-  int getVal() const
-  { 
-      return m_intVal;
-  }
-
 private:
-  void validateIdx(int idx)
-  {
-    if (idx < 0 || idx > (m_arr.size() - 1))
-    {
-      throw std::runtime_error("index on bucket is out of bound");
-    }
-  }
+    int m_intVal;
+    int m_stackAddr;  // relative to the stack frame on current lexical level
+    arenaVectorInt m_arr;
 
+    void validateIdx(int idx);
+
+public:
+    Bucket();
+    ~Bucket() = default;
+    
+    Bucket(int val, int stackAddr);
+    Bucket(arenaVectorInt &arr, int stackAddr);
+    Bucket(arenaVectorInt &&arr, int stackAddr);
+    
+    void setArrSize(unsigned int size);
+    size_t getArrSize() const;
+    
+    void setIntVal(int val);
+    void setArr(arenaVectorInt &arr);
+    void setArrAtIdx(unsigned int idx, int val);
+    int getArrAtIdx(unsigned int idx);
+    int getStackAddr() const;
+    
+    int getVal() const;
+};
+
+class FunctionBucket
+{
 private:
-  int m_intVal;
-  int m_stackAddr;
-  DataType m_dataType;
-  std::vector<int> m_arr;
+    std::vector<std::string, arena::Allocator<std::string>> m_parameters;
+    int m_returnValue;
+    FType m_ftype;
+    std::unordered_map<std::string, Bucket> m_symTab;
+    
+    unsigned int m_start_addr;
+    unsigned int m_end_addr;
+    unsigned int m_localNumVar;
+
+public:
+    FunctionBucket(
+        std::vector<std::string, arena::Allocator<std::string>> &parameters,
+        int returnValue);
+    FunctionBucket(
+        std::vector<std::string, arena::Allocator<std::string>> &parameters);
+    FunctionBucket(
+        std::vector<std::string, arena::Allocator<std::string>> &&parameters,
+        int returnValue);
+
+    FunctionBucket() = default;
+
+    void setSymTab(std::string &identifier, Bucket &bucket);
+    Bucket &getSymTab(std::string &identifier);
+
+    void setStartAddr(unsigned int startAddr);
+    void setEndtAddr(unsigned int endAddr);
+    void setLocalNumVar(unsigned int numVar);
+    unsigned int getStartAddr() const;
+    unsigned int getEndAddr() const;
+    unsigned int getLocalNumVar() const;
 };

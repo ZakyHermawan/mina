@@ -1,0 +1,10 @@
+{
+	var bul: boolean
+	var A: integer;
+	A := 3 + 2 / 1 + 5 * 4
+	bul := true
+	put(A, skip)
+	put(bul, skip)
+	get(A)
+	put(A, skip)
+}

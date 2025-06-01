@@ -1,9 +1,11 @@
 {
+  var A: integer
   var fibo[100]: integer
   var i	  : integer
   var N   : integer;
   
-  get N
+  A := 3 + 2 / 1 + 5 * 4
+  get(N)
   fibo[0] := 1
   fibo[1] := 1
   
@@ -15,7 +17,7 @@
 
   i := 0
   repeat
-    put fibo[i]
+    put(fibo[i], skip)
 	i := i + 1
   until i = N
 }

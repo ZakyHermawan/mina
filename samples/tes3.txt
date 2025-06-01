@@ -1,12 +1,42 @@
 {
   var A   : integer
   var Arr[1+3] : integer
-  integer func satu = 1;
+  var bular[5]: boolean
+  var C: boolean
+  proc something() {
+	var B: integer
+	var X: integer;
+	X := 2
+	X := X + 8
+	put(X, skip)
+  }
+  proc haha (a: integer) {
+	var B: integer;
+	B := 8 + a
+	put(B, skip)
+  }
+  integer func satu {
+	var A: integer;
+	A := 3
+	put(A, skip)
+	return A + 2
+  }
+  proc two(a: integer, b: integer)
+  {
+	;
+	put("XD")
+  }
+  ;
 
-  put "Ok!"
+  put("Ok!")
   Arr[0] := 0
   Arr[1] := 1
   Arr[2] := 2
   A := Arr[2] + 3
-  put A
+  
+  put(A, skip)
+  A := satu
+  put(A, skip)
+  something
+  haha(4)
 }

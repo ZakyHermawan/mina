@@ -1,11 +1,12 @@
 {
   var A     : integer
+  var C: integer
   var B[10+5+2*1] : integer;
 
   A := 0
   repeat
      B[A] := A*2
-     put B[A]
+     put(B[A], skip)
      A := A+1
   until A >= 10
 }

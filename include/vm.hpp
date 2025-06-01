@@ -29,18 +29,22 @@ extern "C"
     BRF = 13,     // branch if false
     ICONST = 14,  // push constant integer
     LOAD = 15,    // load from local context
-    GLOAD = 16,   // load from global memory
-    STORE = 17,   // store in local context
-    GSTORE = 18,  // store in global memory
-    ASTORE = 19,  // store for array
-    ALOAD = 20,   // load for array
-    PRINT = 21,   // print stack top
-    PRINTC = 22,  // print char from stack top
-    READINT = 23, // get int from std input and put it into top of the stack
-    POP = 24,     // throw away top of stack
-    CALL = 25,    // call function at address with nargs,nlocals
-    RET = 26,     // return value from function
-    HALT = 27
+    LLOAD = 16,   // same as LOAD, but with argument from stack
+    SLOAD = 17,   // load from specific stack address
+    GLOAD = 18,   // load from global memory
+    STORE = 19,   // store in local context
+    LSTORE = 20,  // store with argument from stack
+    SSTORE = 21,  // store to specific stack address
+    GSTORE = 22,  // store in global memory
+    ASTORE = 23,  // store for array
+    ALOAD = 24,   // load for array
+    PRINT = 25,   // print stack top
+    PRINTC = 26,  // print char from stack top
+    READINT = 27, // get int from std input and put it into top of the stack
+    POP = 28,     // throw away top of stack
+    CALL = 29,    // call function at address with nargs,nlocals
+    RET = 30,     // return value from function
+    HALT = 31
   } VM_CODE;
 
   typedef struct
@@ -53,6 +57,8 @@ extern "C"
   {
     int *code;
     int code_size;
+
+    int return_value;
 
     // global variable space
     int *globals;

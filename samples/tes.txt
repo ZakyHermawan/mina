@@ -2,7 +2,7 @@
   var b : integer
   var c : boolean;
 
-  get a
+  get (a)
   b := 0
   if a > b then
      c := true
@@ -13,7 +13,7 @@
     a := 5
     if c then
        repeat
-          put b
+          put(b, skip)
           b := b+1
        until b >= a
     end if
