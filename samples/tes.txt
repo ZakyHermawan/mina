@@ -18,4 +18,6 @@
        until b >= a
     end if
   }
+  a := {; ; 1+1}
+  put (a, skip)
 }

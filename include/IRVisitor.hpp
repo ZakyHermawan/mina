@@ -1,20 +1,33 @@
 #pragma once
 
 #include "Visitors.hpp"
+#include "BasicBlock.hpp"
+#include "Types.hpp"
 
 #include <stack>
+#include <memory>
+#include <unordered_map>
 
 class IRVisitor : public Visitor
 {
 private:
     int m_tempCounter;
     int m_labelCounter;
+    int m_currBBCtr;
+    std::string m_currBBNameWithoutCtr;
     std::stack<std::string> m_temp;
+    std::stack<std::shared_ptr<Inst>> m_instStack;
+    std::stack<IdentType> m_identAccType;
     std::stack<std::string> m_labels;
+    
+    std::shared_ptr<BasicBlock> m_cfg;
+    std::shared_ptr<BasicBlock> m_currentBB; // current basic block
 
-   public:
+    std::unordered_map<std::string, int> m_nameCtr;
+    std::unordered_map<std::string, std::shared_ptr<BasicBlock>> m_funcBB;
+
+public:
     IRVisitor();
-    //void visit(StatementAST& v) override;
     void visit(StatementsAST& v) override;
     void visit(NumberAST& v) override;
     void visit(BoolAST& v) override;
@@ -51,8 +64,18 @@ private:
     void visit(ProcDeclAST& v) override;
     void visit(FuncDeclAST& v) override;
 
+    std::vector<std::string> split(std::string s, std::string delimiter);
+
+    std::string getCurrentTemp();
     void generateCurrentTemp();
+
     void pushCurrentTemp();
     std::string popTemp();
     std::string getLastTemp();
+
+    std::shared_ptr<Inst> popInst();
+
+    std::string baseNameToSSA(const std::string& name);
+    std::string getCurrentSSAName(const std::string& name);
+    void printCFG();
 };

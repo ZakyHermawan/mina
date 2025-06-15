@@ -5,7 +5,6 @@
 class DebugVisitor : public Visitor
 {
 public:
-    //void visit(StatementAST& v) override;
     void visit(StatementsAST& v) override;
     void visit(NumberAST& v) override;
     void visit(BoolAST& v) override;

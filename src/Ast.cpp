@@ -14,7 +14,6 @@ void StatementsAST::accept(Visitor& v)
 
 NumberAST::NumberAST(int val) : m_val{ val }
 {
-
 }
 int NumberAST::getVal() const { return m_val; }
 void NumberAST::accept(Visitor& v) { v.visit(*this); }
@@ -221,11 +220,20 @@ void ScopeAST::accept(Visitor& v)
 }
 
 ScopedExprAST::ScopedExprAST(std::shared_ptr<DeclarationsAST> decls,
-                   std::shared_ptr<StatementAST> stmts,
+                   std::shared_ptr<StatementsAST> stmts,
                    std::shared_ptr<ExprAST> expr)
     : m_declarations(std::move(decls)), m_statements(std::move(stmts)), m_expr(std::move(expr))
 {
 }
+std::shared_ptr<DeclarationsAST> ScopedExprAST::getDeclarations()
+{
+  return m_declarations;
+}
+std::shared_ptr<StatementsAST> ScopedExprAST::getStatements()
+{
+  return m_statements;
+}
+std::shared_ptr<ExprAST> ScopedExprAST::getExpr() { return m_expr; }
 void ScopedExprAST::accept(Visitor& v)
 {
     v.visit(*this);

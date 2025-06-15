@@ -1,7 +1,6 @@
 #include "DebugVisitor.hpp"
 #include "Ast.hpp"
 
-//void DebugVisitor::visit(StatementAST& v){ std::cout << "Statement AST\n"; }
 void DebugVisitor::visit(StatementsAST& v) { std::cout << "Statements AST\n"; }
 void DebugVisitor::visit(NumberAST& v)
 {

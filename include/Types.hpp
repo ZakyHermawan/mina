@@ -4,15 +4,21 @@
 
 enum class Type
 {
-  INTEGER,
-  BOOLEAN,
-  UNDEFINED
+    INTEGER,
+    BOOLEAN,
+    UNDEFINED
+};
+
+enum class IdentType
+{
+    VARIABLE,
+    ARRAY
 };
 
 enum class FType
 {
-  PROC,
-  FUNC,
+    PROC,
+    FUNC,
 };
 
 std::string typeToStr(Type type);

@@ -416,18 +416,22 @@ class ScopedExprAST : public ExprAST
 {
 private:
     std::shared_ptr<DeclarationsAST> m_declarations;
-    std::shared_ptr<StatementAST> m_statements;
+    std::shared_ptr<StatementsAST> m_statements;
     std::shared_ptr<ExprAST> m_expr;
 
 public:
     ScopedExprAST(std::shared_ptr<DeclarationsAST> decls,
-               std::shared_ptr<StatementAST> stmts,
+               std::shared_ptr<StatementsAST> stmts,
                std::shared_ptr<ExprAST> expr);
     ~ScopedExprAST() = default;
     ScopedExprAST(const ScopedExprAST&) = delete;
     ScopedExprAST(ScopedExprAST&&) noexcept = default;
     ScopedExprAST& operator=(const ScopedExprAST&) = delete;
     ScopedExprAST& operator=(ScopedExprAST&&) noexcept = default;
+
+    std::shared_ptr<DeclarationsAST> getDeclarations();
+    std::shared_ptr<StatementsAST> getStatements();
+    std::shared_ptr<ExprAST> getExpr();
 
     void accept(Visitor& v);
 };

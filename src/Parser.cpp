@@ -296,7 +296,7 @@ std::shared_ptr<ProgramAST> Parser::program()
   vm_free(vm);
   IRVisitor dv;
   programAST->accept(dv);
-
+  dv.printCFG();
   return programAST;
 }
 
@@ -1327,7 +1327,7 @@ std::shared_ptr<ExprAST> Parser::primary()
             exitParse("Expected ';'");
         }
         advance();
-        statements(SEMI);
+        auto stmts = statements(SEMI);
         advance();
         auto exprAST = expression();
 
@@ -1337,7 +1337,7 @@ std::shared_ptr<ExprAST> Parser::primary()
         }
 
         advance();
-        return std::make_shared<ScopedExprAST>(declsAST, nullptr, exprAST);
+        return std::make_shared<ScopedExprAST>(declsAST, stmts, exprAST);
     }
     else if (getCurrTokenType() == IDENTIFIER)
     {
@@ -1593,7 +1593,7 @@ int Parser::constantsExpression()
         }
         else if (getCurrTokenType() == STAR)
         {
-            expr += " + ";
+            expr += " * ";
         }
         else if (getCurrTokenType() == SLASH)
         {
