@@ -31,7 +31,10 @@ private:
     std::unordered_set<std::shared_ptr<BasicBlock>> m_sealedBlocks;
     
     using subMap = std::unordered_map<std::string, std::shared_ptr<Inst>>;
+    using subPhi = std::unordered_map<std::string, std::shared_ptr<PhiInst>>;
+
     std::unordered_map<std::shared_ptr<BasicBlock>, subMap> m_currDef;
+    std::unordered_map<std::shared_ptr<BasicBlock>, subPhi> m_incompletePhis;
 
 public:
     IRVisitor();
@@ -93,5 +96,6 @@ public:
                                        std::shared_ptr<BasicBlock> block);
     std::shared_ptr<Inst> addPhiOperands(std::string varName,
                                          std::shared_ptr<PhiInst> phi);
+    std::shared_ptr<Inst> tryRemoveTrivialPhi(std::shared_ptr<PhiInst> phi);
     void sealBlock(std::shared_ptr<BasicBlock> block);
 };

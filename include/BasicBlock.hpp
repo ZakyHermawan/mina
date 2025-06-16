@@ -18,7 +18,7 @@ public:
     BasicBlock() = default;
     BasicBlock(std::string name);
     void setInstructions(std::vector<std::shared_ptr<Inst>> instructions);
-    std::vector<std::shared_ptr<Inst>> getInstructions();
+    std::vector<std::shared_ptr<Inst>>& getInstructions();
 
     void pushInst(const std::shared_ptr<Inst>& inst);
     void pushInstBegin(const std::shared_ptr<Inst>& inst);

@@ -7,17 +7,29 @@
 
 class BasicBlock;
 
-class Inst
+class Inst : public std::enable_shared_from_this<Inst>
 {
+private:
+    std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+
 public:
-    virtual std::string getString() = 0;
+    Inst() {};
+    virtual std::string getString() { return ""; };
     virtual std::shared_ptr<Inst> getTarget() { return nullptr; }
+    virtual std::vector<std::shared_ptr<Inst>> getOperands()
+    {
+      return m_operands;
+    }
+    virtual void push_user(std::shared_ptr<Inst> user) {};
+    virtual void setup_def_use() {}
+    virtual bool isPhi() { return false; }
 };
 
 class IntConstInst : public Inst
 {
 private:
     int m_val;
+    std::vector<std::shared_ptr<Inst>> m_users, m_operands;
 
 public:
     IntConstInst(int val);
@@ -34,12 +46,16 @@ public:
         return std::make_shared<IntConstInst>(m_val);
     }
     std::string getString();
+    void push_user(std::shared_ptr<Inst> user) override;
+    void setup_def_use();
+    std::vector<std::shared_ptr<Inst>> getOperands() { return m_operands; }
 };
 
 class BoolConstInst : public Inst
 {
 private:
     bool m_val;
+    std::vector<std::shared_ptr<Inst>> m_users, m_operands;
 
 public:
     BoolConstInst(bool val);
@@ -57,12 +73,16 @@ public:
     }
 
     std::string getString();
+    void push_user(std::shared_ptr<Inst> user) override;
+    void setup_def_use();
+    std::vector<std::shared_ptr<Inst>> getOperands() { return m_operands; }
 };
 
 class StrConstInst : public Inst
 {
 private:
     std::string m_val;
+    std::vector<std::shared_ptr<Inst>> m_users, m_operands;
 
 public:
     StrConstInst(std::string val);
@@ -77,16 +97,19 @@ public:
     {
         return std::make_shared<StrConstInst>(m_val);
     }
-
     std::string getString();
+    void push_user(std::shared_ptr<Inst> user) override;
+    void setup_def_use();
+    std::vector<std::shared_ptr<Inst>> getOperands() { return m_operands; }
 };
 
 class IdentInst : public Inst
 {
 private:
     std::string m_name;
+    std::vector<std::shared_ptr<Inst>> m_users, m_operands;
 
-public:
+   public:
     IdentInst(std::string name);
 
     virtual ~IdentInst() = default;
@@ -101,12 +124,16 @@ public:
     }
 
     std::string getString();
+    void push_user(std::shared_ptr<Inst> user) override;
+    void setup_def_use();
+    std::vector<std::shared_ptr<Inst>> getOperands() { return m_operands; }
 };
 
 class AddInst: public Inst
 {
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+    std::vector<std::shared_ptr<Inst>> m_users;
 
 public:
     AddInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1, std::shared_ptr<Inst> operand2);
@@ -122,12 +149,19 @@ public:
     std::shared_ptr<Inst> getOperand2();
 
     std::string getString();
+    void push_user(std::shared_ptr<Inst> user) override;
+    void setup_def_use();
+    std::vector<std::shared_ptr<Inst>> getOperands()
+    {
+      return std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
+    }
 };
 
 class SubInst: public Inst
 {
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+    std::vector<std::shared_ptr<Inst>> m_users;
 
 public:
     SubInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
@@ -144,12 +178,19 @@ public:
     std::shared_ptr<Inst> getOperand2();
 
     std::string getString();
+    void push_user(std::shared_ptr<Inst> user) override;
+    void setup_def_use();
+    std::vector<std::shared_ptr<Inst>> getOperands()
+    {
+      return std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
+    }
 };
 
 class MulInst: public Inst
 {
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+    std::vector<std::shared_ptr<Inst>> m_users;
 
 public:
     MulInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
@@ -166,12 +207,20 @@ public:
     std::shared_ptr<Inst> getOperand2();
 
     std::string getString();
+    void push_user(std::shared_ptr<Inst> user) override;
+    void setup_def_use();
+    std::vector<std::shared_ptr<Inst>> getOperands()
+    {
+        return std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
+    }
+
 };
 
 class DivInst: public Inst
 {
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+    std::vector<std::shared_ptr<Inst>> m_users;
 
 public:
     DivInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
@@ -188,12 +237,20 @@ public:
     std::shared_ptr<Inst> getOperand2();
 
     std::string getString();
+    void push_user(std::shared_ptr<Inst> user) override;
+    void setup_def_use();
+    std::vector<std::shared_ptr<Inst>> getOperands()
+    {
+      return std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
+    }
+
 };
 
 class NotInst: public Inst
 {
 private:
     std::shared_ptr<Inst> m_target, m_operand;
+    std::vector<std::shared_ptr<Inst>> m_users;
 
 public:
     NotInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand);
@@ -208,12 +265,19 @@ public:
     std::shared_ptr<Inst> getOperand();
 
     std::string getString();
+    void push_user(std::shared_ptr<Inst> user) override;
+    void setup_def_use();
+    std::vector<std::shared_ptr<Inst>> getOperands()
+    {
+      return std::vector<std::shared_ptr<Inst>>{m_operand};
+    }
 };
 
 class AndInst: public Inst
 {
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+    std::vector<std::shared_ptr<Inst>> m_users;
 
 public:
     AndInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
@@ -230,12 +294,19 @@ public:
     std::shared_ptr<Inst> getOperand2();
 
     std::string getString();
+    void push_user(std::shared_ptr<Inst> user) override;
+    void setup_def_use();
+    std::vector<std::shared_ptr<Inst>> getOperands()
+    {
+      return std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
+    }
 };
 
 class OrInst: public Inst
 {
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+    std::vector<std::shared_ptr<Inst>> m_users;
 
 public:
     OrInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
@@ -252,426 +323,556 @@ public:
     std::shared_ptr<Inst> getOperand2();
 
     std::string getString();
+    void push_user(std::shared_ptr<Inst> user) override;
+    void setup_def_use();
+    std::vector<std::shared_ptr<Inst>> getOperands()
+    {
+      return std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
+    }
 };
 
 class AllocaInst : public Inst
 {
-private:
-    std::shared_ptr<Inst> m_target;
-    Type m_type;
-    unsigned int m_size;
+ private:
+  std::shared_ptr<Inst> m_target;
+  Type m_type;
+  unsigned int m_size;
+  std::vector<std::shared_ptr<Inst>> m_users, m_operands;
 
-public:
-    AllocaInst(std::shared_ptr<Inst> target, Type type, unsigned int size);
+ public:
+  AllocaInst(std::shared_ptr<Inst> target, Type type, unsigned int size);
 
-    virtual ~AllocaInst() = default;
-    AllocaInst(const AllocaInst&) = delete;
-    AllocaInst(AllocaInst&&) noexcept = default;
-    AllocaInst& operator=(const AllocaInst&) = delete;
-    AllocaInst& operator=(AllocaInst&&) noexcept = default;
+  virtual ~AllocaInst() = default;
+  AllocaInst(const AllocaInst&) = delete;
+  AllocaInst(AllocaInst&&) noexcept = default;
+  AllocaInst& operator=(const AllocaInst&) = delete;
+  AllocaInst& operator=(AllocaInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget() override;
-    Type getType();
-    unsigned int getSize();
+  std::shared_ptr<Inst> getTarget() override;
+  Type getType();
+  unsigned int getSize();
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
+
 };
 
 class ArrAccessInst : public Inst
 {
-private:
-    std::shared_ptr<Inst> m_target, m_source, m_index;
+ private:
+  std::shared_ptr<Inst> m_target, m_source, m_index;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-public:
-    ArrAccessInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> source,
-           std::shared_ptr<Inst> index);
+ public:
+  ArrAccessInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> source,
+                std::shared_ptr<Inst> index);
 
-    virtual ~ArrAccessInst() = default;
-    ArrAccessInst(const ArrAccessInst&) = delete;
-    ArrAccessInst(ArrAccessInst&&) noexcept = default;
-    ArrAccessInst& operator=(const ArrAccessInst&) = delete;
-    ArrAccessInst& operator=(ArrAccessInst&&) noexcept = default;
+  virtual ~ArrAccessInst() = default;
+  ArrAccessInst(const ArrAccessInst&) = delete;
+  ArrAccessInst(ArrAccessInst&&) noexcept = default;
+  ArrAccessInst& operator=(const ArrAccessInst&) = delete;
+  ArrAccessInst& operator=(ArrAccessInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget() override;
-    std::shared_ptr<Inst> getSource();
-    std::shared_ptr<Inst> getIndex();
+  std::shared_ptr<Inst> getTarget() override;
+  std::shared_ptr<Inst> getSource();
+  std::shared_ptr<Inst> getIndex();
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
+  std::vector<std::shared_ptr<Inst>> getOperands()
+  {
+    return std::vector<std::shared_ptr<Inst>>{m_source, m_index};
+  }
 };
 
-class ArrUpdateInst: public Inst
+class ArrUpdateInst : public Inst
 {
-private:
-    std::shared_ptr<Inst> m_target, m_source, m_index, m_val;
+ private:
+  std::shared_ptr<Inst> m_target, m_source, m_index, m_val;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-public:
-    ArrUpdateInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> source,
-                  std::shared_ptr<Inst> index, std::shared_ptr<Inst> val);
+ public:
+  ArrUpdateInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> source,
+                std::shared_ptr<Inst> index, std::shared_ptr<Inst> val);
 
-    virtual ~ArrUpdateInst() = default;
-    ArrUpdateInst(const ArrUpdateInst&) = delete;
-    ArrUpdateInst(ArrUpdateInst&&) noexcept = default;
-    ArrUpdateInst& operator=(const ArrUpdateInst&) = delete;
-    ArrUpdateInst& operator=(ArrUpdateInst&&) noexcept = default;
+  virtual ~ArrUpdateInst() = default;
+  ArrUpdateInst(const ArrUpdateInst&) = delete;
+  ArrUpdateInst(ArrUpdateInst&&) noexcept = default;
+  ArrUpdateInst& operator=(const ArrUpdateInst&) = delete;
+  ArrUpdateInst& operator=(ArrUpdateInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget() override;
-    std::shared_ptr<Inst> getSource();
-    std::shared_ptr<Inst> getIndex();
-    std::shared_ptr<Inst> getVal();
+  std::shared_ptr<Inst> getTarget() override;
+  std::shared_ptr<Inst> getSource();
+  std::shared_ptr<Inst> getIndex();
+  std::shared_ptr<Inst> getVal();
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
+  std::vector<std::shared_ptr<Inst>> getOperands()
+  {
+    return std::vector<std::shared_ptr<Inst>> { m_source, m_index, m_val };
+  }
 };
 
 class AssignInst : public Inst
 {
-private:
-    std::shared_ptr<Inst> m_target, m_source;
+ private:
+  std::shared_ptr<Inst> m_target, m_source;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-public:
-    AssignInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> source);
+ public:
+  AssignInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> source);
 
-    virtual ~AssignInst() = default;
-    AssignInst(const AssignInst&) = delete;
-    AssignInst(AssignInst&&) noexcept = default;
-    AssignInst& operator=(const AssignInst&) = delete;
-    AssignInst& operator=(AssignInst&&) noexcept = default;
+  virtual ~AssignInst() = default;
+  AssignInst(const AssignInst&) = delete;
+  AssignInst(AssignInst&&) noexcept = default;
+  AssignInst& operator=(const AssignInst&) = delete;
+  AssignInst& operator=(AssignInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget() override;
-    std::shared_ptr<Inst> getSource();
+  std::shared_ptr<Inst> getTarget() override;
+  std::shared_ptr<Inst> getSource();
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
+  std::vector<std::shared_ptr<Inst>> getOperands()
+  {
+    return std::vector<std::shared_ptr<Inst>>{m_source};
+  }
 };
 
 class CmpEQInst : public Inst
 {
-private:
-    std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+ private:
+  std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-public:
-    CmpEQInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
+ public:
+  CmpEQInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
             std::shared_ptr<Inst> operand2);
 
-    virtual ~CmpEQInst() = default;
-    CmpEQInst(const CmpEQInst&) = delete;
-    CmpEQInst(CmpEQInst&&) noexcept = default;
-    CmpEQInst& operator=(const CmpEQInst&) = delete;
-    CmpEQInst& operator=(CmpEQInst&&) noexcept = default;
+  virtual ~CmpEQInst() = default;
+  CmpEQInst(const CmpEQInst&) = delete;
+  CmpEQInst(CmpEQInst&&) noexcept = default;
+  CmpEQInst& operator=(const CmpEQInst&) = delete;
+  CmpEQInst& operator=(CmpEQInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget() override;
-    std::shared_ptr<Inst> getOperand1();
-    std::shared_ptr<Inst> getOperand2();
+  std::shared_ptr<Inst> getTarget() override;
+  std::shared_ptr<Inst> getOperand1();
+  std::shared_ptr<Inst> getOperand2();
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
+  std::vector<std::shared_ptr<Inst>> getOperands()
+  {
+    return std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand1};
+  }
 };
 
 class CmpNEInst : public Inst
 {
-private:
-    std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+ private:
+  std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-public:
-    CmpNEInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
+ public:
+  CmpNEInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
             std::shared_ptr<Inst> operand2);
 
-    virtual ~CmpNEInst() = default;
-    CmpNEInst(const CmpNEInst&) = delete;
-    CmpNEInst(CmpNEInst&&) noexcept = default;
-    CmpNEInst& operator=(const CmpNEInst&) = delete;
-    CmpNEInst& operator=(CmpNEInst&&) noexcept = default;
+  virtual ~CmpNEInst() = default;
+  CmpNEInst(const CmpNEInst&) = delete;
+  CmpNEInst(CmpNEInst&&) noexcept = default;
+  CmpNEInst& operator=(const CmpNEInst&) = delete;
+  CmpNEInst& operator=(CmpNEInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget() override;
-    std::shared_ptr<Inst> getOperand1();
-    std::shared_ptr<Inst> getOperand2();
+  std::shared_ptr<Inst> getTarget() override;
+  std::shared_ptr<Inst> getOperand1();
+  std::shared_ptr<Inst> getOperand2();
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
+  std::vector<std::shared_ptr<Inst>> getOperands()
+  {
+    return std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand1};
+  }
 };
-
 
 class CmpLTInst : public Inst
 {
-private:
-    std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+ private:
+  std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-public:
-    CmpLTInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
+ public:
+  CmpLTInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
             std::shared_ptr<Inst> operand2);
 
-    virtual ~CmpLTInst() = default;
-    CmpLTInst(const CmpLTInst&) = delete;
-    CmpLTInst(CmpLTInst&&) noexcept = default;
-    CmpLTInst& operator=(const CmpLTInst&) = delete;
-    CmpLTInst& operator=(CmpLTInst&&) noexcept = default;
+  virtual ~CmpLTInst() = default;
+  CmpLTInst(const CmpLTInst&) = delete;
+  CmpLTInst(CmpLTInst&&) noexcept = default;
+  CmpLTInst& operator=(const CmpLTInst&) = delete;
+  CmpLTInst& operator=(CmpLTInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget() override;
-    std::shared_ptr<Inst> getOperand1();
-    std::shared_ptr<Inst> getOperand2();
+  std::shared_ptr<Inst> getTarget() override;
+  std::shared_ptr<Inst> getOperand1();
+  std::shared_ptr<Inst> getOperand2();
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
+  std::vector<std::shared_ptr<Inst>> getOperands()
+  {
+    return std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand1};
+  }
 };
 
 class CmpLTEInst : public Inst
 {
-private:
-    std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+ private:
+  std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-public:
-    CmpLTEInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-            std::shared_ptr<Inst> operand2);
+ public:
+  CmpLTEInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
+             std::shared_ptr<Inst> operand2);
 
-    virtual ~CmpLTEInst() = default;
-    CmpLTEInst(const CmpLTEInst&) = delete;
-    CmpLTEInst(CmpLTEInst&&) noexcept = default;
-    CmpLTEInst& operator=(const CmpLTEInst&) = delete;
-    CmpLTEInst& operator=(CmpLTEInst&&) noexcept = default;
+  virtual ~CmpLTEInst() = default;
+  CmpLTEInst(const CmpLTEInst&) = delete;
+  CmpLTEInst(CmpLTEInst&&) noexcept = default;
+  CmpLTEInst& operator=(const CmpLTEInst&) = delete;
+  CmpLTEInst& operator=(CmpLTEInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget() override;
-    std::shared_ptr<Inst> getOperand1();
-    std::shared_ptr<Inst> getOperand2();
+  std::shared_ptr<Inst> getTarget() override;
+  std::shared_ptr<Inst> getOperand1();
+  std::shared_ptr<Inst> getOperand2();
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
+  std::vector<std::shared_ptr<Inst>> getOperands()
+  {
+    return std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand1};
+  }
 };
 
 class CmpGTInst : public Inst
 {
-private:
-    std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+ private:
+  std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-public:
-    CmpGTInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
+ public:
+  CmpGTInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
             std::shared_ptr<Inst> operand2);
 
-    virtual ~CmpGTInst() = default;
-    CmpGTInst(const CmpGTInst&) = delete;
-    CmpGTInst(CmpGTInst&&) noexcept = default;
-    CmpGTInst& operator=(const CmpGTInst&) = delete;
-    CmpGTInst& operator=(CmpGTInst&&) noexcept = default;
+  virtual ~CmpGTInst() = default;
+  CmpGTInst(const CmpGTInst&) = delete;
+  CmpGTInst(CmpGTInst&&) noexcept = default;
+  CmpGTInst& operator=(const CmpGTInst&) = delete;
+  CmpGTInst& operator=(CmpGTInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget() override;
-    std::shared_ptr<Inst> getOperand1();
-    std::shared_ptr<Inst> getOperand2();
+  std::shared_ptr<Inst> getTarget() override;
+  std::shared_ptr<Inst> getOperand1();
+  std::shared_ptr<Inst> getOperand2();
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
+  std::vector<std::shared_ptr<Inst>> getOperands()
+  {
+    return std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand1};
+  }
 };
 
 class CmpGTEInst : public Inst
 {
-private:
-    std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+ private:
+  std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-public:
-    CmpGTEInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-            std::shared_ptr<Inst> operand2);
+ public:
+  CmpGTEInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
+             std::shared_ptr<Inst> operand2);
 
-    virtual ~CmpGTEInst() = default;
-    CmpGTEInst(const CmpGTEInst&) = delete;
-    CmpGTEInst(CmpGTEInst&&) noexcept = default;
-    CmpGTEInst& operator=(const CmpGTEInst&) = delete;
-    CmpGTEInst& operator=(CmpGTEInst&&) noexcept = default;
+  virtual ~CmpGTEInst() = default;
+  CmpGTEInst(const CmpGTEInst&) = delete;
+  CmpGTEInst(CmpGTEInst&&) noexcept = default;
+  CmpGTEInst& operator=(const CmpGTEInst&) = delete;
+  CmpGTEInst& operator=(CmpGTEInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget() override;
-    std::shared_ptr<Inst> getOperand1();
-    std::shared_ptr<Inst> getOperand2();
+  std::shared_ptr<Inst> getTarget() override;
+  std::shared_ptr<Inst> getOperand1();
+  std::shared_ptr<Inst> getOperand2();
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
+  std::vector<std::shared_ptr<Inst>> getOperands()
+  {
+    return std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand1};
+  }
 };
 
 class JumpInst : public Inst
 {
-private:
-    std::shared_ptr<BasicBlock> m_target;
+ private:
+  std::shared_ptr<BasicBlock> m_target;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-public:
-    JumpInst(std::shared_ptr<BasicBlock> target);
+ public:
+  JumpInst(std::shared_ptr<BasicBlock> target);
 
-    virtual ~JumpInst() = default;
-    JumpInst(const JumpInst&) = delete;
-    JumpInst(JumpInst&&) noexcept = default;
-    JumpInst& operator=(const JumpInst&) = delete;
-    JumpInst& operator=(JumpInst&&) noexcept = default;
+  virtual ~JumpInst() = default;
+  JumpInst(const JumpInst&) = delete;
+  JumpInst(JumpInst&&) noexcept = default;
+  JumpInst& operator=(const JumpInst&) = delete;
+  JumpInst& operator=(JumpInst&&) noexcept = default;
 
-    std::shared_ptr<BasicBlock> getJumpTarget();
+  std::shared_ptr<BasicBlock> getJumpTarget();
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
 };
 
 class BRTInst : public Inst
 {
-private:
-    std::shared_ptr<Inst> m_cond;
-    std::shared_ptr<BasicBlock> m_targetSuccess;
-    std::shared_ptr<BasicBlock> m_targetFailed;
+ private:
+  std::shared_ptr<Inst> m_cond;
+  std::shared_ptr<BasicBlock> m_targetSuccess;
+  std::shared_ptr<BasicBlock> m_targetFailed;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-   public:
-    BRTInst(std::shared_ptr<Inst> cond,
-            std::shared_ptr<BasicBlock> targetSuccess,
-            std::shared_ptr<BasicBlock> targetFailed);
+ public:
+  BRTInst(std::shared_ptr<Inst> cond, std::shared_ptr<BasicBlock> targetSuccess,
+          std::shared_ptr<BasicBlock> targetFailed);
 
-    virtual ~BRTInst() = default;
-    BRTInst(const BRTInst&) = delete;
-    BRTInst(BRTInst&&) noexcept = default;
-    BRTInst& operator=(const BRTInst&) = delete;
-    BRTInst& operator=(BRTInst&&) noexcept = default;
+  virtual ~BRTInst() = default;
+  BRTInst(const BRTInst&) = delete;
+  BRTInst(BRTInst&&) noexcept = default;
+  BRTInst& operator=(const BRTInst&) = delete;
+  BRTInst& operator=(BRTInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getCond();
-    std::shared_ptr<BasicBlock> getTargetSuccess();
-    std::shared_ptr<BasicBlock> getTargetFailed();
+  std::shared_ptr<Inst> getCond();
+  std::shared_ptr<BasicBlock> getTargetSuccess();
+  std::shared_ptr<BasicBlock> getTargetFailed();
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
+  std::vector<std::shared_ptr<Inst>> getOperands()
+  {
+    return std::vector<std::shared_ptr<Inst>>{m_cond};
+  }
 };
 
 class BRFInst : public Inst
 {
-private:
-    std::shared_ptr<Inst> m_cond;
-    std::shared_ptr<BasicBlock> m_targetSuccess;
-    std::shared_ptr<BasicBlock> m_targetFailed;
+ private:
+  std::shared_ptr<Inst> m_cond;
+  std::shared_ptr<BasicBlock> m_targetSuccess;
+  std::shared_ptr<BasicBlock> m_targetFailed;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-public:
-    BRFInst(std::shared_ptr<Inst> cond,
-            std::shared_ptr<BasicBlock> targetSuccess,
-            std::shared_ptr<BasicBlock> targetFailed);
+ public:
+  BRFInst(std::shared_ptr<Inst> cond, std::shared_ptr<BasicBlock> targetSuccess,
+          std::shared_ptr<BasicBlock> targetFailed);
 
-    virtual ~BRFInst() = default;
-    BRFInst(const BRFInst&) = delete;
-    BRFInst(BRFInst&&) noexcept = default;
-    BRFInst& operator=(const BRFInst&) = delete;
-    BRFInst& operator=(BRFInst&&) noexcept = default;
+  virtual ~BRFInst() = default;
+  BRFInst(const BRFInst&) = delete;
+  BRFInst(BRFInst&&) noexcept = default;
+  BRFInst& operator=(const BRFInst&) = delete;
+  BRFInst& operator=(BRFInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getCond();
-    std::shared_ptr<BasicBlock> getTargetSuccess();
-    std::shared_ptr<BasicBlock> getTargetFailed();
+  std::shared_ptr<Inst> getCond();
+  std::shared_ptr<BasicBlock> getTargetSuccess();
+  std::shared_ptr<BasicBlock> getTargetFailed();
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
+  std::vector<std::shared_ptr<Inst>> getOperands()
+  {
+    return std::vector<std::shared_ptr<Inst>>{m_cond};
+  }
 };
 
-class PutInst: public Inst
+class PutInst : public Inst
 {
-private:
-    std::shared_ptr<Inst> m_operand;
+ private:
+  std::shared_ptr<Inst> m_operand;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-public:
-    PutInst(std::shared_ptr<Inst> operand);
+ public:
+  PutInst(std::shared_ptr<Inst> operand);
 
-    virtual ~PutInst() = default;
-    PutInst(const PutInst&) = delete;
-    PutInst(PutInst&&) noexcept = default;
-    PutInst& operator=(const PutInst&) = delete;
-    PutInst& operator=(PutInst&&) noexcept = default;
+  virtual ~PutInst() = default;
+  PutInst(const PutInst&) = delete;
+  PutInst(PutInst&&) noexcept = default;
+  PutInst& operator=(const PutInst&) = delete;
+  PutInst& operator=(PutInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getOperand();
+  std::shared_ptr<Inst> getOperand();
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
+  std::vector<std::shared_ptr<Inst>> getOperands()
+  {
+    return std::vector<std::shared_ptr<Inst>>{m_operand};
+  }
 };
 
-class GetInst: public Inst
+class GetInst : public Inst
 {
-private:
-    std::shared_ptr<Inst> m_target;
+ private:
+  std::shared_ptr<Inst> m_target;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-public:
-    GetInst(std::shared_ptr<Inst> target);
+ public:
+  GetInst(std::shared_ptr<Inst> target);
 
-    virtual ~GetInst() = default;
-    GetInst(const GetInst&) = delete;
-    GetInst(GetInst&&) noexcept = default;
-    GetInst& operator=(const GetInst&) = delete;
-    GetInst& operator=(GetInst&&) noexcept = default;
+  virtual ~GetInst() = default;
+  GetInst(const GetInst&) = delete;
+  GetInst(GetInst&&) noexcept = default;
+  GetInst& operator=(const GetInst&) = delete;
+  GetInst& operator=(GetInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget() override;
+  std::shared_ptr<Inst> getTarget() override;
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
 };
 
 class PushInst : public Inst
 {
-private:
-    std::shared_ptr<Inst> m_operand;
+ private:
+  std::shared_ptr<Inst> m_operand;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-public:
-    PushInst(std::shared_ptr<Inst> operand);
+ public:
+  PushInst(std::shared_ptr<Inst> operand);
 
-    virtual ~PushInst() = default;
-    PushInst(const PushInst&) = delete;
-    PushInst(PushInst&&) noexcept = default;
-    PushInst& operator=(const PushInst&) = delete;
-    PushInst& operator=(PushInst&&) noexcept = default;
+  virtual ~PushInst() = default;
+  PushInst(const PushInst&) = delete;
+  PushInst(PushInst&&) noexcept = default;
+  PushInst& operator=(const PushInst&) = delete;
+  PushInst& operator=(PushInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getOperand();
+  std::shared_ptr<Inst> getOperand();
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
+  std::vector<std::shared_ptr<Inst>> getOperands()
+  {
+    return std::vector<std::shared_ptr<Inst>>{m_operand};
+  }
 };
 
-class PopInst: public Inst
+class PopInst : public Inst
 {
-private:
-    std::shared_ptr<Inst> m_target;
+ private:
+  std::shared_ptr<Inst> m_target;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-public:
-    PopInst(std::shared_ptr<Inst> target);
+ public:
+  PopInst(std::shared_ptr<Inst> target);
 
-    virtual ~PopInst() = default;
-    PopInst(const PopInst&) = delete;
-    PopInst(PopInst&&) noexcept = default;
-    PopInst& operator=(const PopInst&) = delete;
-    PopInst& operator=(PopInst&&) noexcept = default;
+  virtual ~PopInst() = default;
+  PopInst(const PopInst&) = delete;
+  PopInst(PopInst&&) noexcept = default;
+  PopInst& operator=(const PopInst&) = delete;
+  PopInst& operator=(PopInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget() override;
+  std::shared_ptr<Inst> getTarget() override;
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
 };
 
 class ReturnInst : public Inst
 {
-private:
+ private:
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-public:
-    ReturnInst();
-    virtual ~ReturnInst() = default;
-    ReturnInst(const ReturnInst&) = delete;
-    ReturnInst(ReturnInst&&) noexcept = default;
-    ReturnInst& operator=(const ReturnInst&) = delete;
-    ReturnInst& operator=(ReturnInst&&) noexcept = default;
+ public:
+  ReturnInst();
+  virtual ~ReturnInst() = default;
+  ReturnInst(const ReturnInst&) = delete;
+  ReturnInst(ReturnInst&&) noexcept = default;
+  ReturnInst& operator=(const ReturnInst&) = delete;
+  ReturnInst& operator=(ReturnInst&&) noexcept = default;
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
 };
 
 class CallInst : public Inst
 {
-private:
-    std::string m_calleeStr;
+ private:
+  std::string m_calleeStr;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-public:
-    CallInst(std::string calleeStr);
-    virtual ~CallInst() = default;
-    CallInst(const CallInst&) = delete;
-    CallInst(CallInst&&) noexcept = default;
-    CallInst& operator=(const CallInst&) = delete;
-    CallInst& operator=(CallInst&&) noexcept = default;
+ public:
+  CallInst(std::string calleeStr);
+  virtual ~CallInst() = default;
+  CallInst(const CallInst&) = delete;
+  CallInst(CallInst&&) noexcept = default;
+  CallInst& operator=(const CallInst&) = delete;
+  CallInst& operator=(CallInst&&) noexcept = default;
 
-    std::string getCalleeStr();
+  std::string getCalleeStr();
 
-    std::string getString();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
 };
 
 class PhiInst : public Inst
 {
-private:
-    std::shared_ptr<Inst> m_target;
-    std::shared_ptr<BasicBlock> m_block;
-    std::vector<std::shared_ptr<Inst>> m_operands;
+ private:
+  std::shared_ptr<Inst> m_target;
+  std::shared_ptr<BasicBlock> m_block;
+  std::vector<std::shared_ptr<Inst>> m_operands;
+  std::vector<std::shared_ptr<Inst>> m_users;
 
-   public:
-    PhiInst(std::string name, std::shared_ptr<BasicBlock> m_block);
+ public:
+  PhiInst(std::string name, std::shared_ptr<BasicBlock> m_block);
 
-    virtual ~PhiInst() = default;
-    PhiInst(const PhiInst&) = delete;
-    PhiInst(PhiInst&&) noexcept = default;
-    PhiInst& operator=(const PhiInst&) = delete;
-    PhiInst& operator=(PhiInst&&) noexcept = default;
+  virtual ~PhiInst() = default;
+  PhiInst(const PhiInst&) = delete;
+  PhiInst(PhiInst&&) noexcept = default;
+  PhiInst& operator=(const PhiInst&) = delete;
+  PhiInst& operator=(PhiInst&&) noexcept = default;
 
-    void appendOperand(std::shared_ptr<Inst> operand);
+  void appendOperand(std::shared_ptr<Inst> operand);
+  std::vector<std::shared_ptr<Inst>>& get_operands();
 
-    std::shared_ptr<Inst> getTarget() override;
-    std::shared_ptr<BasicBlock> getBlock();
-    std::string getString();
+  std::shared_ptr<Inst> getTarget() override;
+  std::shared_ptr<BasicBlock> getBlock();
+  std::string getString();
+  void push_user(std::shared_ptr<Inst> user) override;
+  void setup_def_use();
+    std::vector<std::shared_ptr<Inst>>& get_users();
+  bool isPhi() { return true; }
+
+};
+
+class UndefInst: public Inst
+{
+};
+
+class Noop : public Inst
+{
+ public:
+  std::string getString() { return "noop"; }
 };

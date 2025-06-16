@@ -7,7 +7,7 @@ void BasicBlock::setInstructions(
 {
     m_instructions = std::move(instructions);
 }
-std::vector<std::shared_ptr<Inst>> BasicBlock::getInstructions()
+std::vector<std::shared_ptr<Inst>>& BasicBlock::getInstructions()
 {
     return m_instructions;
 }
