@@ -23,5 +23,6 @@ Features:
 * Console Output
 * Scoped Expression
 
-Now Mina Programming language has an Intermediate Representation!
-![image](https://github.com/user-attachments/assets/2bb52e34-2542-40cb-8ad3-d9989bc41b6f)
+Now Mina Programming language has an Intermediate Representation in SSA Form!
+
+![image](https://github.com/user-attachments/assets/0b6560d2-08a0-4572-8347-341172ca3202)
