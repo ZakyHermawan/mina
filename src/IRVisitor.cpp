@@ -379,7 +379,7 @@ void IRVisitor::visit(IfAST& v)
     //std::cout << ifExprBB->getName() << "pred is: " << m_currentBB->getName() << std::endl;
     sealBlock(m_currentBB);
     m_currentBB = ifExprBB;
-    sealBlock(m_currentBB);
+    //sealBlock(m_currentBB);
 
     auto expr = v.getCondition();
     auto thenArm = v.getThen();
