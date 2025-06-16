@@ -25,4 +25,4 @@ Features:
 
 Now Mina Programming language has an Intermediate Representation in SSA Form!
 
-![image](https://github.com/user-attachments/assets/0b6560d2-08a0-4572-8347-341172ca3202)
+![image](https://github.com/user-attachments/assets/46345737-438f-48ef-a6cf-d041dff2c2ff)
