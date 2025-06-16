@@ -13,7 +13,7 @@ void DebugVisitor::visit(BoolAST& v)
 }
 void DebugVisitor::visit(StringAST& v) { std::cout << "String AST: " << v.getVal(); }
 
-void DebugVisitor::visit(IdentifierAST& v)
+void DebugVisitor::visit(VariableAST& v)
 {
   std::cout << "Identifier: " << v.getName() << ":" << typeToStr(v.getType()) << std::endl;
 }

@@ -3,10 +3,12 @@
 #include "Visitors.hpp"
 #include "BasicBlock.hpp"
 #include "Types.hpp"
+#include "Inst.hpp"
 
 #include <stack>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 
 class IRVisitor : public Visitor
 {
@@ -26,13 +28,18 @@ private:
     std::unordered_map<std::string, int> m_nameCtr;
     std::unordered_map<std::string, std::shared_ptr<BasicBlock>> m_funcBB;
 
+    std::unordered_set<std::shared_ptr<BasicBlock>> m_sealedBlocks;
+    
+    using subMap = std::unordered_map<std::string, std::shared_ptr<Inst>>;
+    std::unordered_map<std::shared_ptr<BasicBlock>, subMap> m_currDef;
+
 public:
     IRVisitor();
     void visit(StatementsAST& v) override;
     void visit(NumberAST& v) override;
     void visit(BoolAST& v) override;
     void visit(StringAST& v) override;
-    void visit(IdentifierAST& v) override;
+    void visit(VariableAST& v) override;
     void visit(ProgramAST& v) override;
     void visit(ScopeAST& v) override;
     void visit(ScopedExprAST& v) override;
@@ -64,8 +71,6 @@ public:
     void visit(ProcDeclAST& v) override;
     void visit(FuncDeclAST& v) override;
 
-    std::vector<std::string> split(std::string s, std::string delimiter);
-
     std::string getCurrentTemp();
     void generateCurrentTemp();
 
@@ -78,4 +83,15 @@ public:
     std::string baseNameToSSA(const std::string& name);
     std::string getCurrentSSAName(const std::string& name);
     void printCFG();
+    std::string getBaseName(std::string name);
+
+    void writeVariable(std::string varName, std::shared_ptr<BasicBlock> block,
+                       std::shared_ptr<Inst> value);
+    std::shared_ptr<Inst> readVariable(std::string varName,
+                                       std::shared_ptr<BasicBlock> block);
+    std::shared_ptr<Inst> readVariableRecursive(std::string varName,
+                                       std::shared_ptr<BasicBlock> block);
+    std::shared_ptr<Inst> addPhiOperands(std::string varName,
+                                         std::shared_ptr<PhiInst> phi);
+    void sealBlock(std::shared_ptr<BasicBlock> block);
 };

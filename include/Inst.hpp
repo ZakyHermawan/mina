@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "Types.hpp"
 
@@ -10,6 +11,7 @@ class Inst
 {
 public:
     virtual std::string getString() = 0;
+    virtual std::shared_ptr<Inst> getTarget() { return nullptr; }
 };
 
 class IntConstInst : public Inst
@@ -27,6 +29,10 @@ public:
     IntConstInst& operator=(IntConstInst&&) noexcept = default;
 
     int getVal();
+    std::shared_ptr<Inst> getTarget() override
+    {
+        return std::make_shared<IntConstInst>(m_val);
+    }
     std::string getString();
 };
 
@@ -45,6 +51,11 @@ public:
     BoolConstInst& operator=(BoolConstInst&&) noexcept = default;
 
     bool getVal();
+    std::shared_ptr<Inst> getTarget() override
+    {
+        return std::make_shared<BoolConstInst>(m_val);
+    }
+
     std::string getString();
 };
 
@@ -61,6 +72,11 @@ public:
     StrConstInst(StrConstInst&&) noexcept = default;
     StrConstInst& operator=(const StrConstInst&) = delete;
     StrConstInst& operator=(StrConstInst&&) noexcept = default;
+
+    std::shared_ptr<Inst> getTarget() override
+    {
+        return std::make_shared<StrConstInst>(m_val);
+    }
 
     std::string getString();
 };
@@ -79,6 +95,11 @@ public:
     IdentInst& operator=(const IdentInst&) = delete;
     IdentInst& operator=(IdentInst&&) noexcept = default;
 
+    std::shared_ptr<Inst> getTarget() override
+    {
+      return std::make_shared<IdentInst>(m_name);
+    }
+
     std::string getString();
 };
 
@@ -96,7 +117,7 @@ public:
     AddInst& operator=(const AddInst&) = delete;
     AddInst& operator=(AddInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
@@ -118,7 +139,7 @@ public:
     SubInst& operator=(const SubInst&) = delete;
     SubInst& operator=(SubInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
@@ -140,7 +161,7 @@ public:
     MulInst& operator=(const MulInst&) = delete;
     MulInst& operator=(MulInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
@@ -162,7 +183,7 @@ public:
     DivInst& operator=(const DivInst&) = delete;
     DivInst& operator=(DivInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
@@ -183,7 +204,7 @@ public:
     NotInst& operator=(const NotInst&) = delete;
     NotInst& operator=(NotInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getOperand();
 
     std::string getString();
@@ -204,7 +225,7 @@ public:
     AndInst& operator=(const AndInst&) = delete;
     AndInst& operator=(AndInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
@@ -226,7 +247,7 @@ public:
     OrInst& operator=(const OrInst&) = delete;
     OrInst& operator=(OrInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
@@ -249,7 +270,7 @@ public:
     AllocaInst& operator=(const AllocaInst&) = delete;
     AllocaInst& operator=(AllocaInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
     Type getType();
     unsigned int getSize();
 
@@ -271,7 +292,7 @@ public:
     ArrAccessInst& operator=(const ArrAccessInst&) = delete;
     ArrAccessInst& operator=(ArrAccessInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getSource();
     std::shared_ptr<Inst> getIndex();
 
@@ -293,7 +314,7 @@ public:
     ArrUpdateInst& operator=(const ArrUpdateInst&) = delete;
     ArrUpdateInst& operator=(ArrUpdateInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getSource();
     std::shared_ptr<Inst> getIndex();
     std::shared_ptr<Inst> getVal();
@@ -315,7 +336,7 @@ public:
     AssignInst& operator=(const AssignInst&) = delete;
     AssignInst& operator=(AssignInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getSource();
 
     std::string getString();
@@ -336,7 +357,7 @@ public:
     CmpEQInst& operator=(const CmpEQInst&) = delete;
     CmpEQInst& operator=(CmpEQInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
@@ -358,7 +379,7 @@ public:
     CmpNEInst& operator=(const CmpNEInst&) = delete;
     CmpNEInst& operator=(CmpNEInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
@@ -381,7 +402,7 @@ public:
     CmpLTInst& operator=(const CmpLTInst&) = delete;
     CmpLTInst& operator=(CmpLTInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
@@ -403,7 +424,7 @@ public:
     CmpLTEInst& operator=(const CmpLTEInst&) = delete;
     CmpLTEInst& operator=(CmpLTEInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
@@ -425,7 +446,7 @@ public:
     CmpGTInst& operator=(const CmpGTInst&) = delete;
     CmpGTInst& operator=(CmpGTInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
@@ -447,7 +468,7 @@ public:
     CmpGTEInst& operator=(const CmpGTEInst&) = delete;
     CmpGTEInst& operator=(CmpGTEInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
@@ -468,7 +489,7 @@ public:
     JumpInst& operator=(const JumpInst&) = delete;
     JumpInst& operator=(JumpInst&&) noexcept = default;
 
-    std::shared_ptr<BasicBlock> getTarget();
+    std::shared_ptr<BasicBlock> getJumpTarget();
 
     std::string getString();
 };
@@ -556,7 +577,7 @@ public:
     GetInst& operator=(const GetInst&) = delete;
     GetInst& operator=(GetInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
 
     std::string getString();
 };
@@ -594,7 +615,7 @@ public:
     PopInst& operator=(const PopInst&) = delete;
     PopInst& operator=(PopInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget();
+    std::shared_ptr<Inst> getTarget() override;
 
     std::string getString();
 };
@@ -632,3 +653,25 @@ public:
     std::string getString();
 };
 
+class PhiInst : public Inst
+{
+private:
+    std::shared_ptr<Inst> m_target;
+    std::shared_ptr<BasicBlock> m_block;
+    std::vector<std::shared_ptr<Inst>> m_operands;
+
+   public:
+    PhiInst(std::string name, std::shared_ptr<BasicBlock> m_block);
+
+    virtual ~PhiInst() = default;
+    PhiInst(const PhiInst&) = delete;
+    PhiInst(PhiInst&&) noexcept = default;
+    PhiInst& operator=(const PhiInst&) = delete;
+    PhiInst& operator=(PhiInst&&) noexcept = default;
+
+    void appendOperand(std::shared_ptr<Inst> operand);
+
+    std::shared_ptr<Inst> getTarget() override;
+    std::shared_ptr<BasicBlock> getBlock();
+    std::string getString();
+};

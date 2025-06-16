@@ -9,7 +9,7 @@ public:
     void visit(NumberAST& v) override;
     void visit(BoolAST& v) override;
     void visit(StringAST& v) override;
-    void visit(IdentifierAST& v) override;
+    void visit(VariableAST& v) override;
     void visit(ProgramAST& v) override;
     void visit(ScopeAST& v) override;
     void visit(ScopedExprAST& v) override;

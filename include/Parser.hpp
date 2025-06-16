@@ -107,7 +107,7 @@ private:
     std::shared_ptr<ExprAST> output();
     std::shared_ptr<OutputsAST> moreOutput();
     std::shared_ptr<InputsAST> inputs();
-    std::shared_ptr<ExprAST> input();
+    std::shared_ptr<InputAST> input();
     std::shared_ptr<InputsAST> moreInputs();
     std::shared_ptr<ExprAST> optSubscript();
 };

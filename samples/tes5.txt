@@ -6,5 +6,10 @@
 	put(A, skip)
 	put(bul, skip)
 	get(A)
+	if A >= 0 then
+		A := 1
+	else
+		A := 2
+	end if
 	put(A, skip)
 }

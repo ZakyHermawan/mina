@@ -8,7 +8,7 @@ class StatementsAST;
 class NumberAST;
 class BoolAST;
 class StringAST;
-class IdentifierAST;
+class VariableAST;
 class ProgramAST;
 class ScopeAST;
 class ScopedExprAST;
@@ -48,7 +48,7 @@ public:
     virtual void visit(NumberAST&) = 0;
     virtual void visit(BoolAST&) = 0;
     virtual void visit(StringAST&) = 0;
-    virtual void visit(IdentifierAST&) = 0;
+    virtual void visit(VariableAST&) = 0;
     virtual void visit(ProgramAST&) = 0;
     virtual void visit(ScopeAST&) = 0;
     virtual void visit(ScopedExprAST&) = 0;

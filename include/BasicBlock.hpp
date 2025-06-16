@@ -21,6 +21,8 @@ public:
     std::vector<std::shared_ptr<Inst>> getInstructions();
 
     void pushInst(const std::shared_ptr<Inst>& inst);
+    void pushInstBegin(const std::shared_ptr<Inst>& inst);
+
     void popInst();
     void setPredecessors(std::vector<std::shared_ptr<BasicBlock>> predecessors);
     void setSuccessors(std::vector<std::shared_ptr<BasicBlock>> successors);

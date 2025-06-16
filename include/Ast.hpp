@@ -100,30 +100,47 @@ class IdentifierAST : public ExprAST
 private:
     std::string m_name;
     Type m_type;
+    IdentType m_identType;
 
 public:
-    IdentifierAST(std::string name, Type type);
+    virtual std::string& getName() = 0;
+    virtual Type getType() const = 0;
+    virtual IdentType getIdentType() const = 0;
+};
 
-    virtual ~IdentifierAST() = default;
-    IdentifierAST(const IdentifierAST&) = delete;
-    IdentifierAST(IdentifierAST&&) noexcept = default;
-    IdentifierAST& operator=(const IdentifierAST&) = delete;
-    IdentifierAST& operator=(IdentifierAST&&) noexcept = default;
+class VariableAST : public IdentifierAST
+{
+private:
+    std::string m_name;
+    Type m_type;
+    IdentType m_identType;
 
-    std::string& getName();
-    Type getType() const;
+public:
+    VariableAST(std::string name, Type type, IdentType identType);
+
+    virtual ~VariableAST() = default;
+    VariableAST(const VariableAST&) = delete;
+    VariableAST(VariableAST&&) noexcept = default;
+    VariableAST& operator=(const VariableAST&) = delete;
+    VariableAST& operator=(VariableAST&&) noexcept = default;
+
+    std::string& getName() override;
+    Type getType() const override;
+    IdentType getIdentType() const override;
     void accept(Visitor& v) override;
 };
 
-class ArrAccessAST : public ExprAST
+class ArrAccessAST : public IdentifierAST
 {
 private:
-    std::shared_ptr<IdentifierAST> m_identifier;
+    std::string m_name;
+    Type m_type;
+    IdentType m_identType;
     std::shared_ptr<ExprAST> m_subsExpr;
 
 public:
-    ArrAccessAST(std::shared_ptr<IdentifierAST> identifier,
-                 std::shared_ptr<ExprAST> subscriptAST);
+    ArrAccessAST(std::string name, Type type, IdentType identType,
+                 std::shared_ptr<ExprAST> subscript);
 
     virtual ~ArrAccessAST() = default;
     ArrAccessAST(const ArrAccessAST&) = delete;
@@ -131,7 +148,10 @@ public:
     ArrAccessAST& operator=(const ArrAccessAST&) = delete;
     ArrAccessAST& operator=(ArrAccessAST&&) noexcept = default;
 
-    std::shared_ptr<IdentifierAST> getIdentifier();
+    std::string& getName() override;
+    Type getType() const override;
+    IdentType getIdentType() const override;
+
     std::shared_ptr<ExprAST> getSubsExpr();
     void accept(Visitor& v) override;
 };
@@ -334,11 +354,11 @@ public:
 class VarDeclAST : public DeclAST
 {
 public:
-    std::shared_ptr<IdentifierAST> m_identifier;
+    std::shared_ptr<VariableAST> m_identifier;
     Type m_type;
 
 public:
-    VarDeclAST(std::shared_ptr<IdentifierAST> identifier, Type type);
+    VarDeclAST(std::shared_ptr<VariableAST> identifier, Type type);
 
     ~VarDeclAST() = default;
     VarDeclAST(const VarDeclAST&) = delete;
@@ -346,18 +366,18 @@ public:
     VarDeclAST& operator=(const VarDeclAST&) = delete;
     VarDeclAST& operator=(VarDeclAST&&) noexcept = default;
 
-    std::shared_ptr<IdentifierAST> getIdentifier();
+    std::shared_ptr<VariableAST> getIdentifier();
     void accept(Visitor& v) override;
 };
 
 class ArrDeclAST : public DeclAST
 {
 public:
-    std::shared_ptr<IdentifierAST> m_identifier;
+    std::shared_ptr<VariableAST> m_identifier;
     unsigned int m_size;
 
 public:
-    ArrDeclAST(std::shared_ptr<IdentifierAST> identifier, unsigned int size);
+    ArrDeclAST(std::shared_ptr<VariableAST> identifier, unsigned int size);
 
     ~ArrDeclAST() = default;
     ArrDeclAST(const ArrDeclAST&) = delete;
@@ -365,7 +385,7 @@ public:
     ArrDeclAST& operator=(const ArrDeclAST&) = delete;
     ArrDeclAST& operator=(ArrDeclAST&&) noexcept = default;
 
-    std::shared_ptr<IdentifierAST> getIdentifier();
+    std::shared_ptr<VariableAST> getIdentifier();
     unsigned int getSize() const;
     void accept(Visitor& v) override;
 };
@@ -439,11 +459,11 @@ public:
 class AssignmentAST : public StatementAST
 {
 private:
-    std::shared_ptr<ExprAST> m_left;
+    std::shared_ptr<IdentifierAST> m_left;
     std::shared_ptr<ExprAST> m_right;
 
 public:
-    AssignmentAST(std::shared_ptr<ExprAST> left,
+    AssignmentAST(std::shared_ptr<IdentifierAST> left,
                   std::shared_ptr<ExprAST> right);
 
     ~AssignmentAST() = default;
@@ -452,7 +472,7 @@ public:
     AssignmentAST& operator=(const AssignmentAST&) = delete;
     AssignmentAST& operator=(AssignmentAST&&) noexcept = default;
 
-    std::shared_ptr<ExprAST> getIdentifier();
+    std::shared_ptr<IdentifierAST> getIdentifier();
     std::shared_ptr<ExprAST> getExpr();
     void accept(Visitor& v);
 };
@@ -498,10 +518,10 @@ public:
 class InputAST : public StatementAST
 {
 private:
-    std::shared_ptr<StatementAST> m_expr;
+    std::shared_ptr<IdentifierAST> m_expr;
 
 public:
-    InputAST(std::shared_ptr<ExprAST> expr);
+    InputAST(std::shared_ptr<IdentifierAST> expr);
 
     ~InputAST() = default;
     InputAST(const InputAST&) = delete;
@@ -509,25 +529,26 @@ public:
     InputAST& operator=(const InputAST&) = delete;
     InputAST& operator=(InputAST&&) noexcept = default;
 
-    std::shared_ptr<StatementAST> getExpr();
+    std::shared_ptr<IdentifierAST> getInput();
     void accept(Visitor& v);
 };
 
 class InputsAST : public StatementAST
 {
 private:
-    std::shared_ptr<ExprAST> m_input;
+    std::shared_ptr<InputAST> m_input;
     std::shared_ptr<InputsAST> m_inputs;
 
 public:
-    InputsAST(std::shared_ptr<ExprAST> input, std::shared_ptr<InputsAST> inputs);
+    InputsAST(std::shared_ptr<InputAST> input,
+              std::shared_ptr<InputsAST> inputs);
     ~InputsAST() = default;
     InputsAST(const InputsAST&) = delete;
     InputsAST(InputsAST&&) noexcept = default;
     InputsAST& operator=(const InputsAST&) = delete;
     InputsAST& operator=(InputsAST&&) noexcept = default;
 
-    std::shared_ptr<ExprAST> getInput();
+    std::shared_ptr<InputAST> getInput();
     std::shared_ptr<InputsAST> getInputs();
     void accept(Visitor& v);
 };
@@ -645,11 +666,11 @@ public:
 class ParameterAST
 {
 private:
-    std::shared_ptr<IdentifierAST> m_identifier;
+    std::shared_ptr<VariableAST> m_identifier;
     Type m_type;
   
 public:
-    ParameterAST(std::shared_ptr<IdentifierAST> identifier, Type type);
+    ParameterAST(std::shared_ptr<VariableAST> identifier, Type type);
   
     ~ParameterAST() = default;
     ParameterAST(const ParameterAST&) = delete;
@@ -657,7 +678,7 @@ public:
     ParameterAST& operator=(const ParameterAST&) = delete;
     ParameterAST& operator=(ParameterAST&&) noexcept = default;
   
-    std::shared_ptr<IdentifierAST> getIdentifier();
+    std::shared_ptr<VariableAST> getIdentifier();
     Type getType() const;
     void accept(Visitor& v);
 };

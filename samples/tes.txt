@@ -13,8 +13,8 @@
     a := 5
     if c then
        repeat
-          put(b, skip)
           b := b+1
+          put(b, skip)
        until b >= a
     end if
   }

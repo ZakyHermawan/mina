@@ -17,6 +17,11 @@ void BasicBlock::pushInst(const std::shared_ptr<Inst>& inst)
     m_instructions.push_back(inst);
 }
 
+void BasicBlock::pushInstBegin(const std::shared_ptr<Inst>& inst)
+{
+    m_instructions.insert(m_instructions.begin(), inst);
+}
+
 void BasicBlock::popInst() { m_instructions.pop_back(); }
 
 void BasicBlock::setPredecessors(

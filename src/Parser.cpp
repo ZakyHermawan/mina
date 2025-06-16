@@ -412,7 +412,8 @@ std::shared_ptr<DeclAST> Parser::declaration()
         
         advance();
         type();
-        auto identifierAST = std::make_shared<IdentifierAST>(varName, m_type);
+        auto identifierAST =
+            std::make_shared<VariableAST>(varName, m_type, IdentType::VARIABLE);
 
         if (isArrDecl)
         {
@@ -940,7 +941,7 @@ std::shared_ptr<StatementAST> Parser::assignOrCall(std::string &identifier)
     else if (getCurrTokenType() == COLON_EQUAL)
     {
         advance();
-        auto leftAST = std::make_shared<IdentifierAST>(identifier, Type::UNDEFINED);
+        auto leftAST = std::make_shared<VariableAST>(identifier, Type::UNDEFINED, IdentType::VARIABLE);
         auto exprAST = assignExpression();
 
         if (m_parsing_function)
@@ -980,13 +981,10 @@ std::shared_ptr<StatementAST> Parser::assignOrCall(std::string &identifier)
             m_instructions.push_back(ICONST);
             m_instructions.push_back(base_pointer_addr + (it->second).getStackAddr());
         }
-        auto leftAST =
-            std::make_shared<IdentifierAST>(identifier, Type::UNDEFINED);
-
         advance();
         auto subscriptAST = subscript();
         auto arrAccessAST =
-            std::make_shared<ArrAccessAST>(leftAST, subscriptAST);
+            std::make_shared<ArrAccessAST>(identifier, Type::UNDEFINED, IdentType::ARRAY, subscriptAST);
         if (getCurrTokenType() != RIGHT_SQUARE)
         {
             exitParse("Expected ']'");
@@ -1410,9 +1408,8 @@ std::shared_ptr<ExprAST> Parser::subsOrCall(std::string &identifier)
         {
             m_instructions.push_back(ALOAD);
         }
-        auto identifierAST =
-            std::make_shared<IdentifierAST>(identifier, Type::UNDEFINED);
-        return std::make_shared<ArrAccessAST>(identifierAST, subsExprAST);
+        return std::make_shared<ArrAccessAST>(identifier, Type::UNDEFINED,
+                                              IdentType::ARRAY, subsExprAST);
     }
     else
     {
@@ -1453,7 +1450,8 @@ std::shared_ptr<ExprAST> Parser::subsOrCall(std::string &identifier)
             m_instructions.push_back(SLOAD);
             m_instructions.push_back(base_pointer_addr + (it->second).getStackAddr());
         }
-        return std::make_shared<IdentifierAST>(identifier, Type::UNDEFINED);
+        return std::make_shared<VariableAST>(identifier, Type::UNDEFINED,
+                                             IdentType::VARIABLE);
     }
 }
 
@@ -1654,7 +1652,8 @@ std::shared_ptr<ParametersAST> Parser::parameters()
     
     advance();
     type();
-    auto identifierAST = std::make_shared<IdentifierAST>(identifier, m_type);
+    auto identifierAST =
+        std::make_shared<VariableAST>(identifier, m_type, IdentType::VARIABLE);
     auto paramAST =
         std::make_shared<ParameterAST>(identifierAST, m_type);
     auto moreParamAST = parameters();
@@ -1754,7 +1753,7 @@ std::shared_ptr<InputsAST> Parser::moreInputs()
 /*
  * input              ::= IDENTIFIER optSubscript ;
  * */
-std::shared_ptr<ExprAST> Parser::input()
+std::shared_ptr<InputAST> Parser::input()
 {
     if (getCurrTokenType() != IDENTIFIER)
     {
@@ -1763,7 +1762,7 @@ std::shared_ptr<ExprAST> Parser::input()
     auto varName = getCurrToken().getLexme();
     auto [it, lexical_level] = variableDefined(varName);
     auto identifierAST =
-        std::make_shared<IdentifierAST>(varName, Type::UNDEFINED);
+        std::make_shared<VariableAST>(varName, Type::UNDEFINED, IdentType::VARIABLE);
     
     m_instructions.push_back(READINT);
     
@@ -1776,9 +1775,12 @@ std::shared_ptr<ExprAST> Parser::input()
     auto subsExpr = optSubscript();
     if (subsExpr)
     {
-        return std::make_shared<ArrAccessAST>(identifierAST, subsExpr);
+        auto x = std::make_shared<ArrAccessAST>(varName, Type::UNDEFINED,
+                                              IdentType::ARRAY, subsExpr);
+        auto inputAST = std::make_shared<InputAST>(x);
+        return inputAST;
     }
-    return identifierAST;
+    return std::make_shared<InputAST>(identifierAST);
 }
 
 /*

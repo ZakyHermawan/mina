@@ -26,25 +26,28 @@ StringAST::StringAST(std::string str) : m_str{str} {}
 std::string StringAST::getVal() const { return m_str; }
 void StringAST::accept(Visitor& v) { v.visit(*this); }
 
-IdentifierAST::IdentifierAST(std::string name, Type type)
-    : m_name(std::move(name)), m_type(type)
+VariableAST::VariableAST(std::string name, Type type, IdentType identType)
+    : m_name(std::move(name)), m_type(type), m_identType(identType)
 {
 }
-void IdentifierAST::accept(Visitor& v){ v.visit(*this); }
-std::string& IdentifierAST::getName() { return m_name; }
-Type IdentifierAST::getType() const { return m_type; }
+void VariableAST::accept(Visitor& v) { v.visit(*this); }
+std::string& VariableAST::getName() { return m_name; }
+Type VariableAST::getType() const { return m_type; }
+IdentType VariableAST::getIdentType() const { return m_identType; }
 
-ArrAccessAST::ArrAccessAST(std::shared_ptr<IdentifierAST> identifier,
+ArrAccessAST::ArrAccessAST(std::string name, Type type, IdentType identType,
                            std::shared_ptr<ExprAST> subscript)
-    : m_identifier(std::move(identifier)), m_subsExpr(std::move(subscript))
+    : m_name(std::move(name)),
+      m_type(type),
+      m_identType(identType),
+      m_subsExpr(std::move(subscript))
 {
 }
-std::shared_ptr<IdentifierAST> ArrAccessAST::getIdentifier()
-{
-    return m_identifier;
-}
-std::shared_ptr<ExprAST> ArrAccessAST::getSubsExpr()
-{
+std::string& ArrAccessAST::getName() { return m_name; }
+Type ArrAccessAST::getType() const { return m_type; }
+IdentType ArrAccessAST::getIdentType() const { return m_identType; }
+
+std::shared_ptr<ExprAST> ArrAccessAST::getSubsExpr() {
     return m_subsExpr;
 }
 void ArrAccessAST::accept(Visitor& v)
@@ -157,11 +160,11 @@ void ExpressionAST::accept(Visitor& v)
     v.visit(*this);
 }
 
-VarDeclAST::VarDeclAST(std::shared_ptr<IdentifierAST> identifier, Type type)
+VarDeclAST::VarDeclAST(std::shared_ptr<VariableAST> identifier, Type type)
     : m_identifier(std::move(identifier)), m_type(type)
 {
 }
-std::shared_ptr<IdentifierAST> VarDeclAST::getIdentifier()
+std::shared_ptr<VariableAST> VarDeclAST::getIdentifier()
 {
     return m_identifier;
 }
@@ -170,12 +173,12 @@ void VarDeclAST::accept(Visitor& v)
     v.visit(*this);
 }
 
-ArrDeclAST::ArrDeclAST(std::shared_ptr<IdentifierAST> identifier,
+ArrDeclAST::ArrDeclAST(std::shared_ptr<VariableAST> identifier,
                        unsigned int size)
     : m_identifier(std::move(identifier)), m_size(size)
 {
 }
-std::shared_ptr<IdentifierAST> ArrDeclAST::getIdentifier()
+std::shared_ptr<VariableAST> ArrDeclAST::getIdentifier()
 {
     return m_identifier;
 }
@@ -239,16 +242,16 @@ void ScopedExprAST::accept(Visitor& v)
     v.visit(*this);
 }
 
-AssignmentAST::AssignmentAST(std::shared_ptr<ExprAST> left,
+AssignmentAST::AssignmentAST(std::shared_ptr<IdentifierAST> left,
                              std::shared_ptr<ExprAST> right)
     : m_left(std::move(left)), m_right(std::move(right))
 {
 }
-std::shared_ptr<ExprAST> AssignmentAST::getIdentifier() { return m_left; }
+std::shared_ptr<IdentifierAST> AssignmentAST::getIdentifier() { return m_left; }
 std::shared_ptr<ExprAST> AssignmentAST::getExpr() { return m_right; }
 void AssignmentAST::accept(Visitor& v)
 {
-  v.visit(*this);
+    v.visit(*this);
 }
 
 OutputAST::OutputAST(std::shared_ptr<ExprAST> expr)
@@ -273,16 +276,19 @@ void OutputsAST::accept(Visitor& v)
     v.visit(*this);
 }
 
-InputAST::InputAST(std::shared_ptr<ExprAST> expr) : m_expr(std::move(expr)) {}
-std::shared_ptr<StatementAST> InputAST::getExpr() { return m_expr; }
+InputAST::InputAST(std::shared_ptr<IdentifierAST> expr)
+    : m_expr(std::move(expr))
+{
+}
+std::shared_ptr<IdentifierAST> InputAST::getInput() { return m_expr; }
 void InputAST::accept(Visitor& v) { v.visit(*this); }
 
-InputsAST::InputsAST(std::shared_ptr<ExprAST> input,
+InputsAST::InputsAST(std::shared_ptr<InputAST> input,
                      std::shared_ptr<InputsAST> inputs)
     : m_input(std::move(input)), m_inputs(std::move(inputs))
 {
 }
-std::shared_ptr<ExprAST> InputsAST::getInput() { return m_input; }
+std::shared_ptr<InputAST> InputsAST::getInput() { return m_input; }
 std::shared_ptr<InputsAST> InputsAST::getInputs() { return m_inputs; }
 void InputsAST::accept(Visitor& v) { v.visit(*this); }
 
@@ -347,11 +353,11 @@ void ProgramAST::accept(Visitor& v)
     v.visit(*this);
 }
 
-ParameterAST::ParameterAST(std::shared_ptr<IdentifierAST> identifier, Type type)
+ParameterAST::ParameterAST(std::shared_ptr<VariableAST> identifier, Type type)
     : m_identifier(std::move(identifier)), m_type(type)
 {
 }
-std::shared_ptr<IdentifierAST> ParameterAST::getIdentifier()
+std::shared_ptr<VariableAST> ParameterAST::getIdentifier()
 {
   return m_identifier;
 }
