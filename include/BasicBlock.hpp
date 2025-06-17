@@ -6,7 +6,7 @@
 
 class Inst;
 
-class BasicBlock
+class BasicBlock : public std::enable_shared_from_this<BasicBlock>
 {
 private:
     std::string m_name;
@@ -20,8 +20,8 @@ public:
     void setInstructions(std::vector<std::shared_ptr<Inst>> instructions);
     std::vector<std::shared_ptr<Inst>>& getInstructions();
 
-    void pushInst(const std::shared_ptr<Inst>& inst);
-    void pushInstBegin(const std::shared_ptr<Inst>& inst);
+    void pushInst(std::shared_ptr<Inst> inst);
+    void pushInstBegin(std::shared_ptr<Inst> inst);
 
     void popInst();
     void setPredecessors(std::vector<std::shared_ptr<BasicBlock>> predecessors);

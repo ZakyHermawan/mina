@@ -1,4 +1,5 @@
 #include "BasicBlock.hpp"
+#include "Inst.hpp"
 
 BasicBlock::BasicBlock(std::string name) : m_name(std::move(name)) {}
 
@@ -7,17 +8,19 @@ void BasicBlock::setInstructions(
 {
     m_instructions = std::move(instructions);
 }
+
 std::vector<std::shared_ptr<Inst>>& BasicBlock::getInstructions()
 {
     return m_instructions;
 }
 
-void BasicBlock::pushInst(const std::shared_ptr<Inst>& inst)
+void BasicBlock::pushInst(std::shared_ptr<Inst> inst)
 {
     m_instructions.push_back(inst);
+    inst->insert_block(shared_from_this());
 }
 
-void BasicBlock::pushInstBegin(const std::shared_ptr<Inst>& inst)
+void BasicBlock::pushInstBegin(std::shared_ptr<Inst> inst)
 {
     m_instructions.insert(m_instructions.begin(), inst);
 }

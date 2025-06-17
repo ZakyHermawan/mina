@@ -44,7 +44,6 @@ void BoolConstInst::setup_def_use() {}
 StrConstInst::StrConstInst(std::string val) : m_val(val) {}
 std::string StrConstInst::getString()
 {
-    //return "StrConst(" + m_val + ")";
     return m_val;
 }
 void StrConstInst::push_user(std::shared_ptr<Inst> user)
@@ -70,6 +69,7 @@ AddInst::AddInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
       m_operand1(std::move(operand1)),
       m_operand2(std::move(operand2))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
 std::shared_ptr<Inst> AddInst::getTarget() { return m_target; }
 std::shared_ptr<Inst> AddInst::getOperand1() {return m_operand1;}
@@ -77,10 +77,18 @@ std::shared_ptr<Inst> AddInst::getOperand2() { return m_operand2; }
 std::string AddInst::getString()
 {
     auto target = m_target->getTarget()->getString();
-    auto operand1 = m_operand1->getTarget()->getString();
-    auto operand2 = m_operand2->getTarget()->getString();
 
-    return target + " <- Add(" + operand1 + ", " + operand2 + ")";
+    std::string res = target + " <- Add(";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    res += ")";
+    return res;
 }
 void AddInst::push_user(std::shared_ptr<Inst> user)
 {
@@ -98,6 +106,7 @@ SubInst::SubInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
     m_operand1(std::move(operand1)),
     m_operand2(std::move(operand2))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
 std::shared_ptr<Inst> SubInst::getTarget() { return m_target; }
 std::shared_ptr<Inst> SubInst::getOperand1() { return m_operand1; }
@@ -105,10 +114,18 @@ std::shared_ptr<Inst> SubInst::getOperand2() { return m_operand2; }
 std::string SubInst::getString()
 {
     auto target = m_target->getTarget()->getString();
-    auto operand1 = m_operand1->getTarget()->getString();
-    auto operand2 = m_operand2->getTarget()->getString();
 
-    return target + " <- Sub(" + operand1 + ", " + operand2 + ")";
+    std::string res = target + " <- Sub(";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    res += ")";
+    return res;
 }
 void SubInst::push_user(std::shared_ptr<Inst> user)
 {
@@ -126,6 +143,7 @@ MulInst::MulInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
     m_operand1(std::move(operand1)),
     m_operand2(std::move(operand2))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
 std::shared_ptr<Inst> MulInst::getTarget() { return m_target; }
 std::shared_ptr<Inst> MulInst::getOperand1() { return m_operand1; }
@@ -133,10 +151,18 @@ std::shared_ptr<Inst> MulInst::getOperand2() { return m_operand2; }
 std::string MulInst::getString()
 {
     auto target = m_target->getTarget()->getString();
-    auto operand1 = m_operand1->getTarget()->getString();
-    auto operand2 = m_operand2->getTarget()->getString();
 
-    return target + " <- Mul(" + operand1 + ", " + operand2 + ")";
+    std::string res = target + " <- Mul(";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    res += ")";
+    return res;
 }
 void MulInst::push_user(std::shared_ptr<Inst> user)
 {
@@ -154,6 +180,7 @@ DivInst::DivInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
     m_operand1(std::move(operand1)),
     m_operand2(std::move(operand2))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
 std::shared_ptr<Inst> DivInst::getTarget() { return m_target; }
 std::shared_ptr<Inst> DivInst::getOperand1() { return m_operand1; }
@@ -161,11 +188,18 @@ std::shared_ptr<Inst> DivInst::getOperand2() { return m_operand2; }
 std::string DivInst::getString()
 {
     auto target = m_target->getTarget()->getString();
-    auto operand1 = m_operand1->getTarget()->getString();
-    auto operand2 = m_operand2->getTarget()->getString();
 
-
-    return target + " <- Div(" + operand1 + ", " + operand2 + ")";
+    std::string res = target + " <- Div(";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    res += ")";
+    return res;
 }
 void DivInst::push_user(std::shared_ptr<Inst> user)
 {
@@ -181,15 +215,25 @@ NotInst::NotInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand)
     : m_target(std::move(target)),
     m_operand(std::move(operand))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand};
 }
 std::shared_ptr<Inst> NotInst::getTarget() { return m_target; }
 std::shared_ptr<Inst> NotInst::getOperand() { return m_operand; }
 std::string NotInst::getString()
 {
     auto target = m_target->getTarget()->getString();
-    auto operand = m_operand->getTarget()->getString();
 
-    return target + " <- Not(" + operand + ")";
+    std::string res = target + " <- Not(";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    res += ")";
+    return res;
 }
 void NotInst::push_user(std::shared_ptr<Inst> user)
 {
@@ -203,6 +247,7 @@ AndInst::AndInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
     m_operand1(std::move(operand1)),
     m_operand2(std::move(operand2))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
 std::shared_ptr<Inst> AndInst::getTarget() { return m_target; }
 std::shared_ptr<Inst> AndInst::getOperand1() { return m_operand1; }
@@ -210,10 +255,18 @@ std::shared_ptr<Inst> AndInst::getOperand2() { return m_operand2; }
 std::string AndInst::getString()
 {
     auto target = m_target->getTarget()->getString();
-    auto operand1 = m_operand1->getTarget()->getString();
-    auto operand2 = m_operand2->getTarget()->getString();
 
-    return target + " <- And(" + operand1 + ", " + operand2 + ")";
+    std::string res = target + " <- And(";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    res += ")";
+    return res;
 }
 void AndInst::push_user(std::shared_ptr<Inst> user)
 {
@@ -231,6 +284,7 @@ OrInst::OrInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
     m_operand1(std::move(operand1)),
     m_operand2(std::move(operand2))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand1};
 }
 std::shared_ptr<Inst> OrInst::getTarget() { return m_target; }
 std::shared_ptr<Inst> OrInst::getOperand1() { return m_operand1; }
@@ -238,10 +292,18 @@ std::shared_ptr<Inst> OrInst::getOperand2() { return m_operand2; }
 std::string OrInst::getString()
 {
     auto target = m_target->getTarget()->getString();
-    auto operand1 = m_operand1->getTarget()->getString();
-    auto operand2 = m_operand2->getTarget()->getString();
 
-    return target + " <- Or(" + operand1 + ", " + operand2 + ")";
+    std::string res = target + " <- Or(";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    res += ")";
+    return res;
 }
 void OrInst::push_user(std::shared_ptr<Inst> user)
 {
@@ -294,6 +356,7 @@ ArrAccessInst::ArrAccessInst(std::shared_ptr<Inst> target,
     m_source(std::move(source)),
     m_index(std::move(index))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_source, m_index};
 }
 std::shared_ptr<Inst> ArrAccessInst::getTarget() { return m_target; }
 std::shared_ptr<Inst> ArrAccessInst::getSource() { return m_source; }
@@ -301,10 +364,18 @@ std::shared_ptr<Inst> ArrAccessInst::getIndex() { return m_index; }
 std::string ArrAccessInst::getString()
 {
     auto target = m_target->getTarget()->getString();
-    auto source = m_source->getTarget()->getString();
-    auto index = m_index->getTarget()->getString();
 
-    return target + " <- Access(" + source + ", " + index + ")";
+    std::string res = target + " <- Access(";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    res += ")";
+    return res;
 }
 void ArrAccessInst::push_user(std::shared_ptr<Inst> user)
 {
@@ -325,6 +396,7 @@ ArrUpdateInst::ArrUpdateInst(std::shared_ptr<Inst> target,
       m_index(std::move(index)),
       m_val(std::move(val))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_source, m_index, m_val};
 }
 std::shared_ptr<Inst> ArrUpdateInst::getTarget() { return m_target; }
 std::shared_ptr<Inst> ArrUpdateInst::getSource() { return m_source; }
@@ -333,11 +405,18 @@ std::shared_ptr<Inst> ArrUpdateInst::getVal() { return m_val; }
 std::string ArrUpdateInst::getString()
 {
     auto target = m_target->getTarget()->getString();
-    auto source = m_source->getTarget()->getString();
-    auto index = m_index->getTarget()->getString();
-    auto val = m_val->getTarget()->getString();
 
-    return target + " <- Update(" + source + ", " + index + ", " + val + ")";
+    std::string res = target + " <- Update(";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    res += ")";
+    return res;
 }
 void ArrUpdateInst::push_user(std::shared_ptr<Inst> user)
 {
@@ -354,16 +433,26 @@ AssignInst ::AssignInst(std::shared_ptr<Inst> target,
                       std::shared_ptr<Inst> source)
     : m_target(std::move(target)), m_source(std::move(source))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_source};
 }
 std::shared_ptr<Inst> AssignInst::getTarget() { return m_target; }
 std::shared_ptr<Inst> AssignInst::getSource() { return m_source; }
 std::string AssignInst::getString()
 {
     auto target = m_target->getTarget()->getString();
-    auto source = m_source->getTarget()->getString();
 
-    return target + " <- " + source;
+    std::string res = target + " <- ";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    return res;
 }
+
 void AssignInst::push_user(std::shared_ptr<Inst> user)
 {
     m_users.push_back(user);
@@ -377,8 +466,7 @@ CmpEQInst::CmpEQInst(std::shared_ptr<Inst> target,
     m_operand1(std::move(operand1)),
     m_operand2(std::move(operand2))
 {
-    m_operand1->push_user(shared_from_this());
-    m_operand2->push_user(shared_from_this());
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
 std::shared_ptr<Inst> CmpEQInst::getTarget() { return m_target; }
 std::shared_ptr<Inst> CmpEQInst::getOperand1() { return m_operand1; }
@@ -386,10 +474,18 @@ std::shared_ptr<Inst> CmpEQInst::getOperand2() { return m_operand2; }
 std::string CmpEQInst::getString()
 {
     auto target = m_target->getTarget()->getString();
-    auto operand1 = m_operand1->getTarget()->getString();
-    auto operand2 = m_operand2->getTarget()->getString();
 
-    return target + " <- Cmp_EQ(" + operand1 + ", " + operand2 + ")";
+    std::string res = target + " <- Cmp_EQ(";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    res += ")";
+    return res;
 }
 void CmpEQInst::push_user(std::shared_ptr<Inst> user)
 {
@@ -408,6 +504,7 @@ CmpNEInst::CmpNEInst(std::shared_ptr<Inst> target,
     m_operand1(std::move(operand1)),
     m_operand2(std::move(operand2))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
 std::shared_ptr<Inst> CmpNEInst::getTarget() { return m_target; }
 std::shared_ptr<Inst> CmpNEInst::getOperand1() { return m_operand1; }
@@ -415,11 +512,20 @@ std::shared_ptr<Inst> CmpNEInst::getOperand2() { return m_operand2; }
 std::string CmpNEInst::getString()
 {
     auto target = m_target->getTarget()->getString();
-    auto operand1 = m_operand1->getTarget()->getString();
-    auto operand2 = m_operand2->getTarget()->getString();
 
-    return target + " <- Cmp_NE(" + operand1 + ", " + operand2 + ")";
+    std::string res = target + " <- Cmp_NE(";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    res += ")";
+    return res;
 }
+
 void CmpNEInst::push_user(std::shared_ptr<Inst> user)
 {
     m_users.push_back(user);
@@ -437,6 +543,7 @@ CmpLTInst::CmpLTInst(std::shared_ptr<Inst> target,
     m_operand1(std::move(operand1)),
     m_operand2(std::move(operand2))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
 std::shared_ptr<Inst> CmpLTInst::getTarget() { return m_target; }
 std::shared_ptr<Inst> CmpLTInst::getOperand1() { return m_operand1; }
@@ -444,10 +551,18 @@ std::shared_ptr<Inst> CmpLTInst::getOperand2() { return m_operand2; }
 std::string CmpLTInst::getString()
 {
     auto target = m_target->getTarget()->getString();
-    auto operand1 = m_operand1->getTarget()->getString();
-    auto operand2 = m_operand2->getTarget()->getString();
 
-    return target + " <- Cmp_LT(" + operand1 + ", " + operand2 + ")";
+    std::string res = target + " <- Cmp_LT(";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    res += ")";
+    return res;
 }
 void CmpLTInst::push_user(std::shared_ptr<Inst> user)
 {
@@ -466,6 +581,7 @@ CmpLTEInst::CmpLTEInst(std::shared_ptr<Inst> target,
     m_operand1(std::move(operand1)),
     m_operand2(std::move(operand2))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
 std::shared_ptr<Inst> CmpLTEInst::getTarget() { return m_target; }
 std::shared_ptr<Inst> CmpLTEInst::getOperand1() { return m_operand1; }
@@ -473,10 +589,18 @@ std::shared_ptr<Inst> CmpLTEInst::getOperand2() { return m_operand2; }
 std::string CmpLTEInst::getString()
 {
     auto target = m_target->getTarget()->getString();
-    auto operand1 = m_operand1->getTarget()->getString();
-    auto operand2 = m_operand2->getTarget()->getString();
 
-    return target + " <- Cmp_LTE(" + operand1 + ", " + operand2 + ")";
+    std::string res = target + " <- Cmp_LTE(";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    res += ")";
+    return res;
 }
 void CmpLTEInst::push_user(std::shared_ptr<Inst> user)
 {
@@ -495,6 +619,7 @@ CmpGTInst::CmpGTInst(std::shared_ptr<Inst> target,
     m_operand1(std::move(operand1)),
     m_operand2(std::move(operand2))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
 std::shared_ptr<Inst> CmpGTInst::getTarget() { return m_target; }
 std::shared_ptr<Inst> CmpGTInst::getOperand1() { return m_operand1; }
@@ -502,10 +627,18 @@ std::shared_ptr<Inst> CmpGTInst::getOperand2() { return m_operand2; }
 std::string CmpGTInst::getString()
 {
     auto target = m_target->getTarget()->getString();
-    auto operand1 = m_operand1->getTarget()->getString();
-    auto operand2 = m_operand2->getTarget()->getString();
 
-    return target + " <- Cmp_GT(" + operand1 + ", " + operand2 + ")";
+    std::string res = target + " <- Cmp_GT(";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    res += ")";
+    return res;
 }
 void CmpGTInst::push_user(std::shared_ptr<Inst> user)
 {
@@ -524,6 +657,7 @@ CmpGTEInst::CmpGTEInst(std::shared_ptr<Inst> target,
       m_operand1(std::move(operand1)),
       m_operand2(std::move(operand2))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
 std::shared_ptr<Inst> CmpGTEInst::getTarget() { return m_target; }
 std::shared_ptr<Inst> CmpGTEInst::getOperand1() { return m_operand1; }
@@ -531,11 +665,20 @@ std::shared_ptr<Inst> CmpGTEInst::getOperand2() { return m_operand2; }
 std::string CmpGTEInst::getString()
 {
     auto target = m_target->getTarget()->getString();
-    auto operand1 = m_operand1->getTarget()->getString();
-    auto operand2 = m_operand2->getTarget()->getString();
 
-    return target + " <- Cmp_GTE(" + operand1 + ", " + operand2 + ")";
+    std::string res = target + " <- Cmp_GTE(";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    res += ")";
+    return res;
 }
+
 void CmpGTEInst::push_user(std::shared_ptr<Inst> user)
 {
     m_users.push_back(user);
@@ -569,6 +712,7 @@ BRTInst::BRTInst(std::shared_ptr<Inst> cond,
       m_targetSuccess(std::move(targetSuccess)),
       m_targetFailed(std::move(targetFailed))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_cond};
 }
 std::shared_ptr<Inst> BRTInst::getCond() { return m_cond; }
 std::shared_ptr<BasicBlock> BRTInst::getTargetSuccess() { return m_targetSuccess; }
@@ -594,6 +738,7 @@ BRFInst::BRFInst(std::shared_ptr<Inst> cond,
       m_targetSuccess(std::move(targetSuccess)),
       m_targetFailed(std::move(targetFailed))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_cond};
 }
 std::shared_ptr<Inst> BRFInst::getCond() { return m_cond; }
 std::shared_ptr<BasicBlock> BRFInst::getTargetSuccess() { return m_targetSuccess; }
@@ -615,6 +760,7 @@ void BRFInst::setup_def_use() { m_cond->push_user(shared_from_this()); }
 PutInst::PutInst(std::shared_ptr<Inst> operand)
     : m_operand(std::move(operand))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand};
 }
 std::shared_ptr<Inst> PutInst::getOperand() { return m_operand; }
 std::string PutInst::getString()
@@ -647,6 +793,7 @@ void GetInst::setup_def_use() {}
 PushInst::PushInst(std::shared_ptr<Inst> operand)
     : m_operand(std::move(operand))
 {
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand};
 }
 std::shared_ptr<Inst> PushInst::getOperand() { return m_operand; }
 std::string PushInst::getString()
@@ -709,10 +856,6 @@ void PhiInst::appendOperand(std::shared_ptr<Inst> operand)
 {
     m_operands.push_back(operand);
 }
-std::vector<std::shared_ptr<Inst>>& PhiInst::get_operands()
-{
-    return m_operands;
-}
 std::shared_ptr<Inst> PhiInst::getTarget() { return m_target; }
 std::shared_ptr<BasicBlock> PhiInst::getBlock() { return m_block; }
 std::string PhiInst::getString()
@@ -737,19 +880,10 @@ std::string PhiInst::getString()
 }
 void PhiInst::push_user(std::shared_ptr<Inst> user)
 {
-  std::cout << getTarget()->getString()
-            << " phi is being used in instruction: " << user->getString()
-            << std::endl;
-  m_users.push_back(user);
-  std::cout << "list of current users:\n";
-  for (int i = 0; i < m_users.size(); ++i)
-  {
-    std::cout << i << " " << m_users[i]->getString() << std::endl;
-  }
+    m_users.push_back(user);
 }
 std::vector<std::shared_ptr<Inst>>& PhiInst::get_users()
 {
-    std::cout << "getting users of " << getTarget()->getString() << std::endl;
     return m_users;
 }
 void PhiInst::setup_def_use() {}

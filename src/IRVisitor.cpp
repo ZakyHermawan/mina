@@ -376,7 +376,7 @@ void IRVisitor::visit(IfAST& v)
     m_currentBB->pushInst(std::move(jumpInst));
     m_currentBB->pushSuccessor(ifExprBB);
     ifExprBB->pushPredecessor(m_currentBB);
-    //std::cout << ifExprBB->getName() << "pred is: " << m_currentBB->getName() << std::endl;
+
     sealBlock(m_currentBB);
     m_currentBB = ifExprBB;
     //sealBlock(m_currentBB);
@@ -521,14 +521,6 @@ void IRVisitor::visit(ReturnAST& v)
     auto retInst = std::make_shared<ReturnInst>();
     retInst->setup_def_use();
     m_currentBB->pushInst(retInst);
-
-    // Assume that return always at the end of function, and a function only have one return
-    //auto newBBLabel =
-    //    m_currBBNameWithoutCtr + "_" + std::to_string(++m_currBBCtr);
-    //auto newBB = std::make_shared<BasicBlock>(newBBLabel);
-    //newBB->pushPredecessor(m_currentBB);
-    //m_currentBB->pushSuccessor(newBB);
-    //m_currentBB = newBB;
 
     std::cout << "return " << popTemp() << std::endl;
 }
@@ -1088,8 +1080,6 @@ std::string IRVisitor::baseNameToSSA(const std::string& name)
     }
     else
     {
-      //std::cout << "untuk name: " << name << " counter: " << m_nameCtr[name]
-      //          << std::endl; 
         ++m_nameCtr[name];
         return name + "." + std::to_string(m_nameCtr[name]);
     }
@@ -1180,8 +1170,6 @@ std::shared_ptr<Inst> IRVisitor::readVariable(std::string varName,
 {
     if (m_currDef[block].find(varName) != m_currDef[block].end())
     {
-      //std::cout << "get value for " << varName << " "
-      //          << m_currDef[block][varName]->getString() << std::endl;
         return m_currDef[block][varName];
     }
     return readVariableRecursive(varName, block);
@@ -1192,11 +1180,9 @@ std::shared_ptr<Inst> IRVisitor::readVariableRecursive(
 {
   if (m_sealedBlocks.find(block) == m_sealedBlocks.end())
     {
-        std::cout << "incomplete block: " << block->getName() << std::endl;
         auto baseName = getBaseName(varName);
         auto phiName = baseNameToSSA(baseName);
         auto val = std::make_shared<PhiInst>(phiName, block);
-        std::cout << "constructing empty phi: " << phiName << std::endl;
         val->setup_def_use();
         block->pushInstBegin(val);
 
@@ -1235,36 +1221,24 @@ std::shared_ptr<Inst> IRVisitor::addPhiOperands(std::string varName,
         auto val = readVariable(varName, pred);
         phi->appendOperand(val);
     }
-    auto users = phi->get_users();
-    std::cout << users.size() << " users, " << phi->getTarget()->getString()
-              << " used in:\n";
-    for (const auto& user : users)
-    {
-        std::cout << user->getString() << std::endl;
-    }
-    std::cout << std::endl << std::endl;
+
     return tryRemoveTrivialPhi(phi);
-    //return phi;
 }
 
 void IRVisitor::sealBlock(std::shared_ptr<BasicBlock> block)
 {
-    std::cout << "sealing block! " << block->getName() << std::endl;
     for (const auto& [var, val] : m_incompletePhis[block])
     {
         addPhiOperands(var, m_incompletePhis[block][var]);
     }
     m_sealedBlocks.insert(block);
-    if (m_sealedBlocks.find(block) != m_sealedBlocks.end())
-    {
-        std::cout << block->getName() << " is sealed!\n";
-    }
 }
 
 std::shared_ptr<Inst> IRVisitor::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> phi)
 {
     std::shared_ptr<Inst> same = nullptr;
-    for (auto& op : phi->get_operands())
+    auto& operan = phi->getOperands();
+    for (auto& op : operan)
     {
         if (op == same || op == phi)
         {
@@ -1275,55 +1249,76 @@ std::shared_ptr<Inst> IRVisitor::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> ph
             return phi;
         }
         same = op;
+        std::cout << same->getString() << std::endl;
     }
-    std::cout << "phi that should be removed: " << phi->getTarget()->getString() << std::endl;
-    return phi;
-    if (same != nullptr)
+
+    if (same == nullptr)
     {
         same = std::shared_ptr<UndefInst>();
     }
 
     auto& users = phi->get_users();
-    for (auto& use : users)
+    auto users_without_phi = std::vector<std::shared_ptr<Inst>>();
+
+    // get every users of phi except phi itself
+    for (const auto& user : users)
     {
-        auto& operands = use->getOperands();
-        for (auto& opr : operands)
+        if (user != phi)
         {
-            if (opr == phi)
+            users_without_phi.push_back(user);
+        }
+    }
+
+    // replace all uses of phi with same
+    for (auto& user : users_without_phi)
+    {
+        auto& block = user->getBlock();
+        auto& instructions = block->getInstructions();
+        for (int i = 0; i < instructions.size(); ++i)
+        {
+            if (instructions[i] == user)
             {
-                std::cout << use->getString() << std::endl;
-                std::cout << "DELETE\n";
-                opr = same;
+                auto& inst = instructions[i];
+                auto& operands = inst->getOperands();
+
+                for (int i = 0; i < operands.size(); ++i)
+                {
+                    if (operands[i] == phi)
+                    {
+                        operands[i] = same;
+                    }
+                }
             }
         }
     }
-    std::cout << "deleting: " << phi->getString() << std::endl;
-    auto block = phi->getBlock();
-    auto& instrs = block->getInstructions();
-    for (int i = 0; i < instrs.size(); ++i)
+
+
+    // remove phi from the hash table
+    auto& block = phi->getBlock();
+    for (auto& [varName, value] : m_currDef[block])
     {
-        if (instrs[i] == phi)
+        if (value == phi)
         {
-          std::cout << instrs[i]->getString() << std::endl;
-          instrs[i] = std::make_shared<Noop>();
-          auto old = m_cfg;
-          std::cout << "xd\n";
-          m_cfg = block;
-          printCFG();
-          m_cfg = old;
+          m_currDef[block][varName] = same;
         }
     }
-    //phi = nullptr;
-    std::cout << "after delete!\n";
-    printCFG();
 
-
-    for (const auto& user : users)
+    // remove phi from instructions
+    for (auto it = block->getInstructions().begin(); it != block->getInstructions().end(); )
     {
-        //if (user == phi)
-        //{
-        //    continue;
-        //}
+        if (*it == phi) // Compare shared_ptr directly for equality
+        {
+            // erase returns an iterator to the next element
+            it = block->getInstructions().erase(it);
+        }
+        else
+        {
+            ++it; // Move to the next element only if not erased
+        }
+    }
+
+    for (auto& user : users)
+    {
         if (user && user->isPhi())
         {
             tryRemoveTrivialPhi(std::static_pointer_cast<PhiInst>(user));
@@ -1331,3 +1326,128 @@ std::shared_ptr<Inst> IRVisitor::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> ph
     }
     return same;
 }
+
+/*
+* before tryRemoveTrivialPhi optimizations
+--- Control Flow Graph (BFS Traversal) ---
+
+Basic Block Name: Entry_0
+  a.0 <- 0
+  b.0 <- 0
+  c.0 <- false
+  a.1 <- Get()
+  b.1 <- 0
+  Jump ifExprBlock_0
+
+Basic Block Name: ifExprBlock_0
+  b.2 <- Phi(b.1)
+  a.2 <- Phi(a.1)
+  t0 <- Cmp_GT(a.2, b.2)
+  BRT(t0, thenBlock_0, elseBlock_0)
+
+Basic Block Name: thenBlock_0
+  c.1 <- true
+  Jump mergeBlock_0
+
+Basic Block Name: elseBlock_0
+  c.2 <- false
+  Jump mergeBlock_0
+
+Basic Block Name: mergeBlock_0
+  b.5 <- Phi(b.2, b.2)
+  c.4 <- Phi(c.1, c.2)
+  a.3 <- 0
+  a.4 <- 5
+  Jump ifExprBlock_1
+
+Basic Block Name: ifExprBlock_1
+  c.3 <- Phi(c.4)
+  BRT(c.3, thenBlock_1, elseBlock_1)
+
+Basic Block Name: thenBlock_1
+  Jump repeatUntilBlock_1
+
+Basic Block Name: elseBlock_1
+  Jump mergeBlock_1
+
+Basic Block Name: mergeBlock_1
+  t3 <- Add(1, 1)
+  a.6 <- t3
+  Put(a.6)
+  Put('\n')
+
+Basic Block Name: repeatUntilBlock_1
+  a.5 <- Phi(a.4, a.5)
+  b.3 <- Phi(b.5, b.4)
+  t1 <- Add(b.3, 1)
+  b.4 <- t1
+  Put(b.4)
+  Put('\n')
+  t2 <- Cmp_GTE(b.4, a.5)
+  BRF(t2, repeatUntilBlock_1, repeatUntilBlock_1_exit)
+
+Basic Block Name: repeatUntilBlock_1_exit
+  Jump mergeBlock_1
+
+--- End of CFG ---
+*/
+
+/*
+* after tryRemoveTrivialPhi optimizations
+--- Control Flow Graph (BFS Traversal) ---
+
+Basic Block Name: Entry_0
+  a.0 <- 0
+  b.0 <- 0
+  c.0 <- false
+  a.1 <- Get()
+  b.1 <- 0
+  Jump ifExprBlock_0
+
+Basic Block Name: ifExprBlock_0
+  t0 <- Cmp_GT(a.1, b.1)
+  BRT(t0, thenBlock_0, elseBlock_0)
+
+Basic Block Name: thenBlock_0
+  c.1 <- true
+  Jump mergeBlock_0
+
+Basic Block Name: elseBlock_0
+  c.2 <- false
+  Jump mergeBlock_0
+
+Basic Block Name: mergeBlock_0
+  c.4 <- Phi(c.1, c.2)
+  a.3 <- 0
+  a.4 <- 5
+  Jump ifExprBlock_1
+
+Basic Block Name: ifExprBlock_1
+  BRT(c.3, thenBlock_1, elseBlock_1)
+
+Basic Block Name: thenBlock_1
+  Jump repeatUntilBlock_1
+
+Basic Block Name: elseBlock_1
+  Jump mergeBlock_1
+
+Basic Block Name: mergeBlock_1
+  t3 <- Add(1, 1)
+  a.6 <- t3
+  Put(a.6)
+  Put('\n')
+
+Basic Block Name: repeatUntilBlock_1
+  b.3 <- Phi(b.1, b.4)
+  t1 <- Add(b.3, 1)
+  b.4 <- t1
+  Put(b.4)
+  Put('\n')
+  t2 <- Cmp_GTE(b.4, a.4)
+  BRF(t2, repeatUntilBlock_1, repeatUntilBlock_1_exit)
+
+Basic Block Name: repeatUntilBlock_1_exit
+  Jump mergeBlock_1
+
+--- End of CFG ---
+*/
