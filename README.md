@@ -22,7 +22,8 @@ Features:
 * Console Input
 * Console Output
 * Scoped Expression
+* Static Single Assignment Intermediate Representation
 
 Now Mina Programming language has an Intermediate Representation in SSA Form!
 
-![image](https://github.com/user-attachments/assets/46345737-438f-48ef-a6cf-d041dff2c2ff)
+![image](https://github.com/user-attachments/assets/b6338c26-99fc-4985-a1b4-009ae1e121bd)
