@@ -56,7 +56,6 @@ IdentInst::IdentInst(std::string name) : m_name(std::move(name)) {}
 std::string IdentInst::getString() { return m_name; }
 void IdentInst::push_user(std::shared_ptr<Inst> user)
 {
-    std::cout << m_name << " a user is using me: " << user->getString() << std::endl;
     m_users.push_back(user);
 }
 void IdentInst::setup_def_use()

@@ -16,10 +16,11 @@ private:
     int m_tempCounter;
     int m_labelCounter;
     int m_currBBCtr;
+    std::vector<std::shared_ptr<Inst>> m_arguments;
+    std::vector<std::string> m_argNames;
     std::string m_currBBNameWithoutCtr;
     std::stack<std::string> m_temp;
     std::stack<std::shared_ptr<Inst>> m_instStack;
-    std::stack<IdentType> m_identAccType;
     std::stack<std::string> m_labels;
     
     std::shared_ptr<BasicBlock> m_cfg;

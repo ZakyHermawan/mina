@@ -130,101 +130,32 @@ void IRVisitor::visit(AssignmentAST& v)
     auto exprInst = popInst();
 
     auto identifier = v.getIdentifier();    
-    auto targetStr = identifier->getName();
+    auto& targetStr = identifier->getName();
 
     std::cout << targetStr << " <- " << exprTemp;
     std::cout << std::endl;
 
     if (identifier->getIdentType() == IdentType::ARRAY)
     {
-        // undo ArrAccAST, since the array is being stored instead of being loaded
-        popInst();
-        popTemp();
-        --m_tempCounter;
-        m_currentBB->popInst();        
-        std::string variable_name;
-        std::string index_value;
-        
-        // Find the position of the opening and closing brackets
-        size_t start_pos = targetStr.find('[');
-        size_t end_pos = targetStr.find(']');
-        
-        // Check if both brackets were found in the correct order
-        if (start_pos != std::string::npos && end_pos != std::string::npos &&
-            start_pos < end_pos)
-        {
-          // 1. Get the part before the '['
-          variable_name = targetStr.substr(0, start_pos);
-        
-          // 2. Get the part between '[' and ']'
-          // The starting position of the index is one character after '['
-          size_t index_start = start_pos + 1;
-          // The length of the index string is the difference between the
-          // positions
-          size_t index_length = end_pos - index_start;
-          index_value = targetStr.substr(index_start, index_length);
-        }
-        else
-        {
-          // Handle cases where the string is not in the expected format
-          // For example, if there are no brackets, you might want to assign the
-          // whole string to variable_name
-          variable_name = targetStr;
-          // index_value remains empty
-        }
-        
-        //std::cout << "Variable Name: " << variable_name << std::endl;
-        //std::cout << "Index Value: " << index_value << std::endl;
-        auto sourceSSAName = getCurrentSSAName(variable_name);
-        auto sourceSSAInst = readVariable(variable_name, m_currentBB);
-        auto targetSSAName = baseNameToSSA(variable_name);
-        auto targetSSAInst = std::make_shared<IdentInst>(targetSSAName);
-        targetSSAInst->setup_def_use();
+        auto sourceSSAName = getCurrentSSAName(targetStr);
+        auto targetSSAName = baseNameToSSA(targetStr);
+        auto sourceInst = readVariable(targetStr, m_currentBB);
+        auto targetInst = std::make_shared<IdentInst>(targetSSAName);
+        targetInst->setup_def_use();
 
-        std::string input = index_value;
-
-        try {
-            size_t chars_processed = 0;
-            // Attempt to convert the string to an integer
-            int integer_value = std::stoi(input, &chars_processed);
-
-            // This is the crucial check: was the ENTIRE string used for the conversion?
-            if (chars_processed == input.length()) {
-                // IF TRUE: The string is a valid integer.
-                auto indexInst = std::make_shared<IntConstInst>(integer_value);
-                indexInst->setup_def_use();
-                auto inst = std::make_shared<ArrUpdateInst>(
-                    std::move(targetSSAInst), std::move(sourceSSAInst),
-                    std::move(indexInst), std::move(exprInst));
-                inst->setup_def_use();
-                writeVariable(variable_name, m_currentBB, inst);
-                m_currentBB->pushInst(inst);
-            } else {
-                // IF FALSE: The string started with a number but contains other text (e.g., "543abc").
-                // We treat this as an identifier.
-                throw std::runtime_error("index value should be either number of valid identifier");
-            }
-
-        } catch (const std::invalid_argument& e) {
-            // CATCH: An exception was thrown because the string does not start with a number (e.g., "hello").
-            // This is clearly an identifier.
-            auto indexInst = std::make_shared<IdentInst>(getCurrentSSAName(input));
-            indexInst->setup_def_use();
-            auto inst = std::make_shared<ArrUpdateInst>(
-                (targetSSAInst), (sourceSSAInst),
-                (indexInst), (exprInst));
-            inst->setup_def_use();
-            writeVariable(variable_name, m_currentBB, inst);
-            m_currentBB->pushInst(inst);
-
-
-        } catch (const std::out_of_range& e) {
-            throw std::runtime_error("index was out of range for an int");
-        }
+        auto arrIdentifier =
+            std::dynamic_pointer_cast<ArrAccessAST>(identifier);
+        auto subsExpr = arrIdentifier->getSubsExpr();
+        subsExpr->accept(*this);
+        auto subsInst = popInst();
+        auto arrayUpdateInst = std::make_shared<ArrUpdateInst>(
+            targetInst, sourceInst, subsInst, exprInst);
+        arrayUpdateInst->setup_def_use();
+        writeVariable(targetStr, m_currentBB, arrayUpdateInst);
+        m_currentBB->pushInst(arrayUpdateInst);
     }
     else if (identifier->getIdentType() == IdentType::VARIABLE)
     {
-        //popInst();
         auto targetSSAName = baseNameToSSA(targetStr);
         auto targetSSAInst = std::make_shared<IdentInst>(targetSSAName);
         targetSSAInst->setup_def_use();
@@ -531,7 +462,8 @@ void IRVisitor::visit(ArrAccessAST& v)
     subsExpr->accept(*this);
 
     auto idxInst = popInst();
-    auto baseName = v.getName();
+    auto& baseName = v.getName();
+    auto readVal = readVariable(baseName, m_currentBB);
     auto idxStr = popTemp();
 
     auto st = baseName + "[" + idxStr + "]";
@@ -546,7 +478,7 @@ void IRVisitor::visit(ArrAccessAST& v)
 
     m_instStack.push(targetInst);
     auto arrAccInst = std::make_shared<ArrAccessInst>(
-        std::move(targetInst), std::move(sourceInst), std::move(idxInst));
+        std::move(targetInst), std::move(readVal), std::move(idxInst));
     arrAccInst->setup_def_use();
     m_temp.push(st);
     m_currentBB->pushInst(arrAccInst);
@@ -558,10 +490,13 @@ void IRVisitor::visit(ArgumentsAST& v)
     auto args = v.getArgs();
     expr->accept(*this);
     auto inst = popInst();
-    std::cout << "push " << popTemp() << std::endl;
+
     auto pushInst = std::make_shared<PushInst>(inst);
     pushInst->setup_def_use();
-    m_currentBB->pushInst(pushInst);
+
+    m_argNames.push_back(popTemp());
+    m_arguments.push_back(pushInst);
+
     if (args)
     {
         args->accept(*this);
@@ -570,40 +505,60 @@ void IRVisitor::visit(ArgumentsAST& v)
 
 void IRVisitor::visit(CallAST& v)
 {
+    m_arguments = std::vector<std::shared_ptr<Inst>>();
+    m_argNames = std::vector<std::string>();
+
     auto args = v.getArgs();
     if (args)
     {
        args->accept(*this);
     }
+
+    std::reverse(m_arguments.begin(), m_arguments.end());
+    std::reverse(m_argNames.begin(), m_argNames.end());
+
+    for (auto& arg : m_arguments)
+    {
+        m_currentBB->pushInst(arg);
+    }
+
+    for (auto& argName : m_argNames)
+    {
+        std::cout << " push " << argName << std::endl;
+    }
+
     auto funcName = v.getFuncName();
 
     auto callInst = std::make_shared<CallInst>(funcName);
     callInst->setup_def_use();
     m_currentBB->pushInst(callInst);
     m_currentBB->pushSuccessor(m_funcBB[funcName]);
+    m_funcBB[funcName]->pushPredecessor(m_currentBB);
 
      auto newBBLabel =
          m_currBBNameWithoutCtr + "_" + std::to_string(++m_currBBCtr);
      auto newBB = std::make_shared<BasicBlock>(newBBLabel);
-     newBB->pushPredecessor(m_currentBB);
-     m_currentBB->pushSuccessor(newBB);
+     newBB->pushPredecessor(m_funcBB[funcName]);
+     m_funcBB[funcName]->pushSuccessor(newBB);
      m_currentBB = newBB;
 
      auto temp = getCurrentTemp();
      pushCurrentTemp();
+     std::cout << temp << " <- " << "call " << funcName << std::endl;
+
      auto tempInst = std::make_shared<IdentInst>(temp);
      tempInst->setup_def_use();
      auto popInst = std::make_shared<PopInst>(tempInst);
      popInst->setup_def_use();
      m_currentBB->pushInst(popInst);
      m_instStack.push(tempInst);
-     std::cout << temp << " <- " << "call " << funcName << std::endl;
 }
 
 void IRVisitor::visit(FactorAST& v)
 {
     v.getFactor()->accept(*this);
 }
+
 void IRVisitor::visit(FactorsAST& v)
 {
     auto op = v.getOp().getLexme();
@@ -693,8 +648,8 @@ void IRVisitor::visit(TermsAST& v)
     if (op == "+")
     {
         auto inst =
-            std::make_shared<AddInst>(std::move(currentTempInst),
-                                      std::move(leftInst), std::move(rightInst));
+            std::make_shared<AddInst>(currentTempInst,
+                                      leftInst, rightInst);
         inst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, inst);
         m_currentBB->pushInst(inst);
@@ -702,8 +657,8 @@ void IRVisitor::visit(TermsAST& v)
     else if (op == "-")
     {
         auto inst =
-            std::make_shared<SubInst>(std::move(currentTempInst),
-                                      std::move(leftInst), std::move(rightInst));
+            std::make_shared<SubInst>(currentTempInst,
+                                      leftInst, rightInst);
         inst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, inst);
         m_currentBB->pushInst(inst);
@@ -711,8 +666,8 @@ void IRVisitor::visit(TermsAST& v)
     else
     {
         auto inst =
-            std::make_shared<OrInst>(std::move(currentTempInst),
-                                     std::move(leftInst), std::move(rightInst));
+            std::make_shared<OrInst>(currentTempInst,
+                                     leftInst, rightInst);
         inst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, inst);
         m_currentBB->pushInst(inst);
@@ -945,13 +900,12 @@ void IRVisitor::visit(DeclarationsAST& v)
 void IRVisitor::visit(ParameterAST& v)
 {
     auto ident = v.getIdentifier();
-    ident->accept(*this);
-    auto identName = popTemp();
-    auto identInst = popInst();
+    auto identName = ident->getName();
+    auto identInst = std::make_shared<IdentInst>(baseNameToSSA(identName));
     std::cout << identName << " : " << typeToStr(v.getType());
+    writeVariable(identName, m_currentBB, identInst);
 
-    auto targetInst = identInst;
-    auto popInst = std::make_shared<PopInst>(targetInst);
+    auto popInst = std::make_shared<PopInst>(identInst);
     popInst->setup_def_use();
     m_currentBB->pushInst(popInst);
 }
@@ -988,6 +942,8 @@ void IRVisitor::visit(ProcDeclAST& v)
     std::cout << ")\n";
     scope->accept(*this);
 
+    // make a push(0) instruction because proc have no return statement,
+    // so we return 0 as default
     auto inst = std::make_shared<IntConstInst>(0);
     inst->setup_def_use();
     auto pushInst = std::make_shared<PushInst>(inst);
@@ -999,7 +955,6 @@ void IRVisitor::visit(ProcDeclAST& v)
     m_currentBB->pushInst(retInst);
     std::cout << "return\n";
     std::cout << "endProc\n";
-
     m_currentBB = oldBB;
 }
 
@@ -1063,6 +1018,7 @@ std::shared_ptr<Inst> IRVisitor::popInst()
     if (m_instStack.size() == 0)
     {
         std::cout << "instruction stack is empty!\n";
+        printCFG();
         exit(1);
     }
     std::shared_ptr<Inst> inst = m_instStack.top();
@@ -1321,7 +1277,7 @@ std::shared_ptr<Inst> IRVisitor::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> ph
     {
         if (user && user->isPhi())
         {
-            tryRemoveTrivialPhi(std::static_pointer_cast<PhiInst>(user));
+            tryRemoveTrivialPhi(std::dynamic_pointer_cast<PhiInst>(user));
         }
     }
     return same;

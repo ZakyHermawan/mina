@@ -12,7 +12,7 @@
   }
   proc haha (a: integer) {
 	var B: integer;
-	B := 8 + a
+	B := 5 + a
 	put(B, skip)
   }
   integer func satu {
@@ -24,7 +24,7 @@
   proc two(a: integer, b: integer)
   {
 	;
-	put("XD")
+	a := a + b
   }
   ;
 
@@ -39,4 +39,5 @@
   put(A, skip)
   something
   haha(4)
+  two(2, 3)
 }
