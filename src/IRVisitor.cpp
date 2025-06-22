@@ -86,6 +86,7 @@ void IRVisitor::visit(VariableAST& v)
 void IRVisitor::visit(ProgramAST& v)
 {
     v.getScope()->accept(*this);
+    sealBlock(m_currentBB);
 }
 
 void IRVisitor::visit(ScopeAST& v)
