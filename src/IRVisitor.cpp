@@ -1242,6 +1242,8 @@ std::shared_ptr<Inst> IRVisitor::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> ph
                     if (operands[i] == phi)
                     {
                         operands[i] = same;
+                        same->push_user(inst);
+                        break;
                     }
                 }
             }
