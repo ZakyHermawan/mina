@@ -18,7 +18,7 @@ protected:
 public:
     Inst() {};
     virtual std::string getString() { return ""; };
-    virtual std::shared_ptr<Inst> getTarget() { return nullptr; }
+    virtual std::shared_ptr<Inst> getTarget() { return shared_from_this(); }
     virtual void push_user(std::shared_ptr<Inst> user) {};
     virtual void setup_def_use() {}
     virtual bool isPhi() { return false; }
@@ -47,10 +47,6 @@ public:
     IntConstInst& operator=(IntConstInst&&) noexcept = default;
 
     int getVal();
-    std::shared_ptr<Inst> getTarget() override
-    {
-        return std::make_shared<IntConstInst>(m_val);
-    }
     std::string getString();
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
@@ -74,11 +70,6 @@ public:
     BoolConstInst& operator=(BoolConstInst&&) noexcept = default;
 
     bool getVal();
-    std::shared_ptr<Inst> getTarget() override
-    {
-        return std::make_shared<BoolConstInst>(m_val);
-    }
-
     std::string getString();
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
@@ -100,10 +91,6 @@ public:
     StrConstInst& operator=(const StrConstInst&) = delete;
     StrConstInst& operator=(StrConstInst&&) noexcept = default;
 
-    std::shared_ptr<Inst> getTarget() override
-    {
-        return std::make_shared<StrConstInst>(m_val);
-    }
     std::string getString();
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
@@ -124,11 +111,6 @@ private:
     IdentInst(IdentInst&&) noexcept = default;
     IdentInst& operator=(const IdentInst&) = delete;
     IdentInst& operator=(IdentInst&&) noexcept = default;
-
-    std::shared_ptr<Inst> getTarget() override
-    {
-      return std::make_shared<IdentInst>(m_name);
-    }
 
     std::string getString();
     void push_user(std::shared_ptr<Inst> user) override;
