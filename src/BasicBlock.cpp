@@ -9,6 +9,15 @@ void BasicBlock::setInstructions(
     m_instructions = std::move(instructions);
 }
 
+void BasicBlock::replaceInstruction(unsigned int index,
+                                    std::shared_ptr<Inst> instruction)
+{
+  std::cout << "replacing instruction at: " << index
+            << " with " + instruction->getString() << std::endl;
+  ;
+    m_instructions[index] = instruction;
+}
+
 std::vector<std::shared_ptr<Inst>>& BasicBlock::getInstructions()
 {
     return m_instructions;
@@ -17,7 +26,6 @@ std::vector<std::shared_ptr<Inst>>& BasicBlock::getInstructions()
 void BasicBlock::pushInst(std::shared_ptr<Inst> inst)
 {
     m_instructions.push_back(inst);
-    inst->insert_block(shared_from_this());
 }
 
 void BasicBlock::pushInstBegin(std::shared_ptr<Inst> inst)

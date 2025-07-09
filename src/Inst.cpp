@@ -4,7 +4,8 @@
 
 #include <stdexcept>
 
-IntConstInst::IntConstInst(int val) : m_val(val)
+IntConstInst::IntConstInst(int val, std::shared_ptr<BasicBlock> block)
+    : m_val(val), m_block(std::move(block))
 {
 }
 int IntConstInst::getVal() { return m_val; }
@@ -21,11 +22,13 @@ void IntConstInst::setup_def_use()
 {
 }
 
-BoolConstInst::BoolConstInst(bool val) : m_val(val) {}
+BoolConstInst::BoolConstInst(bool val, std::shared_ptr<BasicBlock> block)
+    : m_val(val), m_block(std::move(block))
+{
+}
 bool BoolConstInst::getVal() { return m_val; }
 std::string BoolConstInst::getString()
 {
-    //return "BoolConst(" + std::to_string(m_val) + ")";
     if (m_val)
     {
         return "true";
@@ -41,7 +44,10 @@ void BoolConstInst::push_user(std::shared_ptr<Inst> user)
 }
 void BoolConstInst::setup_def_use() {}
 
-StrConstInst::StrConstInst(std::string val) : m_val(val) {}
+StrConstInst::StrConstInst(std::string val, std::shared_ptr<BasicBlock> block)
+    : m_val(val), m_block(std::move(block))
+{
+}
 std::string StrConstInst::getString()
 {
     return m_val;
@@ -52,7 +58,10 @@ void StrConstInst::push_user(std::shared_ptr<Inst> user)
 }
 void StrConstInst::setup_def_use() {}
 
-IdentInst::IdentInst(std::string name) : m_name(std::move(name)) {}
+IdentInst::IdentInst(std::string name, std::shared_ptr<BasicBlock> block)
+    : m_name(std::move(name)), m_block(std::move(block))
+{
+}
 std::string IdentInst::getString() { return m_name; }
 void IdentInst::push_user(std::shared_ptr<Inst> user)
 {
@@ -63,10 +72,12 @@ void IdentInst::setup_def_use()
 }
 
 AddInst::AddInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-                 std::shared_ptr<Inst> operand2)
+                 std::shared_ptr<Inst> operand2,
+                 std::shared_ptr<BasicBlock> block)
     : m_target(std::move(target)),
       m_operand1(std::move(operand1)),
-      m_operand2(std::move(operand2))
+      m_operand2(std::move(operand2)),
+      m_block(std::move(block))
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
@@ -100,10 +111,12 @@ void AddInst::setup_def_use()
 }
 
 SubInst::SubInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-    std::shared_ptr<Inst> operand2)
+                 std::shared_ptr<Inst> operand2,
+                 std::shared_ptr<BasicBlock> block)
     : m_target(std::move(target)),
-    m_operand1(std::move(operand1)),
-    m_operand2(std::move(operand2))
+      m_operand1(std::move(operand1)),
+      m_operand2(std::move(operand2)),
+      m_block(std::move(block))
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
@@ -137,10 +150,12 @@ void SubInst::setup_def_use()
 }
 
 MulInst::MulInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-    std::shared_ptr<Inst> operand2)
+                 std::shared_ptr<Inst> operand2,
+                 std::shared_ptr<BasicBlock> block)
     : m_target(std::move(target)),
-    m_operand1(std::move(operand1)),
-    m_operand2(std::move(operand2))
+      m_operand1(std::move(operand1)),
+      m_operand2(std::move(operand2)),
+      m_block(std::move(block))
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
@@ -174,10 +189,12 @@ void MulInst::setup_def_use()
 }
 
 DivInst::DivInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-    std::shared_ptr<Inst> operand2)
+                 std::shared_ptr<Inst> operand2,
+                 std::shared_ptr<BasicBlock> block)
     : m_target(std::move(target)),
-    m_operand1(std::move(operand1)),
-    m_operand2(std::move(operand2))
+      m_operand1(std::move(operand1)),
+      m_operand2(std::move(operand2)),
+      m_block(std::move(block))
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
@@ -210,9 +227,10 @@ void DivInst::setup_def_use()
     m_operand2->push_user(shared_from_this());
 }
 
-NotInst::NotInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand)
+NotInst::NotInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand,
+                 std::shared_ptr<BasicBlock> block)
     : m_target(std::move(target)),
-    m_operand(std::move(operand))
+      m_operand(std::move(operand)), m_block(std::move(block))
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_operand};
 }
@@ -241,10 +259,12 @@ void NotInst::push_user(std::shared_ptr<Inst> user)
 void NotInst::setup_def_use() { m_operand->push_user(shared_from_this()); }
 
 AndInst::AndInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-    std::shared_ptr<Inst> operand2)
+                 std::shared_ptr<Inst> operand2,
+                 std::shared_ptr<BasicBlock> block)
     : m_target(std::move(target)),
-    m_operand1(std::move(operand1)),
-    m_operand2(std::move(operand2))
+      m_operand1(std::move(operand1)),
+      m_operand2(std::move(operand2)),
+      m_block(std::move(block))
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
@@ -278,10 +298,12 @@ void AndInst::setup_def_use()
 }
 
 OrInst::OrInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-    std::shared_ptr<Inst> operand2)
+               std::shared_ptr<Inst> operand2,
+               std::shared_ptr<BasicBlock> block)
     : m_target(std::move(target)),
-    m_operand1(std::move(operand1)),
-    m_operand2(std::move(operand2))
+      m_operand1(std::move(operand1)),
+      m_operand2(std::move(operand2)),
+      m_block(std::move(block))
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand1};
 }
@@ -315,10 +337,10 @@ void OrInst::setup_def_use()
 }
 
 AllocaInst::AllocaInst(std::shared_ptr<Inst> target, Type type,
-                       unsigned int size)
+                       unsigned int size, std::shared_ptr<BasicBlock> block)
     : m_target(std::move(target)),
-    m_type(type),
-    m_size(size)
+      m_type(type),
+      m_size(size), m_block(block)
 {
     if (m_type == Type::UNDEFINED)
     {
@@ -350,10 +372,12 @@ void AllocaInst::setup_def_use() {}
 
 ArrAccessInst::ArrAccessInst(std::shared_ptr<Inst> target,
                              std::shared_ptr<Inst> source,
-                             std::shared_ptr<Inst> index)
+                             std::shared_ptr<Inst> index,
+                             std::shared_ptr<BasicBlock> block)
     : m_target(std::move(target)),
-    m_source(std::move(source)),
-    m_index(std::move(index))
+      m_source(std::move(source)),
+      m_index(std::move(index)),
+      m_block(std::move(block))
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_source, m_index};
 }
@@ -389,11 +413,13 @@ void ArrAccessInst::setup_def_use()
 ArrUpdateInst::ArrUpdateInst(std::shared_ptr<Inst> target,
                              std::shared_ptr<Inst> source,
                              std::shared_ptr<Inst> index,
-                             std::shared_ptr<Inst> val)
+                             std::shared_ptr<Inst> val,
+                             std::shared_ptr<BasicBlock> block)
     : m_target(std::move(target)),
       m_source(std::move(source)),
       m_index(std::move(index)),
-      m_val(std::move(val))
+      m_val(std::move(val)),
+      m_block(std::move(block))
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_source, m_index, m_val};
 }
@@ -429,8 +455,9 @@ void ArrUpdateInst::setup_def_use()
 }
 
 AssignInst ::AssignInst(std::shared_ptr<Inst> target,
-                      std::shared_ptr<Inst> source)
-    : m_target(std::move(target)), m_source(std::move(source))
+                        std::shared_ptr<Inst> source,
+                        std::shared_ptr<BasicBlock> block)
+    : m_target(std::move(target)), m_source(std::move(source)), m_block(std::move(block))
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_source};
 }
@@ -460,10 +487,12 @@ void AssignInst::setup_def_use() { m_source->push_user(shared_from_this()); }
 
 CmpEQInst::CmpEQInst(std::shared_ptr<Inst> target,
                      std::shared_ptr<Inst> operand1,
-    std::shared_ptr<Inst> operand2)
+                     std::shared_ptr<Inst> operand2,
+                     std::shared_ptr<BasicBlock> block)
     : m_target(std::move(target)),
-    m_operand1(std::move(operand1)),
-    m_operand2(std::move(operand2))
+      m_operand1(std::move(operand1)),
+      m_operand2(std::move(operand2)),
+      m_block(std::move(block))
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
@@ -498,10 +527,12 @@ void CmpEQInst::setup_def_use()
 
 CmpNEInst::CmpNEInst(std::shared_ptr<Inst> target,
                      std::shared_ptr<Inst> operand1,
-    std::shared_ptr<Inst> operand2)
+                     std::shared_ptr<Inst> operand2,
+                     std::shared_ptr<BasicBlock> block)
     : m_target(std::move(target)),
-    m_operand1(std::move(operand1)),
-    m_operand2(std::move(operand2))
+      m_operand1(std::move(operand1)),
+      m_operand2(std::move(operand2)),
+      m_block(std::move(block))
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
@@ -537,10 +568,12 @@ void CmpNEInst::setup_def_use()
 
 CmpLTInst::CmpLTInst(std::shared_ptr<Inst> target,
                      std::shared_ptr<Inst> operand1,
-    std::shared_ptr<Inst> operand2)
+                     std::shared_ptr<Inst> operand2,
+                     std::shared_ptr<BasicBlock> block)
     : m_target(std::move(target)),
-    m_operand1(std::move(operand1)),
-    m_operand2(std::move(operand2))
+      m_operand1(std::move(operand1)),
+      m_operand2(std::move(operand2)),
+      m_block(std::move(block))
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
@@ -575,10 +608,12 @@ void CmpLTInst::setup_def_use()
 
 CmpLTEInst::CmpLTEInst(std::shared_ptr<Inst> target,
                        std::shared_ptr<Inst> operand1,
-    std::shared_ptr<Inst> operand2)
+                       std::shared_ptr<Inst> operand2,
+                       std::shared_ptr<BasicBlock> block)
     : m_target(std::move(target)),
-    m_operand1(std::move(operand1)),
-    m_operand2(std::move(operand2))
+      m_operand1(std::move(operand1)),
+      m_operand2(std::move(operand2)),
+      m_block(std::move(block))
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
@@ -613,10 +648,12 @@ void CmpLTEInst::setup_def_use()
 
 CmpGTInst::CmpGTInst(std::shared_ptr<Inst> target,
                      std::shared_ptr<Inst> operand1,
-    std::shared_ptr<Inst> operand2)
+                     std::shared_ptr<Inst> operand2,
+                     std::shared_ptr<BasicBlock> block)
     : m_target(std::move(target)),
-    m_operand1(std::move(operand1)),
-    m_operand2(std::move(operand2))
+      m_operand1(std::move(operand1)),
+      m_operand2(std::move(operand2)),
+      m_block(std::move(block))
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
@@ -651,10 +688,12 @@ void CmpGTInst::setup_def_use()
 
 CmpGTEInst::CmpGTEInst(std::shared_ptr<Inst> target,
                        std::shared_ptr<Inst> operand1,
-             std::shared_ptr<Inst> operand2)
+                       std::shared_ptr<Inst> operand2,
+                       std::shared_ptr<BasicBlock> block)
     : m_target(std::move(target)),
       m_operand1(std::move(operand1)),
-      m_operand2(std::move(operand2))
+      m_operand2(std::move(operand2)),
+      m_block(std::move(block))
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
@@ -706,75 +745,81 @@ void JumpInst::setup_def_use() {}
 
 BRTInst::BRTInst(std::shared_ptr<Inst> cond,
                  std::shared_ptr<BasicBlock> targetSuccess,
-                 std::shared_ptr<BasicBlock> targetFailed)
-    : m_cond(std::move(cond)),
-      m_targetSuccess(std::move(targetSuccess)),
-      m_targetFailed(std::move(targetFailed))
+                 std::shared_ptr<BasicBlock> targetFailed,
+                 std::shared_ptr<BasicBlock> block)
+    : m_targetSuccess(std::move(targetSuccess)),
+      m_targetFailed(std::move(targetFailed)),
+      m_block(std::move(block))
 {
-    m_operands = std::vector<std::shared_ptr<Inst>>{m_cond};
+    m_operands = std::vector<std::shared_ptr<Inst>>{cond};
 }
-std::shared_ptr<Inst> BRTInst::getCond() { return m_cond; }
+std::shared_ptr<Inst> BRTInst::getCond() { return m_operands[0]; }
 std::shared_ptr<BasicBlock> BRTInst::getTargetSuccess() { return m_targetSuccess; }
 std::shared_ptr<BasicBlock> BRTInst::getTargetFailed() { return m_targetFailed; }
 std::string BRTInst::getString()
 {
-    auto cond = m_cond->getTarget()->getString();
     auto targetSuccess = m_targetSuccess->getName();
     auto targetFailed = m_targetFailed->getName();
 
-    return "BRT(" + cond + ", " + targetSuccess + ", " + targetFailed + ")";
+    return "BRT(" + m_operands[0]->getTarget()->getString() + ", " +
+           targetSuccess + ", " +
+           targetFailed +
+           ")";
 }
 void BRTInst::push_user(std::shared_ptr<Inst> user)
 {
     m_users.push_back(user);
 }
-void BRTInst::setup_def_use() { m_cond->push_user(shared_from_this()); }
+void BRTInst::setup_def_use() { m_operands[0]->push_user(shared_from_this()); }
 
 BRFInst::BRFInst(std::shared_ptr<Inst> cond,
                  std::shared_ptr<BasicBlock> targetSuccess,
-                 std::shared_ptr<BasicBlock> targetFailed)
-    : m_cond(std::move(cond)),
-      m_targetSuccess(std::move(targetSuccess)),
-      m_targetFailed(std::move(targetFailed))
+                 std::shared_ptr<BasicBlock> targetFailed,
+                 std::shared_ptr<BasicBlock> block)
+    : m_targetSuccess(std::move(targetSuccess)),
+      m_targetFailed(std::move(targetFailed)),
+      m_block(std::move(block))
 {
-    m_operands = std::vector<std::shared_ptr<Inst>>{m_cond};
+    m_operands = std::vector<std::shared_ptr<Inst>>{cond};
 }
-std::shared_ptr<Inst> BRFInst::getCond() { return m_cond; }
+std::shared_ptr<Inst> BRFInst::getCond() { return m_operands[0]; }
 std::shared_ptr<BasicBlock> BRFInst::getTargetSuccess() { return m_targetSuccess; }
 std::shared_ptr<BasicBlock> BRFInst::getTargetFailed() { return m_targetFailed; }
 std::string BRFInst::getString()
 {
-    auto cond = m_cond->getTarget()->getString();
     auto targetSuccess = m_targetSuccess->getName();
     auto targetFailed = m_targetFailed->getName();
 
-    return "BRF(" + cond + ", " + targetSuccess + ", " + targetFailed + ")";
+    return "BRT(" + m_operands[0]->getTarget()->getString() + ", " +
+           targetSuccess + ", " + targetFailed + ")";
 }
 void BRFInst::push_user(std::shared_ptr<Inst> user)
 {
     m_users.push_back(user);
 }
-void BRFInst::setup_def_use() { m_cond->push_user(shared_from_this()); }
+void BRFInst::setup_def_use() { m_operands[0]->push_user(shared_from_this()); }
 
-PutInst::PutInst(std::shared_ptr<Inst> operand)
-    : m_operand(std::move(operand))
+PutInst::PutInst(std::shared_ptr<Inst> operand,
+                 std::shared_ptr<BasicBlock> block)
+    : m_block(std::move(block))
 {
-    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand};
+    m_operands = std::vector<std::shared_ptr<Inst>>{operand};
 }
-std::shared_ptr<Inst> PutInst::getOperand() { return m_operand; }
+std::shared_ptr<Inst> PutInst::getOperand() { return m_operands[0]; }
 std::string PutInst::getString()
 {
-    auto operand = m_operand->getTarget()->getString();
+    auto operand = m_operands[0]->getTarget()->getString();
     return "Put(" + operand + ")";
 }
 void PutInst::push_user(std::shared_ptr<Inst> user)
 {
     m_users.push_back(user);
 }
-void PutInst::setup_def_use() { m_operand->push_user(shared_from_this()); }
+void PutInst::setup_def_use() { m_operands[0]->push_user(shared_from_this()); }
 
-GetInst::GetInst(std::shared_ptr<Inst> target)
-    : m_target(std::move(target))
+GetInst::GetInst(std::shared_ptr<Inst> target,
+                 std::shared_ptr<BasicBlock> block)
+    : m_target(std::move(target)), m_block(std::move(block))
 {
 }
 std::shared_ptr<Inst> GetInst::getTarget() { return m_target; }
@@ -789,25 +834,27 @@ void GetInst::push_user(std::shared_ptr<Inst> user)
 }
 void GetInst::setup_def_use() {}
 
-PushInst::PushInst(std::shared_ptr<Inst> operand)
-    : m_operand(std::move(operand))
+PushInst::PushInst(std::shared_ptr<Inst> operand,
+                   std::shared_ptr<BasicBlock> block)
+    : m_block(std::move(block))
 {
-    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand};
+    m_operands = std::vector<std::shared_ptr<Inst>>{operand};
 }
-std::shared_ptr<Inst> PushInst::getOperand() { return m_operand; }
+std::shared_ptr<Inst> PushInst::getOperand() { return m_operands[0]; }
 std::string PushInst::getString()
 {
-    auto operand = m_operand->getTarget()->getString();
+    auto operand = m_operands[0]->getTarget()->getString();
     return "Push(" + operand + ")";
 }
 void PushInst::push_user(std::shared_ptr<Inst> user)
 {
     m_users.push_back(user);
 }
-void PushInst::setup_def_use() { m_operand->push_user(shared_from_this()); }
+void PushInst::setup_def_use() { m_operands[0]->push_user(shared_from_this()); }
 
-PopInst::PopInst(std::shared_ptr<Inst> target)
-    : m_target(std::move(target))
+PopInst::PopInst(std::shared_ptr<Inst> target,
+                 std::shared_ptr<BasicBlock> block)
+    : m_target(std::move(target)), m_block(std::move(block))
 {
 }
 std::shared_ptr<Inst> PopInst::getTarget() { return m_target; }
@@ -822,7 +869,8 @@ void PopInst::push_user(std::shared_ptr<Inst> user)
 }
 void PopInst::setup_def_use() {}
 
-ReturnInst::ReturnInst()
+ReturnInst::ReturnInst(std::shared_ptr<BasicBlock> block)
+    : m_block(std::move(block))
 {
 }
 std::string ReturnInst::getString()
@@ -835,8 +883,8 @@ void ReturnInst::push_user(std::shared_ptr<Inst> user)
 }
 void ReturnInst::setup_def_use() {}
 
-CallInst::CallInst(std::string calleeStr)
-    : m_calleeStr(std::move(calleeStr))
+CallInst::CallInst(std::string calleeStr, std::shared_ptr<BasicBlock> block)
+    : m_calleeStr(std::move(calleeStr)), m_block(std::move(block))
 {
 }
 std::string CallInst::getCalleeStr() { return m_calleeStr; }
@@ -848,7 +896,7 @@ void CallInst::push_user(std::shared_ptr<Inst> user)
 void CallInst::setup_def_use() {}
 
 PhiInst::PhiInst(std::string name, std::shared_ptr<BasicBlock> block)
-    : m_target(std::make_shared<IdentInst>(name)), m_block(std::move(block))
+    : m_target(std::make_shared<IdentInst>(name, block)), m_block(std::move(block))
 {
 }
 void PhiInst::appendOperand(std::shared_ptr<Inst> operand)

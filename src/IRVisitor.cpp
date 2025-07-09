@@ -32,14 +32,14 @@ void IRVisitor::visit(NumberAST& v)
 {
     auto val = v.getVal();
     m_temp.push(std::to_string(val));
-    auto inst = std::make_shared<IntConstInst>(val);
+    auto inst = std::make_shared<IntConstInst>(val, m_currentBB);
     inst->setup_def_use();
     m_instStack.push(inst);
 }
 
 void IRVisitor::visit(BoolAST& v) {
     auto val = v.getVal();
-    auto inst = std::make_shared<BoolConstInst>(val);
+    auto inst = std::make_shared<BoolConstInst>(val, m_currentBB);
     inst->setup_def_use();
     m_instStack.push(inst);
 
@@ -61,7 +61,7 @@ void IRVisitor::visit(StringAST& v)
     {
         m_temp.push("\'\\n\'");
         std::string str = "\'\\n\'";
-        auto inst = std::make_shared<StrConstInst>(str);
+        auto inst = std::make_shared<StrConstInst>(str, m_currentBB);
         inst->setup_def_use();
         m_instStack.push(inst);
     }
@@ -69,7 +69,7 @@ void IRVisitor::visit(StringAST& v)
     {
         auto newVal = "\"" + val + "\"";
         m_temp.push(newVal);
-        auto inst = std::make_shared<StrConstInst>(newVal);
+        auto inst = std::make_shared<StrConstInst>(newVal, m_currentBB);
         inst->setup_def_use();
         m_instStack.push(inst);
     }
@@ -87,6 +87,158 @@ void IRVisitor::visit(ProgramAST& v)
 {
     v.getScope()->accept(*this);
     sealBlock(m_currentBB);
+    
+    DisjointSetUnion dsu;
+
+    // BFS
+    std::queue<std::shared_ptr<BasicBlock>> worklist;
+    std::set<std::shared_ptr<BasicBlock>> visited;
+    worklist.push(m_cfg);
+    visited.insert(m_cfg);
+    std::vector<std::string> variables;
+
+    while (!worklist.empty())
+    {
+        std::shared_ptr<BasicBlock> current_bb = worklist.front();
+        visited.insert(current_bb);
+        worklist.pop();
+
+        auto& instructions = current_bb->getInstructions();
+
+        for (unsigned int i = 0; i < instructions.size(); ++i)
+        {
+            auto& currInst = instructions[i];
+            auto& target = currInst->getTarget();
+            auto& targetStr = target->getString();
+            dsu.make_set(targetStr);
+            if (currInst->isPhi())
+            {
+                auto& operands = currInst->getOperands();
+                for (int i = 0; i < operands.size(); ++i)
+                {
+                    auto& opStr = operands[i]->getString();
+                    dsu.unite(targetStr, opStr);
+                }
+            }
+            variables.push_back(targetStr);
+        }
+
+        for (const auto& successor : current_bb->getSuccessors())
+        {
+            if (visited.find(successor) == visited.end())
+            {
+                visited.insert(successor);
+                worklist.push(successor);
+            }
+        }
+    }
+
+    // 1. Create a map to hold the final name for each set's root.
+    std::unordered_map<std::string, std::string> root_to_new_name;
+
+    // 2. Choose a representative name for each set.
+    //    A common convention is to use the original name without the SSA suffix.
+    for (const auto& var : variables) {
+        std::string root = dsu.find(var);
+        if (root_to_new_name.find(root) == root_to_new_name.end()) {
+            // Example: if root is "x_1", new name becomes "x".
+            std::string base_name = root.substr(0, root.find('.')); 
+            root_to_new_name[root] = base_name;
+        }
+    }
+
+    // 3. Create the final, full renaming map for all variables.
+    std::unordered_map<std::string, std::string> final_rename_map;
+    for (const auto& var : variables) {
+        std::string root = dsu.find(var);
+        final_rename_map[var] = root_to_new_name[root];
+    }
+    std::cout << "mapping: \n";
+    for (const auto& map : root_to_new_name)
+    {
+        std::cout << map.first << " : " << map.second << std::endl;
+    }
+
+    
+    // BFS
+    worklist = {};
+    visited = {};
+
+    worklist.push(m_cfg);
+    visited.insert(m_cfg);
+
+    while (!worklist.empty())
+    {
+        std::shared_ptr<BasicBlock> current_bb = worklist.front();
+        visited.insert(current_bb);
+        worklist.pop();
+
+        auto& instructions = current_bb->getInstructions();
+
+        bool finished = false;
+        unsigned int instruction_idx = 0;
+        while (!finished)
+        {
+            auto& currInst = instructions[instruction_idx];
+            auto& target = currInst->getTarget();
+            auto& targetStr = target->getString();
+
+            if (currInst->isPhi())
+            {
+                instructions.erase(instructions.begin() + instruction_idx);
+                instruction_idx = 0;
+                continue;
+            }
+            else
+            {
+                if (root_to_new_name.find(targetStr) == root_to_new_name.end())
+                {
+                    throw std::runtime_error("can't find target str " + targetStr + "in the hashmap");
+                }
+                auto& new_target_str = root_to_new_name[targetStr];
+
+                std::shared_ptr<IdentInst> newTargetInst = std::make_shared<IdentInst>(new_target_str, currInst->getBlock());
+                
+                auto& operands = currInst->getOperands();
+                for (int i = 0; i < operands.size(); ++i)
+                {
+                    if (operands[i]->canBeRenamed() == false)
+                    {
+                        continue;
+                    }
+                    auto& operandTarget = operands[i]->getTarget();
+                    auto& operandTargetStr = operandTarget->getString();
+                    if (root_to_new_name.find(operandTargetStr) ==
+                        root_to_new_name.end())
+                    {
+                        continue;
+                    }
+
+                    auto& new_operand_target_str = root_to_new_name[operandTargetStr];
+                    std::shared_ptr<IdentInst> newOperandTargetInst =
+                        std::make_shared<IdentInst>(new_operand_target_str,
+                                                    currInst->getBlock());
+                    operands[i] = newOperandTargetInst;
+                }
+                currInst->setTarget(newTargetInst);
+            }
+            ++instruction_idx;
+            if (instruction_idx == instructions.size())
+            {
+                finished = true;
+            }
+        }
+
+        for (const auto& successor : current_bb->getSuccessors())
+        {
+            if (visited.find(successor) == visited.end())
+            {
+                visited.insert(successor);
+                worklist.push(successor);
+            }
+        }
+    }
+    
 }
 
 void IRVisitor::visit(ScopeAST& v)
@@ -141,7 +293,7 @@ void IRVisitor::visit(AssignmentAST& v)
         auto sourceSSAName = getCurrentSSAName(targetStr);
         auto targetSSAName = baseNameToSSA(targetStr);
         auto sourceInst = readVariable(targetStr, m_currentBB);
-        auto targetInst = std::make_shared<IdentInst>(targetSSAName);
+        auto targetInst = std::make_shared<IdentInst>(targetSSAName, m_currentBB);
         targetInst->setup_def_use();
 
         auto arrIdentifier =
@@ -150,7 +302,7 @@ void IRVisitor::visit(AssignmentAST& v)
         subsExpr->accept(*this);
         auto subsInst = popInst();
         auto arrayUpdateInst = std::make_shared<ArrUpdateInst>(
-            targetInst, sourceInst, subsInst, exprInst);
+            targetInst, sourceInst, subsInst, exprInst, m_currentBB);
         arrayUpdateInst->setup_def_use();
         writeVariable(targetStr, m_currentBB, arrayUpdateInst);
         m_currentBB->pushInst(arrayUpdateInst);
@@ -158,10 +310,10 @@ void IRVisitor::visit(AssignmentAST& v)
     else if (identifier->getIdentType() == IdentType::VARIABLE)
     {
         auto targetSSAName = baseNameToSSA(targetStr);
-        auto targetSSAInst = std::make_shared<IdentInst>(targetSSAName);
+        auto targetSSAInst =
+          std::make_shared<IdentInst>(targetSSAName, m_currentBB);
         targetSSAInst->setup_def_use();
-        auto assignInst = std::make_shared<AssignInst>(targetSSAInst,
-                                                       exprInst);
+        auto assignInst = std::make_shared<AssignInst>(targetSSAInst, exprInst, m_currentBB);
         assignInst->setup_def_use();
         writeVariable(targetStr, m_currentBB, assignInst);
         m_currentBB->pushInst(std::move(assignInst));
@@ -191,9 +343,10 @@ void IRVisitor::visit(OutputsAST& v)
     
     if (temp == "\'\\n\'")
     {
-        auto operand = std::make_shared<StrConstInst>("\'\\n\'");
+        auto operand = std::make_shared<StrConstInst>("\'\\n\'", m_currentBB);
         operand->setup_def_use();
-        auto putInst = std::make_shared<PutInst>(std::move(operand));
+        auto putInst =
+            std::make_shared<PutInst>(std::move(operand), m_currentBB);
         putInst->setup_def_use();
         m_currentBB->pushInst(std::move(putInst));
     }
@@ -204,10 +357,11 @@ void IRVisitor::visit(OutputsAST& v)
             //auto inst = popInst();
             std::string baseName = temp.substr(0, pos);
             auto targetInstName = inst->getString();
-            auto targetInst =
-                std::make_shared<IdentInst>(std::move(targetInstName));
+            auto targetInst = std::make_shared<IdentInst>(
+                std::move(targetInstName), m_currentBB);
             targetInst->setup_def_use();
-            auto putInst = std::make_shared<PutInst>(std::move(targetInst));
+            auto putInst =
+                std::make_shared<PutInst>(std::move(targetInst), m_currentBB);
             putInst->setup_def_use();
             m_currentBB->pushInst(std::move(putInst));
         } else {
@@ -220,9 +374,11 @@ void IRVisitor::visit(OutputsAST& v)
                 // This is the crucial check: was the ENTIRE string used for the conversion?
                 if (chars_processed == temp.length()) {
                     // IF TRUE: The string is a valid integer.
-                    auto operand = std::make_shared<IntConstInst>(integer_value);
+                  auto operand = std::make_shared<IntConstInst>(integer_value,
+                                                                m_currentBB);
                     operand->setup_def_use();
-                    auto inst = std::make_shared<PutInst>(std::move(operand));
+                  auto inst = std::make_shared<PutInst>(std::move(operand),
+                                                        m_currentBB);
                     inst->setup_def_use();
                     m_currentBB->pushInst(inst);
 
@@ -238,18 +394,20 @@ void IRVisitor::visit(OutputsAST& v)
                 if (temp[0] == '\"')
                 {
                     auto operand =
-                        std::make_shared<StrConstInst>(temp);
+                        std::make_shared<StrConstInst>(temp, m_currentBB);
                     operand->setup_def_use();
-                    auto inst = std::make_shared<PutInst>(std::move(operand));
+                    auto inst = std::make_shared<PutInst>(std::move(operand),
+                                                          m_currentBB);
                     inst->setup_def_use();
                     m_currentBB->pushInst(inst);
                 }
                 else
                 {
-                    auto operand =
-                        std::make_shared<IdentInst>(getCurrentSSAName(temp));
+                    auto operand = std::make_shared<IdentInst>(
+                      getCurrentSSAName(temp), m_currentBB);
                     operand->setup_def_use();
-                    auto inst = std::make_shared<PutInst>(std::move(operand));
+                    auto inst = std::make_shared<PutInst>(std::move(operand),
+                                                          m_currentBB);
                     inst->setup_def_use();
                     m_currentBB->pushInst(inst);
                 }
@@ -272,7 +430,7 @@ void IRVisitor::visit(InputAST& v)
     std::string name = input->getName();
     m_temp.push(name);
     auto target = baseNameToSSA(name);
-    auto inst = std::make_shared<IdentInst>(target);
+    auto inst = std::make_shared<IdentInst>(target, m_currentBB);
     inst->setup_def_use();
     m_instStack.push(inst);
     writeVariable(name, m_currentBB, inst);
@@ -288,7 +446,7 @@ void IRVisitor::visit(InputsAST& v)
     std::cout << ")\n";
     auto inst = popInst();
 
-    auto getInst = std::make_shared<GetInst>(std::move(inst));
+    auto getInst = std::make_shared<GetInst>(std::move(inst), m_currentBB);
     getInst->setup_def_use();
     m_currentBB->pushInst(std::move(getInst));
     auto inputs = v.getInputs();
@@ -338,7 +496,8 @@ void IRVisitor::visit(IfAST& v)
     thenBB->pushSuccessor(mergeBB);
     elseBB->pushSuccessor(mergeBB);
 
-    auto branchInst = std::make_shared<BRTInst>(exprInst, thenBB, elseBB);
+    auto branchInst =
+        std::make_shared<BRTInst>(exprInst, thenBB, elseBB, m_currentBB);
     branchInst->setup_def_use();
     m_currentBB->pushInst(branchInst);
     m_currentBB->pushSuccessor(thenBB);
@@ -418,8 +577,7 @@ void IRVisitor::visit(RepeatUntilAST& v)
     std::string newBBName =
         "repeatUntilBlock_" + std::to_string(m_labelCounter - 1) + "_exit";
     auto repeatUntilExitBB = std::make_shared<BasicBlock>(newBBName);
-    auto newJumpInst = std::make_shared<BRFInst>(std::move(cond), repeatUntilBB,
-                                                 repeatUntilExitBB);
+    auto newJumpInst = std::make_shared<BRFInst>(std::move(cond), repeatUntilBB, repeatUntilExitBB, m_currentBB);
     newJumpInst->setup_def_use();
     m_currentBB->pushInst(std::move(newJumpInst));
     m_currentBB->pushSuccessor(repeatUntilExitBB);
@@ -447,10 +605,10 @@ void IRVisitor::visit(ReturnAST& v)
     auto retExpr = v.getRetExpr();
     retExpr->accept(*this);
     auto inst = popInst();
-    auto pushInst = std::make_shared<PushInst>(inst);
+    auto pushInst = std::make_shared<PushInst>(inst, m_currentBB);
     pushInst->setup_def_use();
     m_currentBB->pushInst(pushInst);
-    auto retInst = std::make_shared<ReturnInst>();
+    auto retInst = std::make_shared<ReturnInst>(m_currentBB);
     retInst->setup_def_use();
     m_currentBB->pushInst(retInst);
 
@@ -472,14 +630,17 @@ void IRVisitor::visit(ArrAccessAST& v)
     auto sourceSSAName = getCurrentSSAName(baseName);
     auto targetSSAName = getCurrentTemp();
     pushCurrentTemp();
-    auto sourceInst = std::make_shared<IdentInst>(std::move(sourceSSAName));
+    auto sourceInst =
+        std::make_shared<IdentInst>(std::move(sourceSSAName), m_currentBB);
     sourceInst->setup_def_use();
-    auto targetInst = std::make_shared<IdentInst>(std::move(targetSSAName));
+    auto targetInst =
+        std::make_shared<IdentInst>(std::move(targetSSAName), m_currentBB);
     targetInst->setup_def_use();
 
     m_instStack.push(targetInst);
     auto arrAccInst = std::make_shared<ArrAccessInst>(
-        std::move(targetInst), std::move(readVal), std::move(idxInst));
+        std::move(targetInst), std::move(readVal), std::move(idxInst),
+        m_currentBB);
     arrAccInst->setup_def_use();
     m_temp.push(st);
     m_currentBB->pushInst(arrAccInst);
@@ -492,7 +653,7 @@ void IRVisitor::visit(ArgumentsAST& v)
     expr->accept(*this);
     auto inst = popInst();
 
-    auto pushInst = std::make_shared<PushInst>(inst);
+    auto pushInst = std::make_shared<PushInst>(inst, m_currentBB);
     pushInst->setup_def_use();
 
     m_argNames.push_back(popTemp());
@@ -530,7 +691,7 @@ void IRVisitor::visit(CallAST& v)
 
     auto funcName = v.getFuncName();
 
-    auto callInst = std::make_shared<CallInst>(funcName);
+    auto callInst = std::make_shared<CallInst>(funcName, m_currentBB);
     callInst->setup_def_use();
     m_currentBB->pushInst(callInst);
     m_currentBB->pushSuccessor(m_funcBB[funcName]);
@@ -547,9 +708,9 @@ void IRVisitor::visit(CallAST& v)
      pushCurrentTemp();
      std::cout << temp << " <- " << "call " << funcName << std::endl;
 
-     auto tempInst = std::make_shared<IdentInst>(temp);
+     auto tempInst = std::make_shared<IdentInst>(temp, m_currentBB);
      tempInst->setup_def_use();
-     auto popInst = std::make_shared<PopInst>(tempInst);
+     auto popInst = std::make_shared<PopInst>(tempInst, m_currentBB);
      popInst->setup_def_use();
      m_currentBB->pushInst(popInst);
      m_instStack.push(tempInst);
@@ -573,7 +734,7 @@ void IRVisitor::visit(FactorsAST& v)
     auto leftInst = popInst();
     auto currentTempStr = getCurrentTemp();
     auto currentTempInst =
-        std::make_shared<IdentInst>(std::move(currentTempStr));
+        std::make_shared<IdentInst>(std::move(currentTempStr), m_currentBB);
     currentTempInst->setup_def_use();
     m_instStack.push(currentTempInst);
 
@@ -588,7 +749,8 @@ void IRVisitor::visit(FactorsAST& v)
 
         auto inst =
             std::make_shared<MulInst>(std::move(currentTempInst),
-                                    std::move(leftInst), std::move(rightInst));
+                                            std::move(leftInst),
+                                            std::move(rightInst), m_currentBB);
           inst->setup_def_use();
           m_currentBB->pushInst(inst);
     }
@@ -596,7 +758,8 @@ void IRVisitor::visit(FactorsAST& v)
     {
         auto inst =
             std::make_shared<DivInst>(std::move(currentTempInst),
-                                    std::move(leftInst), std::move(rightInst));
+                                            std::move(leftInst),
+                                            std::move(rightInst), m_currentBB);
         inst->setup_def_use();
         m_currentBB->pushInst(inst);
     }
@@ -604,7 +767,8 @@ void IRVisitor::visit(FactorsAST& v)
     {
         auto inst =
             std::make_shared<AndInst>(std::move(currentTempInst),
-                                    std::move(leftInst), std::move(rightInst));
+                                            std::move(leftInst),
+                                            std::move(rightInst), m_currentBB);
         inst->setup_def_use();
         m_currentBB->pushInst(inst);
     }
@@ -636,7 +800,7 @@ void IRVisitor::visit(TermsAST& v)
     auto leftInst = popInst();
     auto currentTempStr = getCurrentTemp();
     auto currentTempInst =
-        std::make_shared<IdentInst>(currentTempStr);
+        std::make_shared<IdentInst>(currentTempStr, m_currentBB);
     currentTempInst->setup_def_use();
     m_instStack.push(currentTempInst);
 
@@ -649,8 +813,8 @@ void IRVisitor::visit(TermsAST& v)
     if (op == "+")
     {
         auto inst =
-            std::make_shared<AddInst>(currentTempInst,
-                                      leftInst, rightInst);
+            std::make_shared<AddInst>(currentTempInst, leftInst,
+                                            rightInst, m_currentBB);
         inst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, inst);
         m_currentBB->pushInst(inst);
@@ -658,8 +822,8 @@ void IRVisitor::visit(TermsAST& v)
     else if (op == "-")
     {
         auto inst =
-            std::make_shared<SubInst>(currentTempInst,
-                                      leftInst, rightInst);
+            std::make_shared<SubInst>(currentTempInst, leftInst,
+                                            rightInst, m_currentBB);
         inst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, inst);
         m_currentBB->pushInst(inst);
@@ -667,8 +831,8 @@ void IRVisitor::visit(TermsAST& v)
     else
     {
         auto inst =
-            std::make_shared<OrInst>(currentTempInst,
-                                     leftInst, rightInst);
+            std::make_shared<OrInst>(currentTempInst, leftInst, rightInst,
+                                           m_currentBB);
         inst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, inst);
         m_currentBB->pushInst(inst);
@@ -695,7 +859,7 @@ void IRVisitor::visit(OptRelationAST& v)
     v.getTerms()->accept(*this);
     generateCurrentTemp();
     auto currentTempStr = getCurrentTemp();
-    auto targetInst = std::make_shared<IdentInst>(currentTempStr);
+    auto targetInst = std::make_shared<IdentInst>(currentTempStr, m_currentBB);
     targetInst->setup_def_use();
 
     auto rightInst = popInst();
@@ -708,7 +872,8 @@ void IRVisitor::visit(OptRelationAST& v)
     if (op == "=")
     {
         auto compInst = std::make_shared<CmpEQInst>(
-            std::move(targetInst), std::move(leftInst), std::move(rightInst));
+          std::move(targetInst), std::move(leftInst), std::move(rightInst),
+          m_currentBB);
       compInst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
@@ -716,7 +881,8 @@ void IRVisitor::visit(OptRelationAST& v)
     else if (op == "!=")
     {
         auto compInst = std::make_shared<CmpNEInst>(
-            std::move(targetInst), std::move(leftInst), std::move(rightInst));
+          std::move(targetInst), std::move(leftInst), std::move(rightInst),
+          m_currentBB);
         compInst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
@@ -724,7 +890,8 @@ void IRVisitor::visit(OptRelationAST& v)
     else if (op == "<")
     {
         auto compInst = std::make_shared<CmpLTInst>(
-            std::move(targetInst), std::move(leftInst), std::move(rightInst));
+          std::move(targetInst), std::move(leftInst), std::move(rightInst),
+          m_currentBB);
         compInst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
@@ -732,7 +899,8 @@ void IRVisitor::visit(OptRelationAST& v)
     else if (op == "<=")
     {
         auto compInst = std::make_shared<CmpLTEInst>(
-            std::move(targetInst), std::move(leftInst), std::move(rightInst));
+          std::move(targetInst), std::move(leftInst), std::move(rightInst),
+          m_currentBB);
         compInst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
@@ -741,7 +909,8 @@ void IRVisitor::visit(OptRelationAST& v)
     else if (op == ">")
     {
         auto compInst = std::make_shared<CmpGTInst>(
-            std::move(targetInst), std::move(leftInst), std::move(rightInst));
+          std::move(targetInst), std::move(leftInst), std::move(rightInst),
+          m_currentBB);
         compInst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
@@ -750,7 +919,8 @@ void IRVisitor::visit(OptRelationAST& v)
     else if (op == ">=")
     {
         auto compInst = std::make_shared<CmpGTEInst>(
-            std::move(targetInst), std::move(leftInst), std::move(rightInst));
+          std::move(targetInst), std::move(leftInst), std::move(rightInst),
+          m_currentBB);
         compInst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
@@ -785,16 +955,16 @@ void IRVisitor::visit(VarDeclAST& v)
     std::cout << baseName << " <- ";
     
     auto ssaName = baseNameToSSA(std::move(baseName));
-    auto targetIdentInst = std::make_shared<IdentInst>(ssaName);
+    auto targetIdentInst = std::make_shared<IdentInst>(ssaName, m_currentBB);
     targetIdentInst->setup_def_use();
 
     auto type = v.getIdentifier()->getType();
     if (type == Type::BOOLEAN)
     {
-        auto boolConstInst = std::make_shared<BoolConstInst>(false);
+        auto boolConstInst = std::make_shared<BoolConstInst>(false, m_currentBB);
         boolConstInst->setup_def_use();
-        auto inst =
-            std::make_shared<AssignInst>(std::move(targetIdentInst), std::move(boolConstInst));
+        auto inst = std::make_shared<AssignInst>(
+            std::move(targetIdentInst), std::move(boolConstInst), m_currentBB);
         inst->setup_def_use();
         writeVariable(baseName, m_currentBB, inst);
         std::cout << "false\n";
@@ -802,11 +972,10 @@ void IRVisitor::visit(VarDeclAST& v)
     }
     else if (type == Type::INTEGER)
     {
-        auto intConstInst = std::make_shared<IntConstInst>(0);
+        auto intConstInst = std::make_shared<IntConstInst>(0, m_currentBB);
         intConstInst->setup_def_use();
 
-        auto inst = std::make_shared<AssignInst>(std::move(targetIdentInst),
-                                                 std::move(intConstInst));
+        auto inst = std::make_shared<AssignInst>(std::move(targetIdentInst), std::move(intConstInst), m_currentBB);
         inst->setup_def_use();
 
         writeVariable(baseName, m_currentBB, inst);
@@ -823,13 +992,13 @@ void IRVisitor::visit(ArrDeclAST& v)
 {
     std::string& baseName = v.getIdentifier()->getName();
     auto ssaName = getCurrentSSAName(baseName);
-    auto allocaIdentInst = std::make_shared<IdentInst>(ssaName);
+    auto allocaIdentInst = std::make_shared<IdentInst>(ssaName, m_currentBB);
     allocaIdentInst->setup_def_use();
 
     auto type = v.getIdentifier()->getType();
     auto size = v.getSize();
-    auto allocaInst =
-        std::make_shared<AllocaInst>(std::move(allocaIdentInst), type, size);
+    auto allocaInst = std::make_shared<AllocaInst>(std::move(allocaIdentInst),
+                                                   type, size, m_currentBB);
     allocaInst->setup_def_use();
     writeVariable(baseName, m_currentBB, allocaInst);
 
@@ -839,13 +1008,15 @@ void IRVisitor::visit(ArrDeclAST& v)
     {
         std::string& baseName = v.getIdentifier()->getName();
         auto ssaName = getCurrentSSAName(baseName);
-        auto sourceIdentInst = std::make_shared<IdentInst>(ssaName);
+        auto sourceIdentInst =
+            std::make_shared<IdentInst>(ssaName, m_currentBB);
         sourceIdentInst->setup_def_use();
 
-        auto indexInst = std::make_shared<IntConstInst>((int)i);
+        auto indexInst = std::make_shared<IntConstInst>((int)i, m_currentBB);
 
         auto targetSsaName = baseNameToSSA(baseName);
-        auto targetIdentInst = std::make_shared<IdentInst>(targetSsaName);
+        auto targetIdentInst =
+            std::make_shared<IdentInst>(targetSsaName, m_currentBB);
         targetIdentInst->setup_def_use();
 
         std::cout << v.getIdentifier()->getName() << "[" << i << "]"  " <- ";
@@ -853,11 +1024,12 @@ void IRVisitor::visit(ArrDeclAST& v)
         auto type = v.getIdentifier()->getType();
         if (type == Type::BOOLEAN)
         {
-            auto boolConstInst = std::make_shared<BoolConstInst>(false);
+          auto boolConstInst =
+              std::make_shared<BoolConstInst>(false, m_currentBB);
             boolConstInst->setup_def_use();
             auto inst = std::make_shared<ArrUpdateInst>(
                 std::move(targetIdentInst), std::move(sourceIdentInst),
-                std::move(indexInst), std::move(boolConstInst));
+                std::move(indexInst), std::move(boolConstInst), m_currentBB);
             inst->setup_def_use();
             writeVariable(baseName, m_currentBB, inst);
 
@@ -867,12 +1039,12 @@ void IRVisitor::visit(ArrDeclAST& v)
         }
         else if (type == Type::INTEGER)
         {
-            auto intConstInst = std::make_shared<IntConstInst>(0);
+            auto intConstInst = std::make_shared<IntConstInst>(0, m_currentBB);
             intConstInst->setup_def_use();
 
             auto inst = std::make_shared<ArrUpdateInst>(
                 std::move(targetIdentInst), std::move(sourceIdentInst),
-                std::move(indexInst), std::move(intConstInst));
+                std::move(indexInst), std::move(intConstInst), m_currentBB);
             inst->setup_def_use();
             writeVariable(baseName, m_currentBB, inst);
 
@@ -902,11 +1074,12 @@ void IRVisitor::visit(ParameterAST& v)
 {
     auto ident = v.getIdentifier();
     auto identName = ident->getName();
-    auto identInst = std::make_shared<IdentInst>(baseNameToSSA(identName));
+    auto identInst =
+        std::make_shared<IdentInst>(baseNameToSSA(identName), m_currentBB);
     std::cout << identName << " : " << typeToStr(v.getType());
     writeVariable(identName, m_currentBB, identInst);
 
-    auto popInst = std::make_shared<PopInst>(identInst);
+    auto popInst = std::make_shared<PopInst>(identInst, m_currentBB);
     popInst->setup_def_use();
     m_currentBB->pushInst(popInst);
 }
@@ -945,13 +1118,13 @@ void IRVisitor::visit(ProcDeclAST& v)
 
     // make a push(0) instruction because proc have no return statement,
     // so we return 0 as default
-    auto inst = std::make_shared<IntConstInst>(0);
+    auto inst = std::make_shared<IntConstInst>(0, m_currentBB);
     inst->setup_def_use();
-    auto pushInst = std::make_shared<PushInst>(inst);
+    auto pushInst = std::make_shared<PushInst>(inst, m_currentBB);
     pushInst->setup_def_use();
     m_currentBB->pushInst(pushInst);
 
-    auto retInst = std::make_shared<ReturnInst>();
+    auto retInst = std::make_shared<ReturnInst>(m_currentBB);
     retInst->setup_def_use();
     m_currentBB->pushInst(retInst);
     std::cout << "return\n";
@@ -1206,7 +1379,6 @@ std::shared_ptr<Inst> IRVisitor::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> ph
             return phi;
         }
         same = op;
-        std::cout << same->getString() << std::endl;
     }
 
     if (same == nullptr)

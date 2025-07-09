@@ -13,21 +13,19 @@ class Inst : public std::enable_shared_from_this<Inst>
 {
 protected:
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
-    std::shared_ptr<BasicBlock> m_block;
 
 public:
     Inst() {};
     virtual std::string getString() { return ""; };
     virtual std::shared_ptr<Inst> getTarget() { return shared_from_this(); }
+    virtual void setTarget(std::shared_ptr<Inst> target) { }
     virtual void push_user(std::shared_ptr<Inst> user) {};
     virtual void setup_def_use() {}
     virtual bool isPhi() { return false; }
-    virtual void insert_block(std::shared_ptr<BasicBlock> block)
-    {
-        m_block = block;
-    }
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() { return m_operands; }
-    virtual std::shared_ptr<BasicBlock> getBlock() { return m_block; }
+    virtual void setOperands(std::vector<std::shared_ptr<Inst>>& operands) { m_operands = operands; }
+    virtual bool canBeRenamed() { return true; }
+    virtual std::shared_ptr<BasicBlock> getBlock() { return nullptr; };
 };
 
 class IntConstInst : public Inst
@@ -38,7 +36,7 @@ private:
     std::shared_ptr<BasicBlock> m_block;
 
 public:
-    IntConstInst(int val);
+    IntConstInst(int val, std::shared_ptr<BasicBlock> block);
 
     virtual ~IntConstInst() = default;
     IntConstInst(const IntConstInst&) = delete;
@@ -51,7 +49,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
-    
+    bool canBeRenamed() { return false; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class BoolConstInst : public Inst
@@ -59,9 +58,10 @@ class BoolConstInst : public Inst
 private:
     bool m_val;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
-    BoolConstInst(bool val);
+    BoolConstInst(bool val, std::shared_ptr<BasicBlock> block);
 
     virtual ~BoolConstInst() = default;
     BoolConstInst(const BoolConstInst&) = delete;
@@ -74,6 +74,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    bool canBeRenamed() { return false; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class StrConstInst : public Inst
@@ -81,9 +83,10 @@ class StrConstInst : public Inst
 private:
     std::string m_val;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
-    StrConstInst(std::string val);
+    StrConstInst(std::string val, std::shared_ptr<BasicBlock> block);
 
     virtual ~StrConstInst() = default;
     StrConstInst(const StrConstInst&) = delete;
@@ -95,6 +98,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    bool canBeRenamed() { return false; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class IdentInst : public Inst
@@ -102,9 +107,10 @@ class IdentInst : public Inst
 private:
     std::string m_name;
     std::vector<std::shared_ptr<Inst>> m_users;
+    std::shared_ptr<BasicBlock> m_block;
 
-   public:
-    IdentInst(std::string name);
+public:
+    IdentInst(std::string name, std::shared_ptr<BasicBlock> block);
 
     virtual ~IdentInst() = default;
     IdentInst(const IdentInst&) = delete;
@@ -115,8 +121,11 @@ private:
     std::string getString();
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
-    std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
-    
+    std::vector<std::shared_ptr<Inst>>& getOperands() override
+    {
+        return m_operands;
+    }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class AddInst: public Inst
@@ -124,9 +133,11 @@ class AddInst: public Inst
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
-    AddInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1, std::shared_ptr<Inst> operand2);
+    AddInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
+            std::shared_ptr<Inst> operand2, std::shared_ptr<BasicBlock> block);
 
     virtual ~AddInst() = default;
     AddInst(const AddInst&) = delete;
@@ -142,6 +153,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class SubInst: public Inst
@@ -149,10 +162,11 @@ class SubInst: public Inst
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
     SubInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-            std::shared_ptr<Inst> operand2);
+            std::shared_ptr<Inst> operand2, std::shared_ptr<BasicBlock> block);
 
     virtual ~SubInst() = default;
     SubInst(const SubInst&) = delete;
@@ -168,6 +182,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class MulInst: public Inst
@@ -175,10 +191,11 @@ class MulInst: public Inst
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
     MulInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-            std::shared_ptr<Inst> operand2);
+            std::shared_ptr<Inst> operand2, std::shared_ptr<BasicBlock> block);
 
     virtual ~MulInst() = default;
     MulInst(const MulInst&) = delete;
@@ -194,6 +211,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class DivInst: public Inst
@@ -201,10 +220,11 @@ class DivInst: public Inst
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
     DivInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-            std::shared_ptr<Inst> operand2);
+            std::shared_ptr<Inst> operand2, std::shared_ptr<BasicBlock> block);
 
     virtual ~DivInst() = default;
     DivInst(const DivInst&) = delete;
@@ -220,6 +240,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class NotInst: public Inst
@@ -227,9 +249,11 @@ class NotInst: public Inst
 private:
     std::shared_ptr<Inst> m_target, m_operand;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
-    NotInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand);
+    NotInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand,
+            std::shared_ptr<BasicBlock> block);
 
     virtual ~NotInst() = default;
     NotInst(const NotInst&) = delete;
@@ -244,6 +268,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class AndInst: public Inst
@@ -251,10 +277,11 @@ class AndInst: public Inst
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
     AndInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-            std::shared_ptr<Inst> operand2);
+            std::shared_ptr<Inst> operand2, std::shared_ptr<BasicBlock> block);
 
     virtual ~AndInst() = default;
     AndInst(const AndInst&) = delete;
@@ -270,6 +297,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class OrInst: public Inst
@@ -277,10 +306,11 @@ class OrInst: public Inst
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
     OrInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-            std::shared_ptr<Inst> operand2);
+           std::shared_ptr<Inst> operand2, std::shared_ptr<BasicBlock> block);
 
     virtual ~OrInst() = default;
     OrInst(const OrInst&) = delete;
@@ -296,6 +326,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class AllocaInst : public Inst
@@ -305,9 +337,11 @@ private:
     Type m_type;
     unsigned int m_size;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
-    AllocaInst(std::shared_ptr<Inst> target, Type type, unsigned int size);
+    AllocaInst(std::shared_ptr<Inst> target, Type type, unsigned int size,
+               std::shared_ptr<BasicBlock> block);
 
     virtual ~AllocaInst() = default;
     AllocaInst(const AllocaInst&) = delete;
@@ -323,6 +357,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class ArrAccessInst : public Inst
@@ -330,10 +366,11 @@ class ArrAccessInst : public Inst
 private:
     std::shared_ptr<Inst> m_target, m_source, m_index;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
     ArrAccessInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> source,
-                  std::shared_ptr<Inst> index);
+                  std::shared_ptr<Inst> index, std::shared_ptr<BasicBlock> block);
     
     virtual ~ArrAccessInst() = default;
     ArrAccessInst(const ArrAccessInst&) = delete;
@@ -349,6 +386,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class ArrUpdateInst : public Inst
@@ -356,10 +395,11 @@ class ArrUpdateInst : public Inst
 private:
     std::shared_ptr<Inst> m_target, m_source, m_index, m_val;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
     ArrUpdateInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> source,
-                  std::shared_ptr<Inst> index, std::shared_ptr<Inst> val);
+                  std::shared_ptr<Inst> index, std::shared_ptr<Inst> val, std::shared_ptr<BasicBlock> block);
 
     virtual ~ArrUpdateInst() = default;
     ArrUpdateInst(const ArrUpdateInst&) = delete;
@@ -376,6 +416,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class AssignInst : public Inst
@@ -383,9 +425,11 @@ class AssignInst : public Inst
 private:
     std::shared_ptr<Inst> m_target, m_source;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
-    AssignInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> source);
+    AssignInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> source,
+               std::shared_ptr<BasicBlock> block);
   
     virtual ~AssignInst() = default;
     AssignInst(const AssignInst&) = delete;
@@ -400,6 +444,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class CmpEQInst : public Inst
@@ -407,10 +453,11 @@ class CmpEQInst : public Inst
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
     CmpEQInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-              std::shared_ptr<Inst> operand2);
+              std::shared_ptr<Inst> operand2, std::shared_ptr<BasicBlock> block);
   
     virtual ~CmpEQInst() = default;
     CmpEQInst(const CmpEQInst&) = delete;
@@ -426,6 +473,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class CmpNEInst : public Inst
@@ -433,10 +482,11 @@ class CmpNEInst : public Inst
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
     CmpNEInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-              std::shared_ptr<Inst> operand2);
+              std::shared_ptr<Inst> operand2, std::shared_ptr<BasicBlock> block);
   
     virtual ~CmpNEInst() = default;
     CmpNEInst(const CmpNEInst&) = delete;
@@ -452,6 +502,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class CmpLTInst : public Inst
@@ -459,10 +511,11 @@ class CmpLTInst : public Inst
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
     CmpLTInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-              std::shared_ptr<Inst> operand2);
+              std::shared_ptr<Inst> operand2, std::shared_ptr<BasicBlock> block);
   
     virtual ~CmpLTInst() = default;
     CmpLTInst(const CmpLTInst&) = delete;
@@ -478,6 +531,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class CmpLTEInst : public Inst
@@ -485,10 +540,11 @@ class CmpLTEInst : public Inst
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
     CmpLTEInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-               std::shared_ptr<Inst> operand2);
+               std::shared_ptr<Inst> operand2, std::shared_ptr<BasicBlock> block);
 
     virtual ~CmpLTEInst() = default;
     CmpLTEInst(const CmpLTEInst&) = delete;
@@ -504,6 +560,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class CmpGTInst : public Inst
@@ -511,10 +569,11 @@ class CmpGTInst : public Inst
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
     CmpGTInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-              std::shared_ptr<Inst> operand2);
+              std::shared_ptr<Inst> operand2, std::shared_ptr<BasicBlock> block);
 
     virtual ~CmpGTInst() = default;
     CmpGTInst(const CmpGTInst&) = delete;
@@ -530,6 +589,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class CmpGTEInst : public Inst
@@ -537,10 +598,11 @@ class CmpGTEInst : public Inst
 private:
     std::shared_ptr<Inst> m_target, m_operand1, m_operand2;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
     CmpGTEInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
-               std::shared_ptr<Inst> operand2);
+               std::shared_ptr<Inst> operand2, std::shared_ptr<BasicBlock> block);
   
     virtual ~CmpGTEInst() = default;
     CmpGTEInst(const CmpGTEInst&) = delete;
@@ -556,6 +618,8 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class JumpInst : public Inst
@@ -563,6 +627,7 @@ class JumpInst : public Inst
 private:
     std::shared_ptr<BasicBlock> m_target;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
     JumpInst(std::shared_ptr<BasicBlock> target);
@@ -578,20 +643,24 @@ public:
     std::string getString();
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
-    std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    std::vector<std::shared_ptr<Inst>>& getOperands() override
+    {
+        return m_operands;
+    }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class BRTInst : public Inst
 {
 private:
-    std::shared_ptr<Inst> m_cond;
     std::shared_ptr<BasicBlock> m_targetSuccess;
     std::shared_ptr<BasicBlock> m_targetFailed;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
     BRTInst(std::shared_ptr<Inst> cond, std::shared_ptr<BasicBlock> targetSuccess,
-            std::shared_ptr<BasicBlock> targetFailed);
+            std::shared_ptr<BasicBlock> targetFailed, std::shared_ptr<BasicBlock> block);
   
     virtual ~BRTInst() = default;
     BRTInst(const BRTInst&) = delete;
@@ -606,20 +675,24 @@ public:
     std::string getString();
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
-    std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    std::vector<std::shared_ptr<Inst>>& getOperands() override
+    {
+      return m_operands;
+    }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class BRFInst : public Inst
 {
 private:
-    std::shared_ptr<Inst> m_cond;
     std::shared_ptr<BasicBlock> m_targetSuccess;
     std::shared_ptr<BasicBlock> m_targetFailed;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
     BRFInst(std::shared_ptr<Inst> cond, std::shared_ptr<BasicBlock> targetSuccess,
-            std::shared_ptr<BasicBlock> targetFailed);
+            std::shared_ptr<BasicBlock> targetFailed, std::shared_ptr<BasicBlock> block);
   
     virtual ~BRFInst() = default;
     BRFInst(const BRFInst&) = delete;
@@ -634,17 +707,21 @@ public:
     std::string getString();
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
-    std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    std::vector<std::shared_ptr<Inst>>& getOperands() override
+    {
+        return m_operands;
+    }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class PutInst : public Inst
 {
 private:
-    std::shared_ptr<Inst> m_operand;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
-    PutInst(std::shared_ptr<Inst> operand);
+    PutInst(std::shared_ptr<Inst> operand, std::shared_ptr<BasicBlock> block);
   
     virtual ~PutInst() = default;
     PutInst(const PutInst&) = delete;
@@ -658,6 +735,7 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class GetInst : public Inst
@@ -665,9 +743,10 @@ class GetInst : public Inst
 private:
     std::shared_ptr<Inst> m_target;
     std::vector<std::shared_ptr<Inst>> m_users;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
-    GetInst(std::shared_ptr<Inst> target);
+    GetInst(std::shared_ptr<Inst> target, std::shared_ptr<BasicBlock> block);
   
     virtual ~GetInst() = default;
     GetInst(const GetInst&) = delete;
@@ -681,16 +760,18 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class PushInst : public Inst
 {
 private:
-    std::shared_ptr<Inst> m_operand;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
-    PushInst(std::shared_ptr<Inst> operand);
+    PushInst(std::shared_ptr<Inst> operand, std::shared_ptr<BasicBlock> block);
   
     virtual ~PushInst() = default;
     PushInst(const PushInst&) = delete;
@@ -703,7 +784,11 @@ public:
     std::string getString();
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
-    std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    std::vector<std::shared_ptr<Inst>>& getOperands() override
+    {
+        return m_operands;
+    }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class PopInst : public Inst
@@ -711,9 +796,10 @@ class PopInst : public Inst
 private:
     std::shared_ptr<Inst> m_target;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
-    PopInst(std::shared_ptr<Inst> target);
+    PopInst(std::shared_ptr<Inst> target, std::shared_ptr<BasicBlock> block);
   
     virtual ~PopInst() = default;
     PopInst(const PopInst&) = delete;
@@ -727,15 +813,18 @@ public:
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class ReturnInst : public Inst
 {
 private:
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
-    ReturnInst();
+    ReturnInst(std::shared_ptr<BasicBlock> block);
     virtual ~ReturnInst() = default;
     ReturnInst(const ReturnInst&) = delete;
     ReturnInst(ReturnInst&&) noexcept = default;
@@ -745,7 +834,11 @@ public:
     std::string getString();
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
-    std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    std::vector<std::shared_ptr<Inst>>& getOperands() override
+    {
+        return m_operands;
+    }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class CallInst : public Inst
@@ -753,9 +846,10 @@ class CallInst : public Inst
 private:
     std::string m_calleeStr;
     std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
 
 public:
-    CallInst(std::string calleeStr);
+    CallInst(std::string calleeStr, std::shared_ptr<BasicBlock> block);
     virtual ~CallInst() = default;
     CallInst(const CallInst&) = delete;
     CallInst(CallInst&&) noexcept = default;
@@ -767,7 +861,11 @@ public:
     std::string getString();
     void push_user(std::shared_ptr<Inst> user) override;
     void setup_def_use();
-    std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
+    std::vector<std::shared_ptr<Inst>>& getOperands() override
+    {
+        return m_operands;
+    }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
 class PhiInst : public Inst
@@ -778,7 +876,7 @@ private:
     std::vector<std::shared_ptr<Inst>> m_users;
 
 public:
-    PhiInst(std::string name, std::shared_ptr<BasicBlock> m_block);
+    PhiInst(std::string name, std::shared_ptr<BasicBlock> block);
 
     virtual ~PhiInst() = default;
     PhiInst(const PhiInst&) = delete;
@@ -796,16 +894,28 @@ public:
     std::vector<std::shared_ptr<Inst>>& get_users();
     std::vector<std::shared_ptr<Inst>>& getOperands() override { return m_operands; }
     bool isPhi() { return true; }
+    virtual void setTarget(std::shared_ptr<Inst> target) { m_target = target; }
 };
 
 class UndefInst: public Inst
 {
+private:
+    std::shared_ptr<BasicBlock> m_block;
+
 public:
+    UndefInst(std::shared_ptr<BasicBlock> block) : m_block(std::move(block)) {}
     std::string getString() { return "Undef"; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
 
-class Noop : public Inst
+class NoopInst : public Inst
 {
+private:
+    std::shared_ptr<BasicBlock> m_block;
+
 public:
+    NoopInst(std::shared_ptr<BasicBlock> block) : m_block(std::move(block)) {}
+
     std::string getString() { return "noop"; }
+    std::shared_ptr<BasicBlock> getBlock() override { return m_block; };
 };
