@@ -24,7 +24,11 @@ Features:
 * Scoped Expression
 * Static Single Assignment Intermediate Representation
 
-Now Mina Programming language has an Intermediate Representation in SSA Form!
+Now Mina programming language has an Intermediate Representation in SSA Form!
 
 ![image](https://github.com/user-attachments/assets/a4b54ef7-593e-4f0a-a102-e5106a36f615)
 
+
+Now Mina programming language being compiled Just in Time (JIT)!
+
+<img width="600" height="620" alt="image" src="https://github.com/user-attachments/assets/498666f0-6c30-45a9-a3ce-8b546a908c7c" />
