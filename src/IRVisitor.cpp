@@ -1,11 +1,44 @@
 #include "IRVisitor.hpp"
 #include "Ast.hpp"
-#include "Inst.hpp"
+#include "InstIR.hpp"
 #include <queue>
 #include <set>
 #include <memory>
 
-IRVisitor::IRVisitor() : m_tempCounter(0), m_labelCounter(0)
+#include <asmjit/x86.h>
+
+typedef int (*Func)(void);
+int intParam;
+bool boolParam;
+char charParam;
+static void paramPrintInt(int val)
+{ printf("%d", intParam); }
+void printInt() { printf("%d", intParam); }
+void printBool()
+{
+    if (boolParam)
+    {
+        printf("true");
+    }
+    else
+    {
+        printf("false");
+    }
+}
+void printChar()
+{
+  //return;
+  putchar(charParam);
+}
+void printWithParam(int param) { putchar(param); }
+
+IRVisitor::IRVisitor()
+    : m_tempCounter(0),
+      m_labelCounter(0),
+      m_jitRuntime(),
+      m_codeHolder(),
+      m_assembler(&m_codeHolder),
+      m_logger(stdout)
 {
     m_cfg = std::make_shared<BasicBlock>("Entry_0");
     m_currBBNameWithoutCtr = "Entry";
@@ -77,7 +110,7 @@ void IRVisitor::visit(StringAST& v)
 
 void IRVisitor::visit(VariableAST& v)
 {
-    auto val = v.getName();
+    auto& val = v.getName();
     auto valInst = readVariable(val, m_currentBB);
     m_temp.push(val);
     m_instStack.push(valInst);
@@ -165,7 +198,7 @@ void IRVisitor::visit(ProgramAST& v)
     visited = {};
 
     worklist.push(m_cfg);
-    visited.insert(m_cfg);
+    //visited.insert(m_cfg);
 
     while (!worklist.empty())
     {
@@ -174,6 +207,10 @@ void IRVisitor::visit(ProgramAST& v)
         worklist.pop();
 
         auto& instructions = current_bb->getInstructions();
+        if (instructions.size() == 0)
+        {
+            continue;
+        }
 
         bool finished = false;
         unsigned int instruction_idx = 0;
@@ -187,7 +224,7 @@ void IRVisitor::visit(ProgramAST& v)
             {
                 instructions.erase(instructions.begin() + instruction_idx);
                 instruction_idx = 0;
-                continue;
+                //continue;
             }
             else
             {
@@ -238,7 +275,7 @@ void IRVisitor::visit(ProgramAST& v)
             }
         }
     }
-    
+    generateX86();
 }
 
 void IRVisitor::visit(ScopeAST& v)
@@ -298,11 +335,12 @@ void IRVisitor::visit(AssignmentAST& v)
 
         auto arrIdentifier =
             std::dynamic_pointer_cast<ArrAccessAST>(identifier);
+        auto type = arrIdentifier->getType();
         auto subsExpr = arrIdentifier->getSubsExpr();
         subsExpr->accept(*this);
         auto subsInst = popInst();
         auto arrayUpdateInst = std::make_shared<ArrUpdateInst>(
-            targetInst, sourceInst, subsInst, exprInst, m_currentBB);
+            targetInst, sourceInst, subsInst, exprInst, m_currentBB, type);
         arrayUpdateInst->setup_def_use();
         writeVariable(targetStr, m_currentBB, arrayUpdateInst);
         m_currentBB->pushInst(arrayUpdateInst);
@@ -640,7 +678,7 @@ void IRVisitor::visit(ArrAccessAST& v)
     m_instStack.push(targetInst);
     auto arrAccInst = std::make_shared<ArrAccessInst>(
         std::move(targetInst), std::move(readVal), std::move(idxInst),
-        m_currentBB);
+        m_currentBB, v.getType());
     arrAccInst->setup_def_use();
     m_temp.push(st);
     m_currentBB->pushInst(arrAccInst);
@@ -651,13 +689,9 @@ void IRVisitor::visit(ArgumentsAST& v)
     auto expr = v.getExpr();
     auto args = v.getArgs();
     expr->accept(*this);
-    auto inst = popInst();
 
-    auto pushInst = std::make_shared<PushInst>(inst, m_currentBB);
-    pushInst->setup_def_use();
-
+    m_arguments.push_back(popInst());
     m_argNames.push_back(popTemp());
-    m_arguments.push_back(pushInst);
 
     if (args)
     {
@@ -676,49 +710,74 @@ void IRVisitor::visit(CallAST& v)
        args->accept(*this);
     }
 
-    std::reverse(m_arguments.begin(), m_arguments.end());
-    std::reverse(m_argNames.begin(), m_argNames.end());
-
-    for (auto& arg : m_arguments)
-    {
-        m_currentBB->pushInst(arg);
-    }
-
-    for (auto& argName : m_argNames)
-    {
-        std::cout << " push " << argName << std::endl;
-    }
-
     auto funcName = v.getFuncName();
 
-    auto callInst = std::make_shared<CallInst>(funcName, m_currentBB);
+    auto callInst = std::make_shared<CallInst>(funcName, m_arguments, m_currentBB);
     callInst->setup_def_use();
     m_currentBB->pushInst(callInst);
     m_currentBB->pushSuccessor(m_funcBB[funcName]);
     m_funcBB[funcName]->pushPredecessor(m_currentBB);
 
-     auto newBBLabel =
-         m_currBBNameWithoutCtr + "_" + std::to_string(++m_currBBCtr);
-     auto newBB = std::make_shared<BasicBlock>(newBBLabel);
-     newBB->pushPredecessor(m_funcBB[funcName]);
-     m_funcBB[funcName]->pushSuccessor(newBB);
-     m_currentBB = newBB;
+    auto newBBLabel =
+        m_currBBNameWithoutCtr + "_" + std::to_string(++m_currBBCtr);
+    auto newBB = std::make_shared<BasicBlock>(newBBLabel);
+    newBB->pushPredecessor(m_funcBB[funcName]);
+    m_funcBB[funcName]->pushSuccessor(newBB);
+    m_currentBB = newBB;
 
-     auto temp = getCurrentTemp();
-     pushCurrentTemp();
-     std::cout << temp << " <- " << "call " << funcName << std::endl;
+    auto temp = getCurrentTemp();
+    pushCurrentTemp();
+    std::cout << temp << " <- " << funcName << "(";
+    for (unsigned int i = 0; i < m_arguments.size(); ++i)
+    {
+        if (i)
+        {
+            std::cout << ',';
+        }
+        std::cout << m_arguments[i]->getTarget()->getString();
+    }
+    std::cout << ')' << std::endl;
 
-     auto tempInst = std::make_shared<IdentInst>(temp, m_currentBB);
-     tempInst->setup_def_use();
-     auto popInst = std::make_shared<PopInst>(tempInst, m_currentBB);
-     popInst->setup_def_use();
-     m_currentBB->pushInst(popInst);
-     m_instStack.push(tempInst);
+    auto tempInst = std::make_shared<IdentInst>(temp, m_currentBB);
+    tempInst->setup_def_use();
+    auto popInst = std::make_shared<PopInst>(tempInst, m_currentBB);
+    popInst->setup_def_use();
+    m_currentBB->pushInst(popInst);
+    m_instStack.push(tempInst);
 }
 
 void IRVisitor::visit(FactorAST& v)
 {
+    auto op = v.getOp().getLexme();
     v.getFactor()->accept(*this);
+    auto temp = popTemp();
+    auto inst = popInst();
+
+    auto currentTempStr = getCurrentTemp();
+    auto currentTempInst =
+        std::make_shared<IdentInst>(std::move(currentTempStr), m_currentBB);
+    currentTempInst->setup_def_use();
+    m_instStack.push(currentTempInst);
+
+    generateCurrentTemp();
+    pushCurrentTemp();
+
+
+    std::cout << " <- " << op << " " << temp;
+    if (op == "-")
+    {
+        auto newInst = std::make_shared<MulInst>(
+            currentTempInst, std::make_shared<IntConstInst>(-1, m_currentBB), inst, m_currentBB);
+        newInst->setup_def_use();
+        m_currentBB->pushInst(newInst);
+    }
+    else if (op == "~")
+    {
+        auto newInst = std::make_shared<NotInst>(
+            currentTempInst, inst, m_currentBB);
+        newInst->setup_def_use();
+        m_currentBB->pushInst(newInst);
+    }
 }
 
 void IRVisitor::visit(FactorsAST& v)
@@ -872,17 +931,17 @@ void IRVisitor::visit(OptRelationAST& v)
     if (op == "=")
     {
         auto compInst = std::make_shared<CmpEQInst>(
-          std::move(targetInst), std::move(leftInst), std::move(rightInst),
-          m_currentBB);
-      compInst->setup_def_use();
+            std::move(targetInst), std::move(leftInst), std::move(rightInst),
+            m_currentBB);
+        compInst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
     }
     else if (op == "!=")
     {
         auto compInst = std::make_shared<CmpNEInst>(
-          std::move(targetInst), std::move(leftInst), std::move(rightInst),
-          m_currentBB);
+            std::move(targetInst), std::move(leftInst), std::move(rightInst),
+            m_currentBB);
         compInst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
@@ -890,8 +949,8 @@ void IRVisitor::visit(OptRelationAST& v)
     else if (op == "<")
     {
         auto compInst = std::make_shared<CmpLTInst>(
-          std::move(targetInst), std::move(leftInst), std::move(rightInst),
-          m_currentBB);
+            std::move(targetInst), std::move(leftInst), std::move(rightInst),
+            m_currentBB);
         compInst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
@@ -899,8 +958,8 @@ void IRVisitor::visit(OptRelationAST& v)
     else if (op == "<=")
     {
         auto compInst = std::make_shared<CmpLTEInst>(
-          std::move(targetInst), std::move(leftInst), std::move(rightInst),
-          m_currentBB);
+            std::move(targetInst), std::move(leftInst), std::move(rightInst),
+            m_currentBB);
         compInst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
@@ -909,8 +968,8 @@ void IRVisitor::visit(OptRelationAST& v)
     else if (op == ">")
     {
         auto compInst = std::make_shared<CmpGTInst>(
-          std::move(targetInst), std::move(leftInst), std::move(rightInst),
-          m_currentBB);
+            std::move(targetInst), std::move(leftInst), std::move(rightInst),
+            m_currentBB);
         compInst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
@@ -919,8 +978,8 @@ void IRVisitor::visit(OptRelationAST& v)
     else if (op == ">=")
     {
         auto compInst = std::make_shared<CmpGTEInst>(
-          std::move(targetInst), std::move(leftInst), std::move(rightInst),
-          m_currentBB);
+            std::move(targetInst), std::move(leftInst), std::move(rightInst),
+            m_currentBB);
         compInst->setup_def_use();
         writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
@@ -1029,7 +1088,7 @@ void IRVisitor::visit(ArrDeclAST& v)
             boolConstInst->setup_def_use();
             auto inst = std::make_shared<ArrUpdateInst>(
                 std::move(targetIdentInst), std::move(sourceIdentInst),
-                std::move(indexInst), std::move(boolConstInst), m_currentBB);
+                std::move(indexInst), std::move(boolConstInst), m_currentBB, Type::BOOLEAN);
             inst->setup_def_use();
             writeVariable(baseName, m_currentBB, inst);
 
@@ -1044,7 +1103,7 @@ void IRVisitor::visit(ArrDeclAST& v)
 
             auto inst = std::make_shared<ArrUpdateInst>(
                 std::move(targetIdentInst), std::move(sourceIdentInst),
-                std::move(indexInst), std::move(intConstInst), m_currentBB);
+                std::move(indexInst), std::move(intConstInst), m_currentBB, Type::INTEGER);
             inst->setup_def_use();
             writeVariable(baseName, m_currentBB, inst);
 
@@ -1456,6 +1515,1433 @@ std::shared_ptr<Inst> IRVisitor::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> ph
         }
     }
     return same;
+}
+
+void IRVisitor::generateX86()
+{
+    // BFS
+    std::queue<std::shared_ptr<BasicBlock>> worklist, worklistNew;
+    std::set<std::shared_ptr<BasicBlock>> visited;
+    worklist.push(m_cfg);
+    visited.insert(m_cfg);
+    
+    std::vector<std::string> variables;
+
+    m_lowerCFG = std::make_shared<BasicBlock>(m_cfg->getName());
+    worklistNew.push(m_lowerCFG);
+
+    //asmjit::FileLogger logger(stdout);  // Logger should always survive CodeHolder.
+    asmjit::StringLogger logger;
+    // Runtime designed for JIT - it holds relocated functions and controls
+    // their lifetime.
+    asmjit::JitRuntime rt;
+
+    // Holds code and relocation information during code generation.
+    asmjit::CodeHolder code;
+
+    // Initialize CodeHolder. It will be configured to match the host CPU
+    // architecture. If you run this on an x86/x86_64 machine, it will generate
+    // x86 code.
+    code.init(rt.environment(), rt.cpuFeatures());
+    code.setLogger(&logger);  // attach logger
+
+    // Use x86::Assembler to emit x86/x86_64 code.
+    asmjit::x86::Compiler cc(&code);
+    cc.addFunc(asmjit::FuncSignature::build<void>());  // Begin a function of `int
+                                              // fn(void)` signature.
+
+    std::unordered_map<std::string, asmjit::x86::Gp> registerMap;
+    std::unordered_map<std::string, asmjit::Label> labelMap;
+
+    while (!worklist.empty())
+    {
+        std::shared_ptr<BasicBlock> current_bb = worklist.front();
+        std::shared_ptr<BasicBlock> new_bb = worklistNew.front();
+        auto bbName = current_bb->getName();
+        if (labelMap.find(bbName) == labelMap.end())
+        {
+            labelMap[bbName] = cc.newNamedLabel(bbName.c_str());
+        }
+        auto& label = labelMap[bbName];
+        cc.bind(label);
+
+        visited.insert(current_bb);
+
+        worklist.pop();
+        worklistNew.pop();
+
+        auto& instructions = current_bb->getInstructions();
+        
+        enum class CmpType
+        {
+            NONE,
+            EQ,
+            NE,
+            LT,
+            LTE,
+            GT,
+            GTE
+        };
+
+        struct CodegenState
+        {
+            CmpType last_comparison_type = CmpType::NONE;
+        } state;
+        bool is_prev_cmp = false;
+        for (unsigned int i = 0; i < instructions.size(); ++i)
+        {
+            auto& currInst = instructions[i];
+            auto instType = currInst->getInstType();
+            switch (instType)
+            {
+                case InstType::Add:
+                {
+                    auto& target = currInst->getTarget();
+                    auto& operands = currInst->getOperands();
+                    auto& operand1 = operands[0]->getTarget();
+                    auto& operand2 = operands[1]->getTarget();
+
+                    auto& targetName = target->getString();
+                    if (registerMap.find(targetName) == registerMap.end())
+                    {
+                        auto newReg = cc.newGp32(targetName.c_str());
+                        registerMap[targetName] = newReg;
+                    }
+
+                    auto& targetRegister = registerMap[targetName];
+                    auto operandInstType = operand1->getInstType();
+                    switch (operandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand1);
+                            auto err = cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            cc.mov(
+                                targetRegister,
+                                registerMap[operand1->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+
+                    auto otherOperandInstType = operand2->getInstType();
+
+                    switch (otherOperandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand2);
+                            cc.add(targetRegister, casted->getVal());
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand2);
+                            cc.add(targetRegister, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            cc.add(
+                                targetRegister,
+                                registerMap[operand2->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+                    break;
+                }
+                case InstType::Sub:
+                {
+                    auto& target = currInst->getTarget();
+                    auto& operands = currInst->getOperands();
+                    auto& operand1 = operands[0]->getTarget();
+                    auto& operand2 = operands[1]->getTarget();
+
+                    auto& targetName = target->getString();
+                    if (registerMap.find(targetName) == registerMap.end())
+                    {
+                        auto newReg = cc.newGp32(targetName.c_str());
+                        registerMap[targetName] = newReg;
+                    }
+
+                    auto& targetRegister = registerMap[targetName];
+                    auto operandInstType = operand1->getInstType();
+                    switch (operandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            cc.mov(
+                                targetRegister,
+                                registerMap[operand1->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+
+                    auto otherOperandInstType = operand2->getInstType();
+                    switch (otherOperandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand2);
+                            cc.sub(targetRegister, casted->getVal());
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand2);
+                            cc.sub(targetRegister, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            cc.sub(
+                                targetRegister,
+                                registerMap[operand2->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+                    break;
+                }
+                case InstType::Mul:
+                {
+                    auto& target = currInst->getTarget();
+                    auto& operands = currInst->getOperands();
+                    auto& operand1 = operands[0]->getTarget();
+                    auto& operand2 = operands[1]->getTarget();
+
+                    auto& targetName = target->getString();
+                    if (registerMap.find(targetName) == registerMap.end())
+                    {
+                        auto newReg = cc.newGp32(targetName.c_str());
+                        registerMap[targetName] = newReg;
+                    }
+
+                    auto& targetRegister = registerMap[targetName];
+                    auto operandInstType = operand1->getInstType();
+                    switch (operandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            cc.mov(
+                                targetRegister,
+                                registerMap[operand1->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+
+                    auto otherOperandInstType = operand2->getInstType();
+                    switch (otherOperandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.imul(targetRegister, tempReg);
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.imul(targetRegister, tempReg);
+                            break;
+                        }
+                        default:
+                        {
+                            cc.imul(
+                                targetRegister,
+                                registerMap[operand2->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+                    break;
+                }
+                case InstType::Div:
+                {
+                    auto& target = currInst->getTarget();
+                    auto& operands = currInst->getOperands();
+                    auto& operand1 = operands[0]->getTarget();
+                    auto& operand2 = operands[1]->getTarget();
+
+                    auto& targetName = target->getString();
+                    if (registerMap.find(targetName) == registerMap.end())
+                    {
+                        auto newReg = cc.newGp32(targetName.c_str());
+                        registerMap[targetName] = newReg;
+                    }
+
+                    auto& targetRegister = registerMap[targetName];
+                    auto operandInstType = operand1->getInstType();
+                    switch (operandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            cc.mov(
+                                targetRegister,
+                                registerMap[operand1->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+
+                    auto otherOperandInstType = operand2->getInstType();
+                    switch (otherOperandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand2);
+                            auto tempReg = cc.newGpd();
+                            cc.mov(asmjit::x86::eax, targetRegister);
+                            cc.mov(asmjit::x86::cl, casted->getVal());
+                            cc.idiv(asmjit::x86::ax, asmjit::x86::cl);
+
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.idiv(targetRegister, tempReg);
+                            break;
+                        }
+                        default:
+                        {
+                            cc.idiv(
+                                targetRegister,
+                                registerMap[operand2->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+                    break;
+                }
+                case InstType::Not:
+                {
+                    auto& target = currInst->getTarget();
+                    auto& operands = currInst->getOperands();
+                    auto& operand1 = operands[0]->getTarget();
+
+                    auto& targetName = target->getString();
+                    if (registerMap.find(targetName) == registerMap.end())
+                    {
+                        auto newReg = cc.newGp32(targetName.c_str());
+                        registerMap[targetName] = newReg;
+                    }
+
+                    auto& targetRegister = registerMap[targetName];
+                    auto operandInstType = operand1->getInstType();
+                    switch (operandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            cc.neg(targetRegister);
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            cc.neg(targetRegister);
+                            break;
+                        }
+                        default:
+                        {
+                            cc.mov(
+                                targetRegister,
+                                registerMap[operand1->getTarget()->getString()]);
+                            cc.neg(targetRegister);
+                            break;
+                        }
+                    }
+                    break;
+                }
+                case InstType::And:
+                {
+                    auto& target = currInst->getTarget();
+                    auto& operands = currInst->getOperands();
+                    auto& operand1 = operands[0]->getTarget();
+                    auto& operand2 = operands[1]->getTarget();
+
+                    auto& targetName = target->getString();
+                    if (registerMap.find(targetName) == registerMap.end())
+                    {
+                        auto newReg = cc.newGp32(targetName.c_str());
+                        registerMap[targetName] = newReg;
+                    }
+
+                    auto& targetRegister = registerMap[targetName];
+                    auto operandInstType = operand1->getInstType();
+                    switch (operandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            cc.mov(
+                                targetRegister,
+                                registerMap[operand1->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+
+                    auto otherOperandInstType = operand2->getInstType();
+                    switch (otherOperandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.and_(targetRegister, tempReg);
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.and_(targetRegister, tempReg);
+                            break;
+                        }
+                        default:
+                        {
+                            cc.and_(
+                                targetRegister,
+                                registerMap[operand2->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+                    break;
+                }
+                case InstType::Or:
+                {
+                    auto& target = currInst->getTarget();
+                    auto& operands = currInst->getOperands();
+                    auto& operand1 = operands[0]->getTarget();
+                    auto& operand2 = operands[1]->getTarget();
+
+                    auto& targetName = target->getString();
+                    if (registerMap.find(targetName) == registerMap.end())
+                    {
+                        auto newReg = cc.newGp32(targetName.c_str());
+                        registerMap[targetName] = newReg;
+                    }
+
+                    auto& targetRegister = registerMap[targetName];
+                    auto operandInstType = operand1->getInstType();
+                    switch (operandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            cc.mov(
+                                targetRegister,
+                                registerMap[operand1->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+
+                    auto otherOperandInstType = operand2->getInstType();
+                    switch (otherOperandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.or_(targetRegister, tempReg);
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.or_(targetRegister, tempReg);
+                            break;
+                        }
+                        default:
+                        {
+                            cc.or_(
+                                targetRegister,
+                                registerMap[operand2->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+                    break;
+                }
+                case InstType::Alloca:
+                {
+                    auto& target = currInst->getTarget();
+                    auto allocaConverted =
+                        std::dynamic_pointer_cast<AllocaInst>(currInst);
+                    auto size = allocaConverted->getSize();
+                    auto type = allocaConverted->getType();
+
+                    auto& targetName = target->getString();
+
+                    if (registerMap.find(targetName) == registerMap.end())
+                    {
+                        auto newReg = cc.newGp32(targetName.c_str());
+                        registerMap[targetName] = newReg;
+                    }
+                    m_tmp = registerMap[targetName];
+                    auto& targetRegister = registerMap[targetName];
+                    if (type == Type::BOOLEAN)
+                    {
+                        cc.sub(asmjit::x86::esp, size);
+                        cc.mov(targetRegister, asmjit::x86::esp);
+                    }
+                    else if (type == Type::INTEGER)
+                    {
+                        cc.sub(asmjit::x86::esp, size * 4);
+                        cc.mov(targetRegister, asmjit::x86::esp);
+                    }
+                    else
+                    {
+                        throw std::runtime_error("Unknown type");
+                    }
+
+                    break;
+                }
+                case InstType::ArrAccess:
+                {
+                    auto castedInst =
+                          std::dynamic_pointer_cast<ArrAccessInst>(currInst);
+                    auto& target = castedInst->getTarget();
+                    auto& source = castedInst->getSource()->getTarget();
+                    auto& index = castedInst->getIndex()->getTarget();
+
+                    auto& sourceReg = registerMap[source->getString()];
+                    auto targetReg = cc.newGp32();
+                    auto& targetName = target->getString();
+                    registerMap[targetName] = targetReg;
+
+                    auto indexType = castedInst->getType();
+                    asmjit::x86::Gp indexTempReg;
+
+                    switch (indexType)
+                    {
+                        case Type::INTEGER:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(index);
+                            indexTempReg = cc.newGp32();
+                            cc.mov(indexTempReg, casted->getVal() * 4);
+                            break;
+                        }
+                        case Type::BOOLEAN:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(index);
+                            indexTempReg = cc.newGp32();
+                            cc.mov(indexTempReg, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(index);
+                            indexTempReg = registerMap[index->getTarget()->getString()];
+                            cc.mov(indexTempReg, casted->getVal());
+                            break;
+                        }
+                    }
+
+                    cc.mov(targetReg, asmjit::x86::dword_ptr(sourceReg, indexTempReg));
+                    break;
+                }
+                case InstType::ArrUpdate:
+                {
+                    auto castedInst =
+                          std::dynamic_pointer_cast<ArrUpdateInst>(currInst);
+                    auto& target = castedInst->getTarget();
+                    auto& source = castedInst->getSource()->getTarget();
+                    auto& index = castedInst->getIndex()->getTarget();
+                    auto& val = castedInst->getVal()->getTarget();
+                    auto& targetName = target->getString();
+                    if (registerMap.find(targetName) == registerMap.end())
+                    {
+                        throw std::runtime_error(
+                            "unknown target register name: " + targetName);
+                    }
+                    auto& targetRegister = registerMap[targetName];
+                    auto& sourceRegister = registerMap[targetName];
+
+                    auto indexType = castedInst->getType();
+                    asmjit::x86::Gp indexTempReg;
+
+                    switch (indexType)
+                    {
+                        case Type::INTEGER:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(index);
+                            if (casted == nullptr)
+                            {
+                                throw std::runtime_error("error when casting pointer!\n");
+                            }
+                            indexTempReg = cc.newGp32();
+                            cc.mov(indexTempReg, casted->getVal() * 4);
+                            break;
+                        }
+                        case Type::BOOLEAN:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(index);
+                            if (casted == nullptr)
+                            {
+                                throw std::runtime_error("error when casting pointer!\n");
+                            }
+                            indexTempReg = cc.newGp32();
+                            cc.mov(indexTempReg, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(index);
+                            if (casted == nullptr)
+                            {
+                                throw std::runtime_error("error when casting pointer!\n");
+                            }
+                            indexTempReg = registerMap[index->getTarget()->getString()];
+                            cc.mov(indexTempReg, casted->getVal());
+                            break;
+                        }
+                    }
+
+                    auto valueType = val->getInstType();
+                    asmjit::x86::Gp valueTempReg;
+                    switch (valueType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(val);
+                            valueTempReg = cc.newGp32();
+                            cc.mov(valueTempReg, casted->getVal());
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(val);
+                            valueTempReg = cc.newGp32();
+                            cc.mov(valueTempReg, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            valueTempReg =
+                                registerMap[index->getTarget()->getString()];
+                            break;
+                        }
+                    }
+
+                    cc.mov(asmjit::x86::dword_ptr(sourceRegister, indexTempReg), valueTempReg);
+                    break;
+                }
+                case InstType::Assign:
+                {
+                    if (is_prev_cmp == true)
+                    {
+                        break;
+                    }
+                    auto& target = currInst->getTarget();
+                    auto& operands = currInst->getOperands();
+                    auto& operand1 = operands[0]->getTarget();
+
+                    auto& targetName = target->getString();
+                    if (registerMap.find(targetName) == registerMap.end())
+                    {
+                        auto newReg = cc.newGp32(targetName.c_str());
+                        registerMap[targetName] = newReg;
+                    }
+                    auto& targetRegister = registerMap[targetName];
+                    auto operandInstType = operand1->getInstType();
+                    switch (operandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            cc.mov(
+                                targetRegister,
+                                registerMap[operand1->getString()]);
+                            break;
+                        }
+                    }
+                    break;
+                }
+                case InstType::CmpEq:
+                {
+                    auto cmpEqInst = std::dynamic_pointer_cast<CmpEQInst>(currInst);
+                    auto& target = cmpEqInst->getTarget();
+                    auto& operands = cmpEqInst->getOperands();
+                    auto& operand1 = operands[0]->getTarget();
+                    auto& operand2 = operands[1]->getTarget();
+
+                    auto& targetName = target->getString();
+                    if (registerMap.find(targetName) == registerMap.end())
+                    {
+                        auto newReg = cc.newGp32(targetName.c_str());
+                        registerMap[targetName] = newReg;
+                    }
+
+                    auto& targetRegister = registerMap[targetName];
+                    auto operandInstType = operand1->getInstType();
+                    switch (operandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            cc.mov(
+                                targetRegister,
+                                registerMap[operand1->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+
+                    auto otherOperandInstType = operand2->getInstType();
+                    switch (otherOperandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.cmp(targetRegister, tempReg);
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.cmp(targetRegister, tempReg);
+                            break;
+                        }
+                        default:
+                        {
+                            cc.cmp(
+                                targetRegister,
+                                registerMap[operand2->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+                    is_prev_cmp = true;
+                    state.last_comparison_type = CmpType::EQ;
+                    break;
+                }
+                case InstType::CmpNE:
+                {
+                    auto cmpNeInst = std::dynamic_pointer_cast<CmpNEInst>(currInst);
+                    auto& target = cmpNeInst->getTarget();
+                    auto& operands = cmpNeInst->getOperands();
+                    auto& operand1 = operands[0]->getTarget();
+                    auto& operand2 = operands[1]->getTarget();
+
+                    auto& targetName = target->getString();
+                    if (registerMap.find(targetName) == registerMap.end())
+                    {
+                        auto newReg = cc.newGp32(targetName.c_str());
+                        registerMap[targetName] = newReg;
+                    }
+
+                    auto& targetRegister = registerMap[targetName];
+                    auto operandInstType = operand1->getInstType();
+                    switch (operandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            cc.mov(
+                                targetRegister,
+                                registerMap[operand1->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+
+                    auto otherOperandInstType = operand2->getInstType();
+                    switch (otherOperandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.cmp(targetRegister, tempReg);
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.cmp(targetRegister, tempReg);
+                            break;
+                        }
+                        default:
+                        {
+                            cc.cmp(
+                                targetRegister,
+                                registerMap[operand2->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+                    is_prev_cmp = true;
+                    state.last_comparison_type = CmpType::NE;
+                    break;
+                }
+                case InstType::CmpLT:
+                {
+                    auto cmpLtInstr = std::dynamic_pointer_cast<CmpLTInst>(currInst);
+                    auto& target = cmpLtInstr->getTarget();
+                    auto& operands = cmpLtInstr->getOperands();
+                    auto& operand1 = operands[0]->getTarget();
+                    auto& operand2 = operands[1]->getTarget();
+
+                    auto& targetName = target->getString();
+                    if (registerMap.find(targetName) == registerMap.end())
+                    {
+                        auto newReg = cc.newGp32(targetName.c_str());
+                        registerMap[targetName] = newReg;
+                    }
+
+                    auto& targetRegister = registerMap[targetName];
+                    auto operandInstType = operand1->getInstType();
+                    switch (operandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            cc.mov(
+                                targetRegister,
+                                registerMap[operand1->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+
+                    auto otherOperandInstType = operand2->getInstType();
+                    switch (otherOperandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.cmp(targetRegister, tempReg);
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.cmp(targetRegister, tempReg);
+                            break;
+                        }
+                        default:
+                        {
+                            cc.cmp(
+                                targetRegister,
+                                registerMap[operand2->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+                    is_prev_cmp = true;
+                    state.last_comparison_type = CmpType::LT;
+                    break;
+                }
+                case InstType::CmpLTE:
+                {
+                    auto cmpLteInst = std::dynamic_pointer_cast<CmpLTEInst>(currInst);
+                    auto& target = cmpLteInst->getTarget();
+                    auto& operands = cmpLteInst->getOperands();
+                    auto& operand1 = operands[0]->getTarget();
+                    auto& operand2 = operands[1]->getTarget();
+
+                    auto& targetName = target->getString();
+                    if (registerMap.find(targetName) == registerMap.end())
+                    {
+                        auto newReg = cc.newGp32(targetName.c_str());
+                        registerMap[targetName] = newReg;
+                    }
+
+                    auto& targetRegister = registerMap[targetName];
+                    auto operandInstType = operand1->getInstType();
+                    switch (operandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            cc.mov(
+                                targetRegister,
+                                registerMap[operand1->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+
+                    auto otherOperandInstType = operand2->getInstType();
+                    switch (otherOperandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.cmp(targetRegister, tempReg);
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.cmp(targetRegister, tempReg);
+                            break;
+                        }
+                        default:
+                        {
+                            cc.cmp(
+                                targetRegister,
+                                registerMap[operand2->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+                    is_prev_cmp = true;
+                    state.last_comparison_type = CmpType::LTE;
+                    break;
+                }
+                case InstType::CmpGT:
+                {
+                    auto cmpGtInst = std::dynamic_pointer_cast<CmpGTInst>(currInst);
+                    auto& target = cmpGtInst->getTarget();
+                    auto& operands = cmpGtInst->getOperands();
+                    auto& operand1 = operands[0]->getTarget();
+                    auto& operand2 = operands[1]->getTarget();
+
+                    auto& targetName = target->getString();
+                    if (registerMap.find(targetName) == registerMap.end())
+                    {
+                        auto newReg = cc.newGp32(targetName.c_str());
+                        registerMap[targetName] = newReg;
+                    }
+
+                    auto& targetRegister = registerMap[targetName];
+                    auto operandInstType = operand1->getInstType();
+                    switch (operandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            cc.mov(
+                                targetRegister,
+                                registerMap[operand1->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+
+                    auto otherOperandInstType = operand2->getInstType();
+                    switch (otherOperandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.cmp(targetRegister, tempReg);
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.cmp(targetRegister, tempReg);
+                            break;
+                        }
+                        default:
+                        {
+                            cc.cmp(
+                                targetRegister,
+                                registerMap[operand2->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+                    is_prev_cmp = true;
+                    state.last_comparison_type = CmpType::GT;
+                    break;
+                }
+                case InstType::CmpGTE:
+                {
+                    auto cmpGteInst = std::dynamic_pointer_cast<CmpGTEInst>(currInst);
+                    auto& target = cmpGteInst->getTarget();
+                    auto& operands = cmpGteInst->getOperands();
+                    auto& operand1 = operands[0]->getTarget();
+                    auto& operand2 = operands[1]->getTarget();
+
+                    auto& targetName = target->getString();
+                    if (registerMap.find(targetName) == registerMap.end())
+                    {
+                        auto newReg = cc.newGp32(targetName.c_str());
+                        registerMap[targetName] = newReg;
+                    }
+
+                    auto& targetRegister = registerMap[targetName];
+                    auto operandInstType = operand1->getInstType();
+                    switch (operandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand1);
+                            cc.mov(targetRegister, casted->getVal());
+                            break;
+                        }
+                        default:
+                        {
+                            cc.mov(
+                                targetRegister,
+                                registerMap[operand1->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+
+                    auto otherOperandInstType = operand2->getInstType();
+                    switch (otherOperandInstType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<IntConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.cmp(targetRegister, tempReg);
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto casted =
+                                std::dynamic_pointer_cast<BoolConstInst>(operand2);
+                            auto tempReg = cc.newGp32();
+                            cc.mov(tempReg, casted->getVal());
+                            cc.cmp(targetRegister, tempReg);
+                            break;
+                        }
+                        default:
+                        {
+                            cc.cmp(
+                                targetRegister,
+                                registerMap[operand2->getTarget()->getString()]);
+                            break;
+                        }
+                    }
+                    is_prev_cmp = true;
+                    state.last_comparison_type = CmpType::GTE;
+                    break;
+                }
+                case InstType::Jump:
+                {
+                    auto jumpInst = std::dynamic_pointer_cast<JumpInst>(currInst);
+                    auto& targetLabel = jumpInst->getJumpTarget();
+                    auto& targetLabelName = targetLabel->getName();
+                    if (labelMap.find(targetLabelName) == labelMap.end())
+                    {
+                        labelMap[targetLabelName] =
+                            cc.newNamedLabel(targetLabelName.c_str());
+                    }
+                    auto& label = labelMap[targetLabelName];
+                    cc.jmp(label);
+                    is_prev_cmp = false;
+                    break;
+                }
+                case InstType::BRT:
+                {
+                    auto brtInst = std::dynamic_pointer_cast<BRTInst>(currInst);
+                    auto& failLabel = brtInst->getTargetFailed();
+                    auto& failLabelName = failLabel->getName();
+                    if (labelMap.find(failLabelName) == labelMap.end())
+                    {
+                        labelMap[failLabelName] =
+                            cc.newNamedLabel(failLabelName.c_str());
+                    }
+                    auto& label = labelMap[failLabelName];
+                    switch (state.last_comparison_type)
+                    {
+                        case CmpType::EQ:
+                            cc.jne(label);
+                            break;
+                        case CmpType::NE:
+                            cc.je(label);
+                            break;
+                        case CmpType::LT:
+                            cc.jge(label);
+                            break;
+                        case CmpType::LTE:
+                            cc.jg(label);
+                            break;
+                        case CmpType::GT:
+                            cc.jle(label);
+                            break;
+                        case CmpType::GTE:
+                            cc.jl(label);
+                            break;
+
+                    }
+                    is_prev_cmp = false;
+                    break;
+                }
+                case InstType::BRF:
+                {
+                    auto brtInst = std::dynamic_pointer_cast<BRFInst>(currInst);
+                    auto& failLabel = brtInst->getTargetFailed();
+                    auto& failLabelName = failLabel->getName();
+                    if (labelMap.find(failLabelName) == labelMap.end())
+                    {
+                        labelMap[failLabelName] =
+                            cc.newNamedLabel(failLabelName.c_str());
+                    }
+                    auto& label = labelMap[failLabelName];
+                    switch (state.last_comparison_type)
+                    {
+                        case CmpType::EQ:
+                            cc.je(label);
+                            break;
+                        case CmpType::NE:
+                            cc.jne(label);
+                            break;
+                        case CmpType::LT:
+                            cc.jl(label);
+                            break;
+                        case CmpType::LTE:
+                            cc.jle(label);
+                            break;
+                        case CmpType::GT:
+                            cc.jg(label);
+                            break;
+                        case CmpType::GTE:
+                            cc.jge(label);
+                            break;
+                    }
+                    is_prev_cmp = false;
+                    break;
+                }
+
+                case InstType::Put:
+                {
+                    break; // not working
+                    auto putInst = std::dynamic_pointer_cast<PutInst>(currInst);
+                    auto& operands = putInst->getOperands();
+                    for (int i = 0; i < operands.size(); ++i)
+                    {
+                        auto& operand = operands[i]->getTarget();
+                        auto operandType = operand->getInstType();
+                        switch (operandType)
+                        {
+                            case InstType::IntConst:
+                            {
+                                auto intConstInst = std::dynamic_pointer_cast<IntConstInst>(operand);
+                                auto val = intConstInst->getVal();
+                                cc.mov(asmjit::x86::rcx, val);
+                                asmjit::Imm printIntAddr =
+                                    asmjit::Imm((void*)paramPrintInt);
+                                cc.call(printIntAddr);
+                                break;
+                            }
+                            case InstType::BoolConst:
+                            {
+                                auto boolConstInst = std::dynamic_pointer_cast<BoolConstInst>(operand);
+                                auto val = boolConstInst->getVal();
+                                boolParam = val;
+                                asmjit::Imm printBoolAddr =
+                                    asmjit::Imm((void*)printBool);
+                                cc.call(printBoolAddr);
+                                break;
+                            }
+                            case InstType::StrConst:
+                            {
+                                auto strConstInst =
+                                    std::dynamic_pointer_cast<StrConstInst>(
+                                        operand);
+                                auto& val = strConstInst->getString();
+                                if (val == "\'\\n\'")
+                                {
+                                    std::cout << "twice\n";
+                                    charParam = '\n';
+                                    asmjit::Imm printCharAddr =
+                                        asmjit::Imm((void*)printChar);
+                                    cc.call(printCharAddr);
+                                    break;
+                                }
+                                for (int i = 0; i < val.length(); ++i)
+                                {
+                                    // not working
+                                    break;
+                                    auto chr = val[i];
+                                    if(chr == '\'' || chr == '\"') continue;
+                                    charParam = chr;
+                                    asmjit::Imm printCharAddr =
+                                        asmjit::Imm((void*)printChar);
+                                    cc.call(printCharAddr);
+                                }
+                                break;
+                            }
+                            default:
+                            {
+                                // not working
+                                break;
+                                auto identifierInst =
+                                    std::dynamic_pointer_cast<IdentInst>(
+                                        operand);
+                                auto& reg =
+                                    registerMap[identifierInst->getString()];
+                                cc.mov(asmjit::x86::ecx, 2);
+                                cc.add(asmjit::x86::ecx, '0');
+                                //cc.push('2');
+                                //break;
+                                charParam = '5';
+                                asmjit::Imm printWithParamAddr =
+                                    asmjit::Imm((void*)putchar);
+                                cc.call(printWithParamAddr);
+                                //cc.xor_(asmjit::x86::eax, asmjit::x86::eax);
+                                break;
+                            }
+                        }
+                    }
+                    break;
+                }
+
+                default:
+                    break;
+            }
+        }
+
+
+        for (const auto& successor : current_bb->getSuccessors())
+        {
+            if (visited.find(successor) == visited.end())
+            {
+              auto newSuccessor =
+                  std::make_shared<BasicBlock>(successor->getName());
+                m_lowerCFG->pushSuccessor(newSuccessor);
+                visited.insert(successor);
+                worklist.push(successor);
+                worklistNew.push(newSuccessor);
+            }
+        }
+    }
+    
+    cc.ret();
+    cc.endFunc();   // End of the function body.
+    cc.finalize();  // Translate and assemble the whole 'cc' content.    
+
+    std::cout << "==================================" << std::endl;
+    Func fn;
+    asmjit::Error err = rt.add(&fn, &code);
+    std::cout << logger.content().data() << std::endl;
+
+    if (err)
+    {
+        printf("AsmJit failed: %s\n", asmjit::DebugUtils::errorAsString(err));
+        return;
+    }
+
+    fn();
+    //std::cout << "JIT executed!\n";
+    //printf("retval: %d\n", result);
+
+    rt.release(fn);
 }
 
 /*

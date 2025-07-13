@@ -1,5 +1,5 @@
 #include "BasicBlock.hpp"
-#include "Inst.hpp"
+#include "InstIR.hpp"
 
 BasicBlock::BasicBlock(std::string name) : m_name(std::move(name)) {}
 

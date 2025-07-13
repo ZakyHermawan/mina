@@ -1,4 +1,4 @@
-#include "Inst.hpp"
+#include "InstIR.hpp"
 #include "BasicBlock.hpp"
 #include <iostream>
 
@@ -373,11 +373,12 @@ void AllocaInst::setup_def_use() {}
 ArrAccessInst::ArrAccessInst(std::shared_ptr<Inst> target,
                              std::shared_ptr<Inst> source,
                              std::shared_ptr<Inst> index,
-                             std::shared_ptr<BasicBlock> block)
+                             std::shared_ptr<BasicBlock> block, Type type)
     : m_target(std::move(target)),
       m_source(std::move(source)),
       m_index(std::move(index)),
-      m_block(std::move(block))
+      m_block(std::move(block)),
+      m_type(type)
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_source, m_index};
 }
@@ -414,12 +415,13 @@ ArrUpdateInst::ArrUpdateInst(std::shared_ptr<Inst> target,
                              std::shared_ptr<Inst> source,
                              std::shared_ptr<Inst> index,
                              std::shared_ptr<Inst> val,
-                             std::shared_ptr<BasicBlock> block)
+                             std::shared_ptr<BasicBlock> block, Type type)
     : m_target(std::move(target)),
       m_source(std::move(source)),
       m_index(std::move(index)),
       m_val(std::move(val)),
-      m_block(std::move(block))
+      m_block(std::move(block)),
+      m_type(type)
 {
     m_operands = std::vector<std::shared_ptr<Inst>>{m_source, m_index, m_val};
 }
@@ -883,12 +885,28 @@ void ReturnInst::push_user(std::shared_ptr<Inst> user)
 }
 void ReturnInst::setup_def_use() {}
 
-CallInst::CallInst(std::string calleeStr, std::shared_ptr<BasicBlock> block)
-    : m_calleeStr(std::move(calleeStr)), m_block(std::move(block))
+CallInst::CallInst(std::string calleeStr,
+                   std::vector<std::shared_ptr<Inst>> operands,
+                   std::shared_ptr<BasicBlock> block)
+    : m_calleeStr(std::move(calleeStr)), m_operands(std::move(operands)), m_block(std::move(block))
 {
 }
 std::string CallInst::getCalleeStr() { return m_calleeStr; }
-std::string CallInst::getString() { return "call(" + m_calleeStr + ")"; }
+std::string CallInst::getString()
+{
+
+    std::string res = m_calleeStr + "(";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    res += ")";
+    return res;
+}
 void CallInst::push_user(std::shared_ptr<Inst> user)
 {
     m_users.push_back(user);

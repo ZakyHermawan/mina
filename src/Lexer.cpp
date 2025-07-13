@@ -265,7 +265,7 @@ void Lexer::advance()
     }
     else if (m_currChar == ';')
     {
-      m_currToken = Token(SEMI, std::string(";"), std::string(), m_currLine);
+        m_currToken = Token(SEMI, std::string(";"), std::string(), m_currLine);
     }
     else if (m_currChar == '=')
     {

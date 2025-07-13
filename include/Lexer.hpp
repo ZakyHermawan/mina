@@ -8,14 +8,14 @@
 
 class Lexer
 {
- private:
+private:
 	std::string m_source;
 	Token m_currToken;
 	char m_currChar;
 	unsigned int m_currLine;
 	unsigned int m_currIdx;  // always point to the next character
 
- public:
+public:
 	Lexer(std::string source);
 	Lexer() = default;
 	Lexer(Lexer &&) = default;
@@ -29,6 +29,8 @@ class Lexer
 	Token getCurrToken() const;
 	TokenType getCurrTokenType() const;
 	unsigned int getCurrLine() const;
+	std::string& getSource() {return m_source;}
+    unsigned int getCurrIdx() { return m_currIdx; }
 	void skipWhitespace();
 	int scanInt();
 	void advance();

@@ -4,53 +4,30 @@
 #include <vector>
 #include <string>
 
-Symbol::Symbol(std::string name)
-    : m_name{std::move(name)},
-      m_lexicalLevel{-1},
-      m_orderNum{-1},
-      m_type{Type::UNDEFINED}
-{
-}
-
-void Symbol::setName(std::string name) { m_name = std::move(name); }
-void Symbol::setLexicalLevel(int ll) { m_lexicalLevel = ll; }
-
-void Symbol::setLLON(int ll, int on)
-{
-    m_lexicalLevel = ll;
-    m_orderNum = on;
-}
-
-void Symbol::setType(Type type) { m_type = type; }
-std::string Symbol::getName() const { return m_name; }
-int Symbol::getLexicalLevel() const { return m_lexicalLevel; }
-int Symbol::getOrderNum() const { return m_orderNum; }
-std::string Symbol::getTypeStr() const { return typeToStr(m_type); }
-
 Bucket::Bucket()
     : m_intVal{0},
       m_arr{arenaVectorInt()},
-      m_stackAddr{0}
+      m_stackAddr{0}, m_type{Type::UNDEFINED}
 {
 }
 
-Bucket::Bucket(int val, int stackAddr)
+Bucket::Bucket(int val, int stackAddr, Type type)
     : m_arr{arenaVectorInt()},
       m_intVal{val},
-      m_stackAddr{stackAddr}
+      m_stackAddr{stackAddr}, m_type{type}
 {
 }
-Bucket::Bucket(arenaVectorInt &arr, int stackAddr)
+Bucket::Bucket(arenaVectorInt &arr, int stackAddr, Type type)
     : m_arr{arr},
       m_intVal{0},
-      m_stackAddr{stackAddr}
+      m_stackAddr{stackAddr}, m_type{type}
 {
 }
 
-Bucket::Bucket(arenaVectorInt &&arr, int stackAddr)
+Bucket::Bucket(arenaVectorInt &&arr, int stackAddr, Type type)
     : m_arr{std::move(arr)},
       m_intVal{0},
-      m_stackAddr{stackAddr}
+      m_stackAddr{stackAddr}, m_type{type}
 {
 }
 
@@ -67,12 +44,14 @@ void Bucket::setArrAtIdx(unsigned int idx, int val)
 
 int Bucket::getArrAtIdx(unsigned int idx)
 {
+
     validateIdx(idx);
     return m_arr[idx];
 }
 
 int Bucket::getStackAddr() const { return m_stackAddr; }
 int Bucket::getVal() const { return m_intVal; }
+Type Bucket::getType() const { return m_type; }
 
 void Bucket::validateIdx(int idx)
 {

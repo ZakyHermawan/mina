@@ -1,15 +1,10 @@
 {
-	var bul: boolean
-	var A: integer;
-	A := 3 + 2 / 1 + 5 * 4
-	bul := true
-	put(A, skip)
-	put(bul, skip)
-	get(A)
-	if A >= 0 then
-		A := 1
+	var a: integer
+;
+    a := 5
+	if a = 5 then
+		a := 1
 	else
-		A := 2
+		a := 2
 	end if
-	put(A, skip)
 }

@@ -10,42 +10,13 @@
 
 using arenaVectorInt = std::vector<int, arena::Allocator<int>>;
 
-class Symbol
-{
-private:
-    std::string m_name;
-    int m_lexicalLevel;
-    int m_orderNum;
-    Type m_type;
-
- public:
-    Symbol(std::string name); 
-    Symbol() = default;
-    Symbol(Symbol &&) = default;
-    Symbol(const Symbol &) = default;
-    Symbol &operator=(Symbol &&) = default;
-    Symbol &operator=(const Symbol &) = default;
-    ~Symbol() = default;
-    
-    void setName(std::string name);
-    void setLexicalLevel(int ll);
-    
-    // set lexical level and order number
-    void setLLON(int ll, int on);
-    void setType(Type type);
-    std::string getName() const;
-    int getLexicalLevel() const;
-    int getOrderNum() const;
-    std::string getTypeStr() const;
-
-};
-
 class Bucket
 {
 private:
     int m_intVal;
     int m_stackAddr;  // relative to the stack frame on current lexical level
     arenaVectorInt m_arr;
+    Type m_type;
 
     void validateIdx(int idx);
 
@@ -53,9 +24,9 @@ public:
     Bucket();
     ~Bucket() = default;
     
-    Bucket(int val, int stackAddr);
-    Bucket(arenaVectorInt &arr, int stackAddr);
-    Bucket(arenaVectorInt &&arr, int stackAddr);
+    Bucket(int val, int stackAddr, Type type);
+    Bucket(arenaVectorInt &arr, int stackAddr, Type type);
+    Bucket(arenaVectorInt &&arr, int stackAddr, Type type);
     
     void setArrSize(unsigned int size);
     size_t getArrSize() const;
@@ -65,7 +36,8 @@ public:
     void setArrAtIdx(unsigned int idx, int val);
     int getArrAtIdx(unsigned int idx);
     int getStackAddr() const;
-    
+
+    Type getType() const;   
     int getVal() const;
 };
 

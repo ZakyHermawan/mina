@@ -3,12 +3,20 @@
 #include "Visitors.hpp"
 #include "BasicBlock.hpp"
 #include "Types.hpp"
-#include "Inst.hpp"
+#include "InstIR.hpp"
 
 #include <stack>
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
+
+#include <asmjit/asmjit.h>
+
+
+void printInt();
+void printBool();
+void printChar();
+void printWithParam(int param);
 
 class IRVisitor : public Visitor
 {
@@ -23,7 +31,7 @@ private:
     std::stack<std::shared_ptr<Inst>> m_instStack;
     std::stack<std::string> m_labels;
     
-    std::shared_ptr<BasicBlock> m_cfg;
+    std::shared_ptr<BasicBlock> m_cfg, m_lowerCFG;
     std::shared_ptr<BasicBlock> m_currentBB; // current basic block
 
     std::unordered_map<std::string, int> m_nameCtr;
@@ -36,6 +44,13 @@ private:
 
     std::unordered_map<std::shared_ptr<BasicBlock>, subMap> m_currDef;
     std::unordered_map<std::shared_ptr<BasicBlock>, subPhi> m_incompletePhis;
+
+    asmjit::JitRuntime m_jitRuntime;
+    asmjit::CodeHolder m_codeHolder;
+    asmjit::x86::Assembler m_assembler;
+    asmjit::FileLogger m_logger;  // Logger should always survive CodeHolder.
+
+    asmjit::x86::Gp m_tmp;
 
 public:
     IRVisitor();
@@ -99,6 +114,7 @@ public:
                                          std::shared_ptr<PhiInst> phi);
     std::shared_ptr<Inst> tryRemoveTrivialPhi(std::shared_ptr<PhiInst> phi);
     void sealBlock(std::shared_ptr<BasicBlock> block);
+    void generateX86();
 };
 
 class DisjointSetUnion {

@@ -25,6 +25,7 @@ private:
     int m_arrSize;
     Type m_type; // data type for identifier
     arena::vector<std::string> m_parameters;
+    arena::vector<Type> m_parameterTypes;
     arena::vector<int> m_arguments;
     unsigned int m_ip;  // instruction pointer
     int m_sp;           // stack pointer, always point to the next valid address
@@ -67,6 +68,8 @@ private:
     void symbolNotDefinedOnLexicalLevel(const std::string &identifier,
                                         int lexical_level);
     void symbolNotDefinedOnCurrentLexicalLevel(const std::string &identifier);
+
+    Type getTypeFromSymTab(std::string &identifier);
     void printInstructions();
     
     std::shared_ptr<ProgramAST> program();
