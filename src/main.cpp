@@ -76,7 +76,7 @@ int main(int argc, char* argv[])
 #include "Parser.hpp"
 #include "Token.hpp"
 
-static void repl()
+void repl()
 {
     while (1)
     {
@@ -93,7 +93,7 @@ static void repl()
     }
 }
 
-static void runFile(const char* fileName)
+void runFile(const char* fileName)
 {
     std::ifstream fileStream;
     fileStream.open(fileName);
@@ -112,13 +112,7 @@ static void runFile(const char* fileName)
 
 using namespace asmjit;
 
-// Signature of the generated function.
-// It takes no arguments and returns an integer.
-typedef int (*Func)(void);
-//void func_a(int val)
-//{
-//  printf("func_a(): Called %d\n", val);
-//}
+typedef void (*Func)(void);
 
 int main(int argc, char* argv[]) {
     FileLogger logger(stdout);  // Logger should always survive CodeHolder.
@@ -127,52 +121,6 @@ int main(int argc, char* argv[]) {
 
     code.init(rt.environment(), rt.cpuFeatures());
     code.setLogger(&logger); // attach logger
-
-    x86::Compiler cc(&code);
-    cc.addFunc(FuncSignature::build<int>());
-    x86::Gp i = cc.newIntPtr("i");
-    //Imm func_a_addr = Imm((void*)func_a);
-    //cc.mov(asmjit::x86::rcx, 's');
-    // 2. Emit the call instruction.
-    // Since func_a() takes no arguments, we don't need to set up
-    // any registers like RDI or RCX.
-    //cc.call(putchar);
-    asmjit::x86::Mem stack_var = cc.newStack(8, 4);
-    x86::Mem stackIdx(stack_var);  // Copy of stack with i added.
-    //stackIdx.setIndex(i);      // stackIdx <- stack[i].
-    //stackIdx.setSize(4);       // stackIdx <- byte ptr stack[i].
-
-    //// Create a register to hold the pointer.
-    asmjit::x86::Gp ptr_reg = cc.newGpq("ptr_reg");
-
-    //// Use LEA to load the effective address of the stack variable
-    //// into our pointer register.
-    cc.lea(ptr_reg, stack_var);
-    //cc.xor_(x86::rax, x86::rax);
-
-    cc.mov(x86::ax, 10);
-    cc.mov(x86::cl, 2);
-    cc.idiv(x86::ax, x86::cl);
-
-    cc.ret();
-    cc.endFunc();
-    cc.finalize();
-
-    Func fn;
-    Error err = rt.add(&fn, &code);
-
-    if (err) {
-        printf("AsmJit failed: %s\n", DebugUtils::errorAsString(err));
-        return 1;
-    }
-
-
-
-    // Execute the generated function.
-    int result = fn();
-    printf("The function returned: %d\n", result); // Expected output: 100
-
-    rt.release(fn);
 
     runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes5.txt");
 

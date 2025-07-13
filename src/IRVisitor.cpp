@@ -2820,7 +2820,7 @@ void IRVisitor::generateX86()
 
                 case InstType::Put:
                 {
-                    break; // not working
+                    //break; // not working
                     auto putInst = std::dynamic_pointer_cast<PutInst>(currInst);
                     auto& operands = putInst->getOperands();
                     for (int i = 0; i < operands.size(); ++i)
@@ -2857,44 +2857,48 @@ void IRVisitor::generateX86()
                                 auto& val = strConstInst->getString();
                                 if (val == "\'\\n\'")
                                 {
-                                    std::cout << "twice\n";
-                                    charParam = '\n';
+                                    cc.mov(asmjit::x86::ecx, '\n');
                                     asmjit::Imm printCharAddr =
-                                        asmjit::Imm((void*)printChar);
+                                        asmjit::Imm((void*)putchar);
                                     cc.call(printCharAddr);
                                     break;
                                 }
                                 for (int i = 0; i < val.length(); ++i)
                                 {
-                                    // not working
-                                    break;
-                                    auto chr = val[i];
-                                    if(chr == '\'' || chr == '\"') continue;
-                                    charParam = chr;
+                                    if(val[i] == '\"' || val[i] == '\'') continue;
+                                    cc.mov(asmjit::x86::ecx, val[i]);
                                     asmjit::Imm printCharAddr =
-                                        asmjit::Imm((void*)printChar);
+                                        asmjit::Imm((void*)putchar);
                                     cc.call(printCharAddr);
                                 }
                                 break;
                             }
                             default:
                             {
-                                // not working
-                                break;
+                                // todo: check data type, and print true/false or integer based on data type
+                                // assume integer
                                 auto identifierInst =
                                     std::dynamic_pointer_cast<IdentInst>(
                                         operand);
+                                std::string result;
+                                std::string st = identifierInst->getString();
+                                auto dot_pos = st.find(".");
+                                if (dot_pos != std::string::npos)
+                                {
+                                    result = st.substr(0, dot_pos);
+                                }
+                                else
+                                {
+                                    result = st;
+                                }
+
                                 auto& reg =
-                                    registerMap[identifierInst->getString()];
-                                cc.mov(asmjit::x86::ecx, 2);
+                                    registerMap[result];
+                                cc.mov(asmjit::x86::ecx, reg);
                                 cc.add(asmjit::x86::ecx, '0');
-                                //cc.push('2');
-                                //break;
-                                charParam = '5';
                                 asmjit::Imm printWithParamAddr =
                                     asmjit::Imm((void*)putchar);
                                 cc.call(printWithParamAddr);
-                                //cc.xor_(asmjit::x86::eax, asmjit::x86::eax);
                                 break;
                             }
                         }
@@ -2921,7 +2925,18 @@ void IRVisitor::generateX86()
             }
         }
     }
-    
+    asmjit::x86::Mem stack_var = cc.newStack(8, 4);
+    asmjit::x86::Mem stackIdx(stack_var);  // Copy of stack with i added.
+    // stackIdx.setIndex(i);      // stackIdx <- stack[i].
+    // stackIdx.setSize(4);       // stackIdx <- byte ptr stack[i].
+
+    //// Create a register to hold the pointer.
+    asmjit::x86::Gp ptr_reg = cc.newGpq("ptr_reg");
+
+    //// Use LEA to load the effective address of the stack variable
+    //// into our pointer register.
+    cc.lea(ptr_reg, stack_var);
+
     cc.ret();
     cc.endFunc();   // End of the function body.
     cc.finalize();  // Translate and assemble the whole 'cc' content.    
@@ -2938,7 +2953,7 @@ void IRVisitor::generateX86()
     }
 
     fn();
-    //std::cout << "JIT executed!\n";
+    std::cout << "JIT executed!\n";
     //printf("retval: %d\n", result);
 
     rt.release(fn);
