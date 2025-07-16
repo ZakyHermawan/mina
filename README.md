@@ -1,7 +1,7 @@
 mina
 ====
 
-A virtual machine based programming language
+virtual machine based and JIT compiled programming language
 
 Example:
 ![image](https://github.com/user-attachments/assets/933a0199-5638-45c4-85db-dc27528dd317)
