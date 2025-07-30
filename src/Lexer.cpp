@@ -14,6 +14,7 @@ Lexer::Lexer(std::string source)
     m_source += '\n';
     advance();
 }
+
 void Lexer::read_file(std::string source)
 {
     m_source = std::move(source);
@@ -30,6 +31,8 @@ bool Lexer::isFinished() const
     return false;
 }
 
+std::string& Lexer::getSource() { return m_source; }
+unsigned int Lexer::getCurrIdx() const { return m_currIdx; }
 Token Lexer::getCurrToken() const { return m_currToken; }
 TokenType Lexer::getCurrTokenType() const { return m_currToken.getTokenType(); }
 unsigned int Lexer::getCurrLine() const { return m_currLine; }

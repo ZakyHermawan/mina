@@ -29,8 +29,8 @@ public:
 	Token getCurrToken() const;
 	TokenType getCurrTokenType() const;
 	unsigned int getCurrLine() const;
-	std::string& getSource() {return m_source;}
-    unsigned int getCurrIdx() { return m_currIdx; }
+    std::string &getSource();
+    unsigned int getCurrIdx() const;
 	void skipWhitespace();
 	int scanInt();
 	void advance();

@@ -76,7 +76,7 @@ int main(int argc, char* argv[])
 #include "Parser.hpp"
 #include "Token.hpp"
 
-void repl()
+static void repl()
 {
     while (1)
     {
@@ -93,7 +93,7 @@ void repl()
     }
 }
 
-void runFile(const char* fileName)
+static void runFile(const char* fileName)
 {
     std::ifstream fileStream;
     fileStream.open(fileName);
@@ -123,6 +123,5 @@ int main(int argc, char* argv[]) {
     code.setLogger(&logger); // attach logger
 
     runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes5.txt");
-
     return 0;
 }

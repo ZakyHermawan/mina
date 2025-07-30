@@ -1587,6 +1587,7 @@ void IRVisitor::generateX86()
         {
             CmpType last_comparison_type = CmpType::NONE;
         } state;
+
         bool is_prev_cmp = false;
         for (unsigned int i = 0; i < instructions.size(); ++i)
         {
@@ -2925,7 +2926,7 @@ void IRVisitor::generateX86()
             }
         }
     }
-    asmjit::x86::Mem stack_var = cc.newStack(8, 4);
+    asmjit::x86::Mem stack_var = cc.newStack(32, 4);
     asmjit::x86::Mem stackIdx(stack_var);  // Copy of stack with i added.
     // stackIdx.setIndex(i);      // stackIdx <- stack[i].
     // stackIdx.setSize(4);       // stackIdx <- byte ptr stack[i].

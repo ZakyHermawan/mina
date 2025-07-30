@@ -211,7 +211,7 @@ public:
     FactorAST& operator=(const FactorAST&) = delete;
     FactorAST& operator=(FactorAST&&) noexcept = default;
 
-    Token getOp() { return m_op; }
+    Token getOp() const;
     std::shared_ptr<ExprAST> getFactor();
     void accept(Visitor& v);
 };

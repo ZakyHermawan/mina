@@ -81,6 +81,7 @@ FactorAST::FactorAST(Token op, std::shared_ptr<ExprAST> factor)
     : m_op(op), m_factor(std::move(factor))
 {
 }
+Token FactorAST::getOp() const { return m_op; }
 std::shared_ptr<ExprAST> FactorAST::getFactor() { return m_factor; }
 void FactorAST::accept(Visitor& v)
 {

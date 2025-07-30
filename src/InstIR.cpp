@@ -21,6 +21,13 @@ void IntConstInst::push_user(std::shared_ptr<Inst> user)
 void IntConstInst::setup_def_use()
 {
 }
+std::vector<std::shared_ptr<Inst>>& IntConstInst::getOperands()
+{
+    return m_operands;
+}
+bool IntConstInst::canBeRenamed() const { return false; }
+std::shared_ptr<BasicBlock> IntConstInst::getBlock() { return m_block; };
+InstType IntConstInst::getInstType() const { return InstType::IntConst; }
 
 BoolConstInst::BoolConstInst(bool val, std::shared_ptr<BasicBlock> block)
     : m_val(val), m_block(std::move(block))
@@ -43,6 +50,13 @@ void BoolConstInst::push_user(std::shared_ptr<Inst> user)
     m_users.push_back(user);
 }
 void BoolConstInst::setup_def_use() {}
+std::vector<std::shared_ptr<Inst>>& BoolConstInst::getOperands()
+{
+    return m_operands;
+}
+bool BoolConstInst::canBeRenamed() const { return false; }
+std::shared_ptr<BasicBlock> BoolConstInst::getBlock() { return m_block; };
+InstType BoolConstInst::getInstType() const { return InstType::BoolConst; }
 
 StrConstInst::StrConstInst(std::string val, std::shared_ptr<BasicBlock> block)
     : m_val(val), m_block(std::move(block))
@@ -57,6 +71,13 @@ void StrConstInst::push_user(std::shared_ptr<Inst> user)
     m_users.push_back(user);
 }
 void StrConstInst::setup_def_use() {}
+std::vector<std::shared_ptr<Inst>>& StrConstInst::getOperands()
+{
+    return m_operands;
+}
+bool StrConstInst::canBeRenamed() const { return false; }
+std::shared_ptr<BasicBlock> StrConstInst::getBlock() { return m_block; };
+InstType StrConstInst::getInstType() const { return InstType::StrConst; }
 
 IdentInst::IdentInst(std::string name, std::shared_ptr<BasicBlock> block)
     : m_name(std::move(name)), m_block(std::move(block))
@@ -70,6 +91,12 @@ void IdentInst::push_user(std::shared_ptr<Inst> user)
 void IdentInst::setup_def_use()
 {
 }
+std::vector<std::shared_ptr<Inst>>& IdentInst::getOperands()
+{
+    return m_operands;
+}
+std::shared_ptr<BasicBlock> IdentInst::getBlock() { return m_block; };
+InstType IdentInst::getInstType() const { return InstType::Ident; }
 
 AddInst::AddInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
                  std::shared_ptr<Inst> operand2,
@@ -109,6 +136,13 @@ void AddInst::setup_def_use()
     m_operand1->push_user(shared_from_this());
     m_operand2->push_user(shared_from_this());
 }
+std::vector<std::shared_ptr<Inst>>& AddInst::getOperands()
+{
+    return m_operands;
+}
+void AddInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+std::shared_ptr<BasicBlock> AddInst::getBlock() { return m_block; };
+InstType AddInst::getInstType() const { return InstType::Add; }
 
 SubInst::SubInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
                  std::shared_ptr<Inst> operand2,
@@ -148,6 +182,13 @@ void SubInst::setup_def_use()
     m_operand1->push_user(shared_from_this());
     m_operand2->push_user(shared_from_this());
 }
+std::vector<std::shared_ptr<Inst>>& SubInst::getOperands()
+{
+    return m_operands;
+}
+void SubInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+std::shared_ptr<BasicBlock> SubInst::getBlock() { return m_block; };
+InstType SubInst::getInstType() const { return InstType::Sub; }
 
 MulInst::MulInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
                  std::shared_ptr<Inst> operand2,
@@ -187,6 +228,13 @@ void MulInst::setup_def_use()
     m_operand1->push_user(shared_from_this());
     m_operand2->push_user(shared_from_this());
 }
+std::vector<std::shared_ptr<Inst>>& MulInst::getOperands()
+{
+    return m_operands;
+}
+void MulInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+std::shared_ptr<BasicBlock> MulInst::getBlock() { return m_block; };
+InstType MulInst::getInstType() const { return InstType::Mul; }
 
 DivInst::DivInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
                  std::shared_ptr<Inst> operand2,
@@ -226,6 +274,13 @@ void DivInst::setup_def_use()
     m_operand1->push_user(shared_from_this());
     m_operand2->push_user(shared_from_this());
 }
+std::vector<std::shared_ptr<Inst>>& DivInst::getOperands()
+{
+    return m_operands;
+}
+void DivInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+std::shared_ptr<BasicBlock> DivInst::getBlock() { return m_block; };
+InstType DivInst::getInstType() const { return InstType::Div; }
 
 NotInst::NotInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand,
                  std::shared_ptr<BasicBlock> block)
@@ -257,6 +312,13 @@ void NotInst::push_user(std::shared_ptr<Inst> user)
     m_users.push_back(user);
 }
 void NotInst::setup_def_use() { m_operand->push_user(shared_from_this()); }
+std::vector<std::shared_ptr<Inst>>& NotInst::getOperands()
+{
+    return m_operands;
+}
+void NotInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+std::shared_ptr<BasicBlock> NotInst::getBlock() { return m_block; };
+InstType NotInst::getInstType() const { return InstType::Not; }
 
 AndInst::AndInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
                  std::shared_ptr<Inst> operand2,
@@ -296,6 +358,13 @@ void AndInst::setup_def_use()
     m_operand1->push_user(shared_from_this());
     m_operand2->push_user(shared_from_this());
 }
+std::vector<std::shared_ptr<Inst>>& AndInst::getOperands()
+{
+    return m_operands;
+}
+void AndInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+std::shared_ptr<BasicBlock> AndInst::getBlock() { return m_block; };
+InstType AndInst::getInstType() const { return InstType::And; }
 
 OrInst::OrInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
                std::shared_ptr<Inst> operand2,
@@ -335,6 +404,13 @@ void OrInst::setup_def_use()
     m_operand1->push_user(shared_from_this());
     m_operand2->push_user(shared_from_this());
 }
+std::vector<std::shared_ptr<Inst>>& OrInst::getOperands()
+{
+    return m_operands;
+}
+void OrInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+std::shared_ptr<BasicBlock> OrInst::getBlock() { return m_block; };
+InstType OrInst::getInstType() const { return InstType::Or; }
 
 AllocaInst::AllocaInst(std::shared_ptr<Inst> target, Type type,
                        unsigned int size, std::shared_ptr<BasicBlock> block)
@@ -369,6 +445,13 @@ void AllocaInst::push_user(std::shared_ptr<Inst> user)
     m_users.push_back(user);
 }
 void AllocaInst::setup_def_use() {}
+std::vector<std::shared_ptr<Inst>>& AllocaInst::getOperands()
+{
+    return m_operands;
+}
+void AllocaInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+std::shared_ptr<BasicBlock> AllocaInst::getBlock() { return m_block; };
+InstType AllocaInst::getInstType() const { return InstType::Alloca; }
 
 ArrAccessInst::ArrAccessInst(std::shared_ptr<Inst> target,
                              std::shared_ptr<Inst> source,
@@ -410,6 +493,16 @@ void ArrAccessInst::setup_def_use()
     m_source->push_user(shared_from_this());
     m_index->push_user(shared_from_this());
 }
+std::vector<std::shared_ptr<Inst>>& ArrAccessInst::getOperands()
+{
+    return m_operands;
+}
+void ArrAccessInst::setTarget(std::shared_ptr<Inst> target)
+{
+    m_target = target;
+}
+std::shared_ptr<BasicBlock> ArrAccessInst::getBlock() { return m_block; };
+InstType ArrAccessInst::getInstType() const { return InstType::ArrAccess; }
 
 ArrUpdateInst::ArrUpdateInst(std::shared_ptr<Inst> target,
                              std::shared_ptr<Inst> source,
@@ -455,6 +548,16 @@ void ArrUpdateInst::setup_def_use()
     m_index->push_user(shared_from_this());
     m_val->push_user(shared_from_this());
 }
+std::vector<std::shared_ptr<Inst>>& ArrUpdateInst::getOperands()
+{
+    return m_operands;
+}
+void ArrUpdateInst::setTarget(std::shared_ptr<Inst> target)
+{
+    m_target = target;
+}
+std::shared_ptr<BasicBlock> ArrUpdateInst::getBlock() { return m_block; };
+InstType ArrUpdateInst::getInstType() const { return InstType::ArrUpdate; }
 
 AssignInst ::AssignInst(std::shared_ptr<Inst> target,
                         std::shared_ptr<Inst> source,
@@ -486,6 +589,16 @@ void AssignInst::push_user(std::shared_ptr<Inst> user)
     m_users.push_back(user);
 }
 void AssignInst::setup_def_use() { m_source->push_user(shared_from_this()); }
+std::vector<std::shared_ptr<Inst>>& AssignInst::getOperands()
+{
+    return m_operands;
+}
+void AssignInst::setTarget(std::shared_ptr<Inst> target)
+{
+    m_target = target;
+}
+std::shared_ptr<BasicBlock> AssignInst::getBlock() { return m_block; };
+InstType AssignInst::getInstType() const { return InstType::Assign; }
 
 CmpEQInst::CmpEQInst(std::shared_ptr<Inst> target,
                      std::shared_ptr<Inst> operand1,
@@ -526,6 +639,13 @@ void CmpEQInst::setup_def_use()
     m_operand1->push_user(shared_from_this());
     m_operand2->push_user(shared_from_this());
 }
+std::vector<std::shared_ptr<Inst>>& CmpEQInst::getOperands()
+{
+    return m_operands;
+}
+void CmpEQInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+std::shared_ptr<BasicBlock> CmpEQInst::getBlock() { return m_block; };
+InstType CmpEQInst::getInstType() const { return InstType::CmpEq; }
 
 CmpNEInst::CmpNEInst(std::shared_ptr<Inst> target,
                      std::shared_ptr<Inst> operand1,
@@ -567,6 +687,13 @@ void CmpNEInst::setup_def_use()
     m_operand1->push_user(shared_from_this());
     m_operand2->push_user(shared_from_this());
 }
+std::vector<std::shared_ptr<Inst>>& CmpNEInst::getOperands()
+{
+    return m_operands;
+}
+void CmpNEInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+std::shared_ptr<BasicBlock> CmpNEInst::getBlock() { return m_block; };
+InstType CmpNEInst::getInstType() const { return InstType::CmpNE; }
 
 CmpLTInst::CmpLTInst(std::shared_ptr<Inst> target,
                      std::shared_ptr<Inst> operand1,
@@ -607,6 +734,13 @@ void CmpLTInst::setup_def_use()
     m_operand1->push_user(shared_from_this());
     m_operand2->push_user(shared_from_this());
 }
+std::vector<std::shared_ptr<Inst>>& CmpLTInst::getOperands()
+{
+    return m_operands;
+}
+void CmpLTInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+std::shared_ptr<BasicBlock> CmpLTInst::getBlock() { return m_block; };
+InstType CmpLTInst::getInstType() const { return InstType::CmpLT; }
 
 CmpLTEInst::CmpLTEInst(std::shared_ptr<Inst> target,
                        std::shared_ptr<Inst> operand1,
@@ -647,6 +781,13 @@ void CmpLTEInst::setup_def_use()
     m_operand1->push_user(shared_from_this());
     m_operand2->push_user(shared_from_this());
 }
+std::vector<std::shared_ptr<Inst>>& CmpLTEInst::getOperands()
+{
+    return m_operands;
+}
+void CmpLTEInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+std::shared_ptr<BasicBlock> CmpLTEInst::getBlock() { return m_block; };
+InstType CmpLTEInst::getInstType() const { return InstType::CmpLTE; }
 
 CmpGTInst::CmpGTInst(std::shared_ptr<Inst> target,
                      std::shared_ptr<Inst> operand1,
@@ -687,6 +828,13 @@ void CmpGTInst::setup_def_use()
     m_operand1->push_user(shared_from_this());
     m_operand2->push_user(shared_from_this());
 }
+std::vector<std::shared_ptr<Inst>>& CmpGTInst::getOperands()
+{
+    return m_operands;
+}
+void CmpGTInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+std::shared_ptr<BasicBlock> CmpGTInst::getBlock() { return m_block; };
+InstType CmpGTInst::getInstType() const { return InstType::CmpGT; }
 
 CmpGTEInst::CmpGTEInst(std::shared_ptr<Inst> target,
                        std::shared_ptr<Inst> operand1,
@@ -728,6 +876,13 @@ void CmpGTEInst::setup_def_use()
     m_operand1->push_user(shared_from_this());
     m_operand2->push_user(shared_from_this());
 }
+std::vector<std::shared_ptr<Inst>>& CmpGTEInst::getOperands()
+{
+    return m_operands;
+}
+void CmpGTEInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+std::shared_ptr<BasicBlock> CmpGTEInst::getBlock() { return m_block; };
+InstType CmpGTEInst::getInstType() const { return InstType::CmpGTE; }
 
 JumpInst::JumpInst(std::shared_ptr<BasicBlock> target)
     : m_target(std::move(target))
@@ -744,6 +899,12 @@ void JumpInst::push_user(std::shared_ptr<Inst> user)
     m_users.push_back(user);
 }
 void JumpInst::setup_def_use() {}
+std::vector<std::shared_ptr<Inst>>& JumpInst::getOperands()
+{
+    return m_operands;
+}
+std::shared_ptr<BasicBlock> JumpInst::getBlock() { return m_block; };
+InstType JumpInst::getInstType() const { return InstType::Jump; }
 
 BRTInst::BRTInst(std::shared_ptr<Inst> cond,
                  std::shared_ptr<BasicBlock> targetSuccess,
@@ -773,6 +934,12 @@ void BRTInst::push_user(std::shared_ptr<Inst> user)
     m_users.push_back(user);
 }
 void BRTInst::setup_def_use() { m_operands[0]->push_user(shared_from_this()); }
+std::vector<std::shared_ptr<Inst>>& BRTInst::getOperands()
+{
+    return m_operands;
+}
+std::shared_ptr<BasicBlock> BRTInst::getBlock() { return m_block; };
+InstType BRTInst::getInstType() const { return InstType::BRT; }
 
 BRFInst::BRFInst(std::shared_ptr<Inst> cond,
                  std::shared_ptr<BasicBlock> targetSuccess,
@@ -800,6 +967,12 @@ void BRFInst::push_user(std::shared_ptr<Inst> user)
     m_users.push_back(user);
 }
 void BRFInst::setup_def_use() { m_operands[0]->push_user(shared_from_this()); }
+std::vector<std::shared_ptr<Inst>>& BRFInst::getOperands()
+{
+    return m_operands;
+}
+std::shared_ptr<BasicBlock> BRFInst::getBlock() { return m_block; };
+InstType BRFInst::getInstType() const { return InstType::BRF; }
 
 PutInst::PutInst(std::shared_ptr<Inst> operand,
                  std::shared_ptr<BasicBlock> block)
@@ -818,6 +991,12 @@ void PutInst::push_user(std::shared_ptr<Inst> user)
     m_users.push_back(user);
 }
 void PutInst::setup_def_use() { m_operands[0]->push_user(shared_from_this()); }
+std::vector<std::shared_ptr<Inst>>& PutInst::getOperands()
+{
+    return m_operands;
+}
+std::shared_ptr<BasicBlock> PutInst::getBlock() { return m_block; };
+InstType PutInst::getInstType() const { return InstType::Put; }
 
 GetInst::GetInst(std::shared_ptr<Inst> target,
                  std::shared_ptr<BasicBlock> block)
@@ -835,6 +1014,13 @@ void GetInst::push_user(std::shared_ptr<Inst> user)
     m_users.push_back(user);
 }
 void GetInst::setup_def_use() {}
+std::vector<std::shared_ptr<Inst>>& GetInst::getOperands()
+{
+    return m_operands;
+}
+void GetInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+std::shared_ptr<BasicBlock> GetInst::getBlock() { return m_block; };
+InstType GetInst::getInstType() const { return InstType::Get; }
 
 PushInst::PushInst(std::shared_ptr<Inst> operand,
                    std::shared_ptr<BasicBlock> block)
@@ -853,6 +1039,12 @@ void PushInst::push_user(std::shared_ptr<Inst> user)
     m_users.push_back(user);
 }
 void PushInst::setup_def_use() { m_operands[0]->push_user(shared_from_this()); }
+std::vector<std::shared_ptr<Inst>>& PushInst::getOperands()
+{
+    return m_operands;
+}
+std::shared_ptr<BasicBlock> PushInst::getBlock() { return m_block; };
+InstType PushInst::getInstType() const { return InstType::Push; }
 
 PopInst::PopInst(std::shared_ptr<Inst> target,
                  std::shared_ptr<BasicBlock> block)
@@ -870,6 +1062,13 @@ void PopInst::push_user(std::shared_ptr<Inst> user)
     m_users.push_back(user);
 }
 void PopInst::setup_def_use() {}
+std::vector<std::shared_ptr<Inst>>& PopInst::getOperands()
+{
+    return m_operands;
+}
+void PopInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+std::shared_ptr<BasicBlock> PopInst::getBlock() { return m_block; };
+InstType PopInst::getInstType() const { return InstType::Pop; }
 
 ReturnInst::ReturnInst(std::shared_ptr<BasicBlock> block)
     : m_block(std::move(block))
@@ -884,6 +1083,12 @@ void ReturnInst::push_user(std::shared_ptr<Inst> user)
     m_users.push_back(user);
 }
 void ReturnInst::setup_def_use() {}
+std::vector<std::shared_ptr<Inst>>& ReturnInst::getOperands()
+{
+    return m_operands;
+}
+std::shared_ptr<BasicBlock> ReturnInst::getBlock() { return m_block; };
+InstType ReturnInst::getInstType() const { return InstType::Return; }
 
 CallInst::CallInst(std::string calleeStr,
                    std::vector<std::shared_ptr<Inst>> operands,
@@ -912,6 +1117,12 @@ void CallInst::push_user(std::shared_ptr<Inst> user)
     m_users.push_back(user);
 }
 void CallInst::setup_def_use() {}
+std::vector<std::shared_ptr<Inst>>& CallInst::getOperands()
+{
+    return m_operands;
+}
+std::shared_ptr<BasicBlock> CallInst::getBlock() { return m_block; };
+InstType CallInst::getInstType() const { return InstType::Call; }
 
 PhiInst::PhiInst(std::string name, std::shared_ptr<BasicBlock> block)
     : m_target(std::make_shared<IdentInst>(name, block)), m_block(std::move(block))
@@ -952,3 +1163,18 @@ std::vector<std::shared_ptr<Inst>>& PhiInst::get_users()
     return m_users;
 }
 void PhiInst::setup_def_use() {}
+std::vector<std::shared_ptr<Inst>>& PhiInst::getOperands()
+{
+    return m_operands;
+}
+bool PhiInst::isPhi() { return true; }
+void PhiInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
+InstType PhiInst::getInstType() const { return InstType::Phi; }
+
+std::string UndefInst::getString() { return "Undef"; }
+std::shared_ptr<BasicBlock> UndefInst::getBlock() { return m_block; };
+InstType UndefInst::getInstType() const { return InstType::Undef; }
+
+std::string NoopInst::getString() { return "noop"; }
+std::shared_ptr<BasicBlock> NoopInst::getBlock() { return m_block; };
+InstType NoopInst::getInstType() const { return InstType::Noop; }
