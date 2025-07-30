@@ -186,13 +186,7 @@ void IRVisitor::visit(ProgramAST& v)
         std::string root = dsu.find(var);
         final_rename_map[var] = root_to_new_name[root];
     }
-    std::cout << "mapping: \n";
-    for (const auto& map : root_to_new_name)
-    {
-        std::cout << map.first << " : " << map.second << std::endl;
-    }
 
-    
     // BFS
     worklist = {};
     visited = {};
