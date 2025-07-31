@@ -27,8 +27,7 @@ void printBool()
 }
 void printChar()
 {
-  //return;
-  putchar(charParam);
+    putchar(charParam);
 }
 void printWithParam(int param) { putchar(param); }
 
@@ -192,7 +191,6 @@ void IRVisitor::visit(ProgramAST& v)
     visited = {};
 
     worklist.push(m_cfg);
-    //visited.insert(m_cfg);
 
     while (!worklist.empty())
     {
@@ -206,19 +204,23 @@ void IRVisitor::visit(ProgramAST& v)
             continue;
         }
 
-        bool finished = false;
         unsigned int instruction_idx = 0;
-        while (!finished)
+        while (true)
         {
+            if (instruction_idx == instructions.size())
+            {
+                break;
+            }
+
             auto& currInst = instructions[instruction_idx];
             auto& target = currInst->getTarget();
+            auto& operands = currInst->getOperands();
             auto& targetStr = target->getString();
 
             if (currInst->isPhi())
             {
                 instructions.erase(instructions.begin() + instruction_idx);
-                instruction_idx = 0;
-                //continue;
+                continue;
             }
             else
             {
@@ -229,7 +231,6 @@ void IRVisitor::visit(ProgramAST& v)
                 auto& new_target_str = root_to_new_name[targetStr];
 
                 std::shared_ptr<IdentInst> newTargetInst = std::make_shared<IdentInst>(new_target_str, currInst->getBlock());
-                
                 auto& operands = currInst->getOperands();
                 for (int i = 0; i < operands.size(); ++i)
                 {
@@ -254,10 +255,6 @@ void IRVisitor::visit(ProgramAST& v)
                 currInst->setTarget(newTargetInst);
             }
             ++instruction_idx;
-            if (instruction_idx == instructions.size())
-            {
-                finished = true;
-            }
         }
 
         for (const auto& successor : current_bb->getSuccessors())
@@ -1565,7 +1562,7 @@ void IRVisitor::generateX86()
         worklistNew.pop();
 
         auto& instructions = current_bb->getInstructions();
-        
+
         enum class CmpType
         {
             NONE,
