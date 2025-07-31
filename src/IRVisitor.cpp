@@ -8,28 +8,6 @@
 #include <asmjit/x86.h>
 
 typedef int (*Func)(void);
-int intParam;
-bool boolParam;
-char charParam;
-static void paramPrintInt(int val)
-{ printf("%d", intParam); }
-void printInt() { printf("%d", intParam); }
-void printBool()
-{
-    if (boolParam)
-    {
-        printf("true");
-    }
-    else
-    {
-        printf("false");
-    }
-}
-void printChar()
-{
-    putchar(charParam);
-}
-void printWithParam(int param) { putchar(param); }
 
 IRVisitor::IRVisitor()
     : m_tempCounter(0),
@@ -1443,15 +1421,12 @@ std::shared_ptr<Inst> IRVisitor::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> ph
 void IRVisitor::generateX86()
 {
     // BFS
-    std::queue<std::shared_ptr<BasicBlock>> worklist, worklistNew;
+    std::queue<std::shared_ptr<BasicBlock>> worklist;
     std::set<std::shared_ptr<BasicBlock>> visited;
     worklist.push(m_cfg);
     visited.insert(m_cfg);
     
     std::vector<std::string> variables;
-
-    m_lowerCFG = std::make_shared<BasicBlock>(m_cfg->getName());
-    worklistNew.push(m_lowerCFG);
 
     //asmjit::FileLogger logger(stdout);  // Logger should always survive CodeHolder.
     asmjit::StringLogger logger;
@@ -1479,7 +1454,6 @@ void IRVisitor::generateX86()
     while (!worklist.empty())
     {
         std::shared_ptr<BasicBlock> current_bb = worklist.front();
-        std::shared_ptr<BasicBlock> new_bb = worklistNew.front();
         auto bbName = current_bb->getName();
         if (labelMap.find(bbName) == labelMap.end())
         {
@@ -1491,7 +1465,6 @@ void IRVisitor::generateX86()
         visited.insert(current_bb);
 
         worklist.pop();
-        worklistNew.pop();
 
         auto& instructions = current_bb->getInstructions();
 
@@ -2757,9 +2730,10 @@ void IRVisitor::generateX86()
                             {
                                 auto intConstInst = std::dynamic_pointer_cast<IntConstInst>(operand);
                                 auto val = intConstInst->getVal();
-                                cc.mov(asmjit::x86::rcx, val);
+                                cc.mov(asmjit::x86::rcx, val + '0');
+                                std::cout << "xdd\n";
                                 asmjit::Imm printIntAddr =
-                                    asmjit::Imm((void*)paramPrintInt);
+                                    asmjit::Imm((void*)putchar);
                                 cc.call(printIntAddr);
                                 break;
                             }
@@ -2767,9 +2741,9 @@ void IRVisitor::generateX86()
                             {
                                 auto boolConstInst = std::dynamic_pointer_cast<BoolConstInst>(operand);
                                 auto val = boolConstInst->getVal();
-                                boolParam = val;
+                                cc.mov(asmjit::x86::rcx, val + '0');
                                 asmjit::Imm printBoolAddr =
-                                    asmjit::Imm((void*)printBool);
+                                    asmjit::Imm((void*)putchar);
                                 cc.call(printBoolAddr);
                                 break;
                             }
@@ -2842,10 +2816,8 @@ void IRVisitor::generateX86()
             {
               auto newSuccessor =
                   std::make_shared<BasicBlock>(successor->getName());
-                m_lowerCFG->pushSuccessor(newSuccessor);
                 visited.insert(successor);
                 worklist.push(successor);
-                worklistNew.push(newSuccessor);
             }
         }
     }

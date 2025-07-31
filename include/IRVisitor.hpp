@@ -13,11 +13,6 @@
 #include <asmjit/asmjit.h>
 
 
-void printInt();
-void printBool();
-void printChar();
-void printWithParam(int param);
-
 class IRVisitor : public Visitor
 {
 private:
@@ -30,8 +25,8 @@ private:
     std::stack<std::string> m_temp;
     std::stack<std::shared_ptr<Inst>> m_instStack;
     std::stack<std::string> m_labels;
-    
-    std::shared_ptr<BasicBlock> m_cfg, m_lowerCFG;
+
+    std::shared_ptr<BasicBlock> m_cfg;
     std::shared_ptr<BasicBlock> m_currentBB; // current basic block
 
     std::unordered_map<std::string, int> m_nameCtr;
