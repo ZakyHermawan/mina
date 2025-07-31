@@ -313,8 +313,6 @@ void IRVisitor::visit(AssignmentAST& v)
     auto identifier = v.getIdentifier();    
     auto& targetStr = identifier->getName();
 
-    std::cout << targetStr << " <- " << exprTemp;
-    std::cout << std::endl;
 
     if (identifier->getIdentType() == IdentType::ARRAY)
     {
@@ -362,13 +360,10 @@ void IRVisitor::visit(OutputAST& v)
 void IRVisitor::visit(OutputsAST& v)
 {
     auto output = v.getOutput();
-    std::cout << "put(";
     output->accept(*this);
     auto temp = popTemp();
 
     auto inst = popInst();
-    std::cout << temp;
-    std::cout << ")\n";
     
     if (temp == "\'\\n\'")
     {
@@ -468,11 +463,8 @@ void IRVisitor::visit(InputAST& v)
 void IRVisitor::visit(InputsAST& v)
 {
     auto input = v.getInput();
-    std::cout << "get(";
     input->accept(*this);
     auto temp = popTemp();
-    std::cout << temp;
-    std::cout << ")\n";
     auto inst = popInst();
 
     auto getInst = std::make_shared<GetInst>(std::move(inst), m_currentBB);
@@ -488,7 +480,6 @@ void IRVisitor::visit(InputsAST& v)
 void IRVisitor::visit(IfAST& v)
 {
     auto ifExprLabel = "ifExprBlock_" + std::to_string(m_labelCounter);
-    std::cout << ifExprLabel << ":" << std::endl;   
     auto ifExprBB = std::make_shared<BasicBlock>(ifExprLabel);
     auto jumpInst = std::make_shared<JumpInst>(ifExprBB);
     jumpInst->setup_def_use();
@@ -532,24 +523,12 @@ void IRVisitor::visit(IfAST& v)
     m_currentBB->pushSuccessor(thenBB);
     m_currentBB->pushSuccessor(elseBB);
 
-    std::cout << "if(!" << popTemp();
-    std::cout << ") goto ";
-    if (elseArm)
-    {
-        std::cout << elseBlockLabel << std::endl;
-    }
-    else
-    {
-        std::cout << mergeBlockLabel << std::endl;
-    }
 
     sealBlock(m_currentBB);
     m_currentBB = thenBB;
     //sealBlock(m_currentBB);
 
     thenArm->accept(*this);
-
-    std::cout << "goto " << mergeBlockLabel << std::endl;
 
     auto otherjumpInst = std::make_shared<JumpInst>(mergeBB);
     otherjumpInst->setup_def_use();
@@ -562,7 +541,6 @@ void IRVisitor::visit(IfAST& v)
 
     if (elseArm)
     {
-        std::cout << elseBlockLabel << std::endl;
         elseArm->accept(*this);
     }
     auto moreJumpInst = std::make_shared<JumpInst>(mergeBB);
@@ -574,7 +552,6 @@ void IRVisitor::visit(IfAST& v)
     m_currentBB = mergeBB;
     //sealBlock(m_currentBB);
 
-    std::cout << mergeBlockLabel << std::endl;
     ++m_labelCounter;
 }
 
@@ -594,13 +571,10 @@ void IRVisitor::visit(RepeatUntilAST& v)
     m_currentBB = repeatUntilBB;
     //sealBlock(m_currentBB);
 
-    std::cout << '\n' << label << std::endl;
     auto statements = v.getStatements();
     auto expr = v.getExitCond();
     statements->accept(*this);
     expr->accept(*this);
-    std::cout << "if(!" << popTemp();
-    std::cout << ") goto " << label << std::endl << std::endl;
 
     auto cond = popInst();
     std::string newBBName =
@@ -620,15 +594,13 @@ void IRVisitor::visit(RepeatUntilAST& v)
 void IRVisitor::visit(LoopAST& v)
 {
     auto label = "Loop_" + std::to_string(m_labelCounter++) + ":";
-    std::cout << '\n' << label << std::endl;
 
     auto statements = v.getStatements();
     v.accept(*this);
 
-    std::cout << "goto " << label << std::endl << std::endl;
 }
 
-void IRVisitor::visit(ExitAST& v) { std::cout << "Exit AST\n"; }
+void IRVisitor::visit(ExitAST& v) { }
 void IRVisitor::visit(ReturnAST& v)
 {
     auto retExpr = v.getRetExpr();
@@ -640,8 +612,6 @@ void IRVisitor::visit(ReturnAST& v)
     auto retInst = std::make_shared<ReturnInst>(m_currentBB);
     retInst->setup_def_use();
     m_currentBB->pushInst(retInst);
-
-    std::cout << "return " << popTemp() << std::endl;
 }
 
 void IRVisitor::visit(ArrAccessAST& v)
@@ -718,16 +688,6 @@ void IRVisitor::visit(CallAST& v)
 
     auto temp = getCurrentTemp();
     pushCurrentTemp();
-    std::cout << temp << " <- " << funcName << "(";
-    for (unsigned int i = 0; i < m_arguments.size(); ++i)
-    {
-        if (i)
-        {
-            std::cout << ',';
-        }
-        std::cout << m_arguments[i]->getTarget()->getString();
-    }
-    std::cout << ')' << std::endl;
 
     auto tempInst = std::make_shared<IdentInst>(temp, m_currentBB);
     tempInst->setup_def_use();
@@ -754,7 +714,6 @@ void IRVisitor::visit(FactorAST& v)
     pushCurrentTemp();
 
 
-    std::cout << " <- " << op << " " << temp;
     if (op == "-")
     {
         auto newInst = std::make_shared<MulInst>(
@@ -790,9 +749,6 @@ void IRVisitor::visit(FactorsAST& v)
 
     generateCurrentTemp();
     pushCurrentTemp();
-
-    std::cout << " <- ";
-    std::cout << left << " " << op << " " << right << std::endl;
 
     if (op == "*")
     {
@@ -857,9 +813,6 @@ void IRVisitor::visit(TermsAST& v)
     generateCurrentTemp();
     pushCurrentTemp();
 
-    std::cout << " <- ";
-    std::cout << left << " " << op << " " << right << std::endl;
-
     if (op == "+")
     {
         auto inst =
@@ -915,10 +868,9 @@ void IRVisitor::visit(OptRelationAST& v)
     auto rightInst = popInst();
     auto leftInst = popInst();
     m_instStack.push(targetInst);
-    std::cout << " <- ";
     auto rightTemp = popTemp();
     auto leftTemp = popTemp();
-    std::cout << leftTemp << " " << op << " " << rightTemp << std::endl;
+
     if (op == "=")
     {
         auto compInst = std::make_shared<CmpEQInst>(
@@ -1002,7 +954,6 @@ void IRVisitor::visit(ExpressionAST& v)
 void IRVisitor::visit(VarDeclAST& v)
 {
     auto baseName = v.getIdentifier()->getName();
-    std::cout << baseName << " <- ";
     
     auto ssaName = baseNameToSSA(std::move(baseName));
     auto targetIdentInst = std::make_shared<IdentInst>(ssaName, m_currentBB);
@@ -1017,7 +968,6 @@ void IRVisitor::visit(VarDeclAST& v)
             std::move(targetIdentInst), std::move(boolConstInst), m_currentBB);
         inst->setup_def_use();
         writeVariable(baseName, m_currentBB, inst);
-        std::cout << "false\n";
         m_currentBB->pushInst(inst);
     }
     else if (type == Type::INTEGER)
@@ -1029,7 +979,6 @@ void IRVisitor::visit(VarDeclAST& v)
         inst->setup_def_use();
 
         writeVariable(baseName, m_currentBB, inst);
-        std::cout << "0\n";
         m_currentBB->pushInst(inst);
     }
     else
@@ -1069,8 +1018,6 @@ void IRVisitor::visit(ArrDeclAST& v)
             std::make_shared<IdentInst>(targetSsaName, m_currentBB);
         targetIdentInst->setup_def_use();
 
-        std::cout << v.getIdentifier()->getName() << "[" << i << "]"  " <- ";
-
         auto type = v.getIdentifier()->getType();
         if (type == Type::BOOLEAN)
         {
@@ -1084,8 +1031,6 @@ void IRVisitor::visit(ArrDeclAST& v)
             writeVariable(baseName, m_currentBB, inst);
 
             m_currentBB->pushInst(inst);
-
-            std::cout << "false\n";
         }
         else if (type == Type::INTEGER)
         {
@@ -1099,8 +1044,6 @@ void IRVisitor::visit(ArrDeclAST& v)
             writeVariable(baseName, m_currentBB, inst);
 
             m_currentBB->pushInst(inst);
-
-            std::cout << "0\n";
         }
         else
         {
@@ -1126,7 +1069,6 @@ void IRVisitor::visit(ParameterAST& v)
     auto identName = ident->getName();
     auto identInst =
         std::make_shared<IdentInst>(baseNameToSSA(identName), m_currentBB);
-    std::cout << identName << " : " << typeToStr(v.getType());
     writeVariable(identName, m_currentBB, identInst);
 
     auto popInst = std::make_shared<PopInst>(identInst, m_currentBB);
@@ -1141,7 +1083,6 @@ void IRVisitor::visit(ParametersAST& v)
     parameter->accept(*this);
     if (parameters)
     {
-        std::cout << ", ";
         parameters->accept(*this);
     }
 }
@@ -1150,7 +1091,6 @@ void IRVisitor::visit(ProcDeclAST& v)
 {
     auto procName = v.getProcName();
     std::string bbName = procName;
-    std::cout << std::endl << "proc_" << v.getProcName() << "(";
 
     auto basicBlock = std::make_shared<BasicBlock>(bbName);
     m_funcBB[bbName] = basicBlock;
@@ -1163,7 +1103,6 @@ void IRVisitor::visit(ProcDeclAST& v)
     {
         params->accept(*this);
     }
-    std::cout << ")\n";
     scope->accept(*this);
 
     // make a push(0) instruction because proc have no return statement,
@@ -1177,8 +1116,6 @@ void IRVisitor::visit(ProcDeclAST& v)
     auto retInst = std::make_shared<ReturnInst>(m_currentBB);
     retInst->setup_def_use();
     m_currentBB->pushInst(retInst);
-    std::cout << "return\n";
-    std::cout << "endProc\n";
     m_currentBB = oldBB;
 }
 
@@ -1186,7 +1123,6 @@ void IRVisitor::visit(FuncDeclAST& v)
 {
     auto funcName = v.getFuncName();
     std::string bbName = funcName;
-    std::cout << std::endl << bbName << "(";
     
     auto basicBlock = std::make_shared<BasicBlock>(bbName);
     m_funcBB[bbName] = basicBlock;
@@ -1198,9 +1134,7 @@ void IRVisitor::visit(FuncDeclAST& v)
     {
         params->accept(*this);
     }
-    std::cout << ")\n";
     scope->accept(*this);
-    std::cout << "endFunc\n";
     m_currentBB = oldBB;
 }
 
@@ -1209,9 +1143,7 @@ std::string IRVisitor::getCurrentTemp()
   return "t" + std::to_string(m_tempCounter);
 }
 
-void IRVisitor::generateCurrentTemp() {
-    std::cout << getCurrentTemp();
-}
+void IRVisitor::generateCurrentTemp() {  }
 
 void IRVisitor::pushCurrentTemp()
 {
@@ -1224,7 +1156,7 @@ std::string IRVisitor::popTemp()
 {
     if (m_temp.size() == 0)
     {
-        std::cout << "empty!\n";
+        std::cerr << "empty!\n";
         exit(1);
     }
     std::string val = m_temp.top();
@@ -1241,7 +1173,7 @@ std::shared_ptr<Inst> IRVisitor::popInst()
 {
     if (m_instStack.size() == 0)
     {
-        std::cout << "instruction stack is empty!\n";
+        std::cerr << "instruction stack is empty!\n";
         printCFG();
         exit(1);
     }
@@ -1283,7 +1215,7 @@ void IRVisitor::printCFG()
 {
     // --- Step 0: Handle the case of an empty CFG ---
     if (!m_cfg) {
-        std::cout << "CFG is empty or not initialized." << std::endl;
+        std::cerr << "CFG is empty or not initialized." << std::endl;
         return;
     }
 
