@@ -110,6 +110,10 @@ public:
     std::shared_ptr<Inst> tryRemoveTrivialPhi(std::shared_ptr<PhiInst> phi);
     void sealBlock(std::shared_ptr<BasicBlock> block);
     void generateX86();
+    asmjit::x86::Gp getFirstArgumentRegister(asmjit::x86::Compiler& cc);
+    asmjit::x86::Gp getSecondArgumentRegister(asmjit::x86::Compiler& cc);
+    void syscallPutChar(asmjit::x86::Compiler& cc, char c);
+    void syscallPrintInt(asmjit::x86::Compiler& cc, int val);
 };
 
 class DisjointSetUnion {

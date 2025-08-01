@@ -2716,7 +2716,6 @@ void IRVisitor::generateX86()
 
                 case InstType::Put:
                 {
-                    //break; // not working
                     auto putInst = std::dynamic_pointer_cast<PutInst>(currInst);
                     auto& operands = putInst->getOperands();
                     for (int i = 0; i < operands.size(); ++i)
@@ -2729,11 +2728,7 @@ void IRVisitor::generateX86()
                             {
                                 auto intConstInst = std::dynamic_pointer_cast<IntConstInst>(operand);
                                 auto val = intConstInst->getVal();
-                                cc.mov(asmjit::x86::rcx, val + '0');
-                                std::cout << "xdd\n";
-                                asmjit::Imm printIntAddr =
-                                    asmjit::Imm((void*)putchar);
-                                cc.call(printIntAddr);
+                                syscallPrintInt(cc, val);
                                 break;
                             }
                             case InstType::BoolConst:
@@ -2754,19 +2749,13 @@ void IRVisitor::generateX86()
                                 auto& val = strConstInst->getString();
                                 if (val == "\'\\n\'")
                                 {
-                                    cc.mov(asmjit::x86::ecx, '\n');
-                                    asmjit::Imm printCharAddr =
-                                        asmjit::Imm((void*)putchar);
-                                    cc.call(printCharAddr);
+                                    syscallPutChar(cc, '\n');
                                     break;
                                 }
                                 for (int i = 0; i < val.length(); ++i)
                                 {
                                     if(val[i] == '\"' || val[i] == '\'') continue;
-                                    cc.mov(asmjit::x86::ecx, val[i]);
-                                    asmjit::Imm printCharAddr =
-                                        asmjit::Imm((void*)putchar);
-                                    cc.call(printCharAddr);
+                                    syscallPutChar(cc, val[i]);
                                 }
                                 break;
                             }
@@ -2795,7 +2784,9 @@ void IRVisitor::generateX86()
                                 cc.add(asmjit::x86::ecx, '0');
                                 asmjit::Imm printWithParamAddr =
                                     asmjit::Imm((void*)putchar);
+                                cc.sub(asmjit::x86::rsp, 32);
                                 cc.call(printWithParamAddr);
+                                cc.add(asmjit::x86::rsp, 32);
                                 break;
                             }
                         }
@@ -2820,17 +2811,6 @@ void IRVisitor::generateX86()
             }
         }
     }
-    asmjit::x86::Mem stack_var = cc.newStack(32, 4);
-    asmjit::x86::Mem stackIdx(stack_var);  // Copy of stack with i added.
-    // stackIdx.setIndex(i);      // stackIdx <- stack[i].
-    // stackIdx.setSize(4);       // stackIdx <- byte ptr stack[i].
-
-    //// Create a register to hold the pointer.
-    asmjit::x86::Gp ptr_reg = cc.newGpq("ptr_reg");
-
-    //// Use LEA to load the effective address of the stack variable
-    //// into our pointer register.
-    cc.lea(ptr_reg, stack_var);
 
     cc.ret();
     cc.endFunc();   // End of the function body.
@@ -2853,6 +2833,54 @@ void IRVisitor::generateX86()
 
     rt.release(fn);
 }
+
+asmjit::x86::Gp IRVisitor::getFirstArgumentRegister(asmjit::x86::Compiler& cc)
+{
+    asmjit::x86::Gp arg1_reg = (cc.environment().isPlatformWindows())
+        ? asmjit::x86::rcx   // 1st argument on
+                             // Windows
+        : asmjit::x86::rdi;  // 1st argument on
+                             // Linux/macOS
+    return arg1_reg;
+}
+asmjit::x86::Gp IRVisitor::getSecondArgumentRegister(asmjit::x86::Compiler& cc)
+{
+    asmjit::x86::Gp arg2_reg = (cc.environment().isPlatformWindows())
+        ? asmjit::x86::rdx  // 2nd argument on
+                            // Windows
+        : asmjit::x86::rsi; // 2nd argument on
+                            // Linux/macOS
+    return arg2_reg;
+}
+
+
+void IRVisitor::syscallPutChar(asmjit::x86::Compiler& cc, char c)
+{
+    asmjit::x86::Gp arg1_reg = getFirstArgumentRegister(cc);
+
+    cc.mov(arg1_reg, c);
+    cc.sub(asmjit::x86::rsp, 32);
+    cc.call(putchar);
+    cc.add(asmjit::x86::rsp, 32);
+}
+
+void IRVisitor::syscallPrintInt(asmjit::x86::Compiler& cc, int val)
+{
+    const char* fmt_str = "%d";
+
+    asmjit::x86::Gp arg1_reg = getFirstArgumentRegister(cc);
+    asmjit::x86::Gp arg2_reg = getSecondArgumentRegister(cc);
+
+    cc.mov(arg1_reg, asmjit::Imm((void*)fmt_str));
+    cc.mov(arg2_reg, val);
+    asmjit::x86::Gp printf_addr = cc.newGpq();
+    cc.mov(printf_addr, asmjit::Imm(printf));
+    cc.sub(asmjit::x86::rsp, 32);
+    cc.call(printf_addr);
+    cc.add(asmjit::x86::rsp, 32);
+}
+
+
 
 /*
 * before tryRemoveTrivialPhi optimizations
