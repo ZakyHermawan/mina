@@ -2728,7 +2728,16 @@ void IRVisitor::generateX86()
                             {
                                 auto intConstInst = std::dynamic_pointer_cast<IntConstInst>(operand);
                                 auto val = intConstInst->getVal();
-                                syscallPrintInt(cc, val);
+                                std::vector<char> printChars;
+                                while (val)
+                                {
+                                    printChars.push_back((val % 10) + '0');
+                                    val /= 10;
+                                }
+                                for (int i = printChars.size() - 1; i >= 0; -i)
+                                {
+                                    syscallPutChar(cc, printChars[i]);
+                                }
                                 break;
                             }
                             case InstType::BoolConst:
@@ -2879,24 +2888,9 @@ void IRVisitor::syscallPutChar(asmjit::x86::Compiler& cc, char c)
     cc.add(asmjit::x86::rsp, 32);
 }
 
-void IRVisitor::syscallPrintInt(asmjit::x86::Compiler& cc, int val)
-{
-    const char* fmt_str = "%d";
-
-    asmjit::x86::Gp arg1_reg = getFirstArgumentRegister(cc);
-    asmjit::x86::Gp arg2_reg = getSecondArgumentRegister(cc);
-
-    cc.mov(arg1_reg, asmjit::Imm(fmt_str));
-    cc.mov(arg2_reg, val);
-    asmjit::x86::Gp printf_addr = cc.newGpq();
-    cc.mov(printf_addr, asmjit::Imm(printf));
-    cc.sub(asmjit::x86::rsp, 32);
-    cc.call(printf_addr);
-    cc.add(asmjit::x86::rsp, 32);
-}
-
 void IRVisitor::syscallScanInt(asmjit::x86::Compiler& cc, asmjit::x86::Gp reg)
 {
+    // currently, can only scan one digit integer
     asmjit::x86::Gp arg1_reg = getFirstArgumentRegister(cc);
 
     cc.sub(asmjit::x86::rsp, 32);
