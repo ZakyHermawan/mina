@@ -2793,6 +2793,22 @@ void IRVisitor::generateX86()
                     }
                     break;
                 }
+                case InstType::Get:
+                {
+                    auto getInst = std::dynamic_pointer_cast<GetInst>(currInst);
+                    auto target = getInst->getTarget();
+
+                    auto& targetName = target->getString();
+                    if (registerMap.find(targetName) == registerMap.end())
+                    {
+                        auto newReg = cc.newGp32(targetName.c_str());
+                        registerMap[targetName] = newReg;
+                    }
+                    auto& targetRegister = registerMap[targetName];
+                    syscallScanInt(cc, targetRegister);
+                    cc.mov(targetRegister, asmjit::x86::eax);
+                    break;
+                }
 
                 default:
                     break;
@@ -2829,7 +2845,6 @@ void IRVisitor::generateX86()
 
     fn();
     std::cout << "JIT executed!\n";
-    //printf("retval: %d\n", result);
 
     rt.release(fn);
 }
@@ -2837,18 +2852,18 @@ void IRVisitor::generateX86()
 asmjit::x86::Gp IRVisitor::getFirstArgumentRegister(asmjit::x86::Compiler& cc)
 {
     asmjit::x86::Gp arg1_reg = (cc.environment().isPlatformWindows())
-        ? asmjit::x86::rcx   // 1st argument on
+        ? asmjit::x86::ecx   // 1st argument on
                              // Windows
-        : asmjit::x86::rdi;  // 1st argument on
+        : asmjit::x86::edi;  // 1st argument on
                              // Linux/macOS
     return arg1_reg;
 }
 asmjit::x86::Gp IRVisitor::getSecondArgumentRegister(asmjit::x86::Compiler& cc)
 {
     asmjit::x86::Gp arg2_reg = (cc.environment().isPlatformWindows())
-        ? asmjit::x86::rdx  // 2nd argument on
+        ? asmjit::x86::edx  // 2nd argument on
                             // Windows
-        : asmjit::x86::rsi; // 2nd argument on
+        : asmjit::x86::esi; // 2nd argument on
                             // Linux/macOS
     return arg2_reg;
 }
@@ -2871,7 +2886,7 @@ void IRVisitor::syscallPrintInt(asmjit::x86::Compiler& cc, int val)
     asmjit::x86::Gp arg1_reg = getFirstArgumentRegister(cc);
     asmjit::x86::Gp arg2_reg = getSecondArgumentRegister(cc);
 
-    cc.mov(arg1_reg, asmjit::Imm((void*)fmt_str));
+    cc.mov(arg1_reg, asmjit::Imm(fmt_str));
     cc.mov(arg2_reg, val);
     asmjit::x86::Gp printf_addr = cc.newGpq();
     cc.mov(printf_addr, asmjit::Imm(printf));
@@ -2880,7 +2895,16 @@ void IRVisitor::syscallPrintInt(asmjit::x86::Compiler& cc, int val)
     cc.add(asmjit::x86::rsp, 32);
 }
 
+void IRVisitor::syscallScanInt(asmjit::x86::Compiler& cc, asmjit::x86::Gp reg)
+{
+    asmjit::x86::Gp arg1_reg = getFirstArgumentRegister(cc);
 
+    cc.sub(asmjit::x86::rsp, 32);
+    cc.call(asmjit::Imm(getchar));
+    cc.add(asmjit::x86::rsp, 32);
+    cc.sub(asmjit::x86::eax, '0');
+    cc.mov(reg, asmjit::x86::eax);
+}
 
 /*
 * before tryRemoveTrivialPhi optimizations

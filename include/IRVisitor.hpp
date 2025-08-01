@@ -114,6 +114,7 @@ public:
     asmjit::x86::Gp getSecondArgumentRegister(asmjit::x86::Compiler& cc);
     void syscallPutChar(asmjit::x86::Compiler& cc, char c);
     void syscallPrintInt(asmjit::x86::Compiler& cc, int val);
+    void syscallScanInt(asmjit::x86::Compiler& cc, asmjit::x86::Gp);
 };
 
 class DisjointSetUnion {

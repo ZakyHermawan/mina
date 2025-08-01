@@ -313,7 +313,7 @@ std::shared_ptr<ProgramAST> Parser::program()
 
   printInstructions();
 
-  vm_exec(vm, 0, false);
+  //vm_exec(vm, 0, false);
   vm_free(vm);
   IRVisitor dv;
   programAST->accept(dv);
