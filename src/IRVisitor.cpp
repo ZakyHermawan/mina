@@ -481,7 +481,6 @@ void IRVisitor::visit(IfAST& v)
     auto thenBB = std::make_shared<BasicBlock>(thenBlockLabel);
     thenBB->pushPredecessor(m_currentBB);
 
-    //auto elseLabel = "elseBlock_" + std::to_string(m_labelCounter) + ":";
     auto elseBlockLabel = "elseBlock_" + std::to_string(m_labelCounter);
     auto elseBB = std::make_shared<BasicBlock>(elseBlockLabel);
     elseBB->pushPredecessor(m_currentBB);
