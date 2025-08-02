@@ -8,4 +8,5 @@
 		a := 2
 	end if
 	put(a, skip)
+	put(9123, skip)
 }

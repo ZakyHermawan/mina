@@ -1747,10 +1747,16 @@ void IRVisitor::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<IntConstInst>(operand2);
-                            auto tempReg = cc.newGpd();
-                            cc.mov(asmjit::x86::eax, targetRegister);
-                            cc.mov(asmjit::x86::cl, casted->getVal());
-                            cc.idiv(asmjit::x86::ax, asmjit::x86::cl);
+
+                            auto a = cc.newInt32("a");
+                            auto b = cc.newInt32("b");
+                            auto dummy = cc.newInt32("dummy");
+
+                            cc.xor_(dummy, dummy);
+                            cc.mov(a, targetRegister);
+                            cc.mov(b, casted->getVal());
+                            cc.idiv(dummy, a, b);
+                            cc.mov(targetRegister, a);
 
                             break;
                         }
@@ -1758,16 +1764,31 @@ void IRVisitor::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<BoolConstInst>(operand2);
-                            auto tempReg = cc.newGp32();
-                            cc.mov(tempReg, casted->getVal());
-                            cc.idiv(targetRegister, tempReg);
+
+                            auto a = cc.newInt32("a");
+                            auto b = cc.newInt32("b");
+                            auto dummy = cc.newInt32("dummy");
+
+                            cc.xor_(dummy, dummy);
+                            cc.mov(a, targetRegister);
+                            cc.mov(b, casted->getVal());
+                            cc.idiv(dummy, a, b);
+                            cc.mov(targetRegister, a);
+
                             break;
                         }
                         default:
                         {
-                            cc.idiv(
-                                targetRegister,
-                                registerMap[operand2->getTarget()->getString()]);
+                            auto a = cc.newInt32("a");
+                            auto b = cc.newInt32("b");
+                            auto dummy = cc.newInt32("dummy");
+
+                            cc.xor_(dummy, dummy);
+                            cc.mov(a, targetRegister);
+                            cc.mov(b, registerMap[operand2->getTarget()->getString()]);
+                            cc.idiv(dummy, a, b);
+                            cc.mov(targetRegister, a);
+
                             break;
                         }
                     }
@@ -2728,13 +2749,14 @@ void IRVisitor::generateX86()
                             {
                                 auto intConstInst = std::dynamic_pointer_cast<IntConstInst>(operand);
                                 auto val = intConstInst->getVal();
+
                                 std::vector<char> printChars;
                                 while (val)
                                 {
                                     printChars.push_back((val % 10) + '0');
                                     val /= 10;
                                 }
-                                for (int i = printChars.size() - 1; i >= 0; -i)
+                                for (int i = printChars.size() - 1; i >= 0; --i)
                                 {
                                     syscallPutChar(cc, printChars[i]);
                                 }
