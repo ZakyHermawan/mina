@@ -43,18 +43,7 @@ static void runFile(const char* fileName)
     parser.program();
 }
 
-using namespace asmjit;
-
-typedef void (*Func)(void);
-
 int main(int argc, char* argv[]) {
-    FileLogger logger(stdout);  // Logger should always survive CodeHolder.
-    JitRuntime rt;
-    CodeHolder code;
-
-    code.init(rt.environment(), rt.cpuFeatures());
-    code.setLogger(&logger); // attach logger
-
     runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes5.txt");
     return 0;
 }
