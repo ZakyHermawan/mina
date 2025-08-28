@@ -2749,17 +2749,7 @@ void IRVisitor::generateX86()
                             {
                                 auto intConstInst = std::dynamic_pointer_cast<IntConstInst>(operand);
                                 auto val = intConstInst->getVal();
-
-                                std::vector<char> printChars;
-                                while (val)
-                                {
-                                    printChars.push_back((val % 10) + '0');
-                                    val /= 10;
-                                }
-                                for (int i = printChars.size() - 1; i >= 0; --i)
-                                {
-                                    syscallPutChar(cc, printChars[i]);
-                                }
+                                syscallPrintInt(cc, val);
                                 break;
                             }
                             case InstType::BoolConst:
@@ -2945,18 +2935,18 @@ void IRVisitor::generateX86()
 asmjit::x86::Gp IRVisitor::getFirstArgumentRegister(asmjit::x86::Compiler& cc)
 {
     asmjit::x86::Gp arg1_reg = (cc.environment().isPlatformWindows())
-        ? asmjit::x86::ecx   // 1st argument on
+        ? asmjit::x86::rcx   // 1st argument on
                              // Windows
-        : asmjit::x86::edi;  // 1st argument on
+        : asmjit::x86::rdi;  // 1st argument on
                              // Linux/macOS
     return arg1_reg;
 }
 asmjit::x86::Gp IRVisitor::getSecondArgumentRegister(asmjit::x86::Compiler& cc)
 {
     asmjit::x86::Gp arg2_reg = (cc.environment().isPlatformWindows())
-        ? asmjit::x86::edx  // 2nd argument on
+        ? asmjit::x86::rdx  // 2nd argument on
                             // Windows
-        : asmjit::x86::esi; // 2nd argument on
+        : asmjit::x86::rsi; // 2nd argument on
                             // Linux/macOS
     return arg2_reg;
 }
@@ -2965,12 +2955,36 @@ asmjit::x86::Gp IRVisitor::getSecondArgumentRegister(asmjit::x86::Compiler& cc)
 void IRVisitor::syscallPutChar(asmjit::x86::Compiler& cc, char c)
 {
     asmjit::x86::Gp arg1_reg = getFirstArgumentRegister(cc);
-
     cc.mov(arg1_reg, c);
     cc.sub(asmjit::x86::rsp, 32);
     cc.call(putchar);
     cc.add(asmjit::x86::rsp, 32);
 }
+
+// implement printf("%d", val);
+void IRVisitor::syscallPrintInt(asmjit::x86::Compiler& cc, int val)
+{
+    asmjit::x86::Gp arg1_reg = getFirstArgumentRegister(cc);
+    asmjit::x86::Gp arg2_reg = getSecondArgumentRegister(cc);
+    
+    // Allocate 16 bytes on the stack for the format string and the integer.
+    cc.sub(asmjit::x86::rsp, 16);
+    
+    // Write "%d\0" as a string to [rsp]. "%d" is 0x6425, null terminator is 0.
+    cc.mov(asmjit::x86::word_ptr(asmjit::x86::rsp), 0x6425);  // "%d"
+    cc.mov(asmjit::x86::byte_ptr(asmjit::x86::rsp, 2), 0);    // null terminator
+    
+    cc.lea(arg1_reg, asmjit::x86::ptr(asmjit::x86::rsp));
+    cc.mov(arg2_reg, val);
+
+    cc.sub(asmjit::x86::rsp, 32);
+    cc.call(printf);
+    cc.add(asmjit::x86::rsp, 32);
+    
+    // Restore stack
+    cc.add(asmjit::x86::rsp, 16);
+}
+
 
 void IRVisitor::syscallScanInt(asmjit::x86::Compiler& cc, asmjit::x86::Gp reg)
 {
