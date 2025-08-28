@@ -2781,12 +2781,6 @@ void IRVisitor::generateX86()
                                     syscallPrintString(cc, std::string("false"));
                                 }
                                 break;
-                                
-                                cc.mov(asmjit::x86::rcx, val + '0');
-                                asmjit::Imm printBoolAddr =
-                                    asmjit::Imm((void*)putchar);
-                                cc.call(printBoolAddr);
-                                break;
                             }
                             case InstType::StrConst:
                             {
