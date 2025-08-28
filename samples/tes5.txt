@@ -9,4 +9,5 @@
 	end if
 	put(a, skip)
 	put(9123, skip)
+	put(true, skip)
 }

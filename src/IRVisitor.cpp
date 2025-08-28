@@ -352,6 +352,16 @@ void IRVisitor::visit(OutputsAST& v)
         putInst->setup_def_use();
         m_currentBB->pushInst(std::move(putInst));
     }
+    else if (temp == "true" || temp == "false")
+    {
+        auto boolVal = (temp == "true") ? true : false;
+        auto operand = std::make_shared<BoolConstInst>(boolVal, m_currentBB);
+        operand->setup_def_use();
+        auto putInst =
+            std::make_shared<PutInst>(std::move(operand), m_currentBB);
+        putInst->setup_def_use();
+        m_currentBB->pushInst(std::move(putInst));
+    }
     else
     {
         size_t pos = temp.find('[');
@@ -2742,6 +2752,7 @@ void IRVisitor::generateX86()
                     for (int i = 0; i < operands.size(); ++i)
                     {
                         auto& operand = operands[i]->getTarget();
+                        std::cout << putInst->getString() << std::endl;
                         auto operandType = operand->getInstType();
                         switch (operandType)
                         {
@@ -2756,6 +2767,21 @@ void IRVisitor::generateX86()
                             {
                                 auto boolConstInst = std::dynamic_pointer_cast<BoolConstInst>(operand);
                                 auto val = boolConstInst->getVal();
+                                if (val != 0 && val != 1)
+                                {
+                                    throw std::runtime_error("Boolean value must be 0 or 1!");
+                                }
+                                
+                                if (val)
+                                {
+                                    syscallPrintString(cc, std::string("true"));
+                                }
+                                else
+                                {
+                                    syscallPrintString(cc, std::string("false"));
+                                }
+                                break;
+                                
                                 cc.mov(asmjit::x86::rcx, val + '0');
                                 asmjit::Imm printBoolAddr =
                                     asmjit::Imm((void*)putchar);
@@ -2985,6 +3011,13 @@ void IRVisitor::syscallPrintInt(asmjit::x86::Compiler& cc, int val)
     cc.add(asmjit::x86::rsp, 16);
 }
 
+void IRVisitor::syscallPrintString(asmjit::x86::Compiler& cc, std::string& str)
+{
+  for (int i = 0; i < str.size(); ++i)
+  {
+      syscallPutChar(cc, str[i]);
+  }
+}
 
 void IRVisitor::syscallScanInt(asmjit::x86::Compiler& cc, asmjit::x86::Gp reg)
 {
