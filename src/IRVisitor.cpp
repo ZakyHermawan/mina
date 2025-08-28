@@ -1071,7 +1071,7 @@ void IRVisitor::visit(ProcDeclAST& v)
 
     auto basicBlock = std::make_shared<BasicBlock>(bbName);
     m_funcBB[bbName] = basicBlock;
-    auto oldBB = m_currentBB;
+    auto& oldBB = m_currentBB;
     m_currentBB = basicBlock;
 
     auto params = v.getParams();
@@ -1214,7 +1214,7 @@ void IRVisitor::printCFG()
         worklist.pop();
 
         // --- Process the current block (print its contents) ---
-        std::cout << "\nBasic Block Name: " << current_bb->getName() << std::endl;
+        std::cout << "\n" << current_bb->getName() << ":" << std::endl;
         auto instructions = current_bb->getInstructions();
         if (instructions.empty()) {
             std::cout << "  (no instructions)" << std::endl;
@@ -1445,7 +1445,7 @@ void IRVisitor::generateX86()
     // Use x86::Assembler to emit x86/x86_64 code.
     asmjit::x86::Compiler cc(&code);
     cc.addFunc(asmjit::FuncSignature::build<void>());  // Begin a function of `int
-                                              // fn(void)` signature.
+                                                       // fn(void)` signature.
 
     std::unordered_map<std::string, asmjit::x86::Gp> registerMap;
     std::unordered_map<std::string, asmjit::Label> labelMap;
@@ -2838,6 +2838,68 @@ void IRVisitor::generateX86()
                     auto& targetRegister = registerMap[targetName];
                     syscallScanInt(cc, targetRegister);
                     cc.mov(targetRegister, asmjit::x86::eax);
+                    break;
+                }
+                case InstType::Push:
+                {
+                    auto pushInst = std::dynamic_pointer_cast<GetInst>(currInst);
+                    auto operand = pushInst->getOperands()[0]->getTarget();
+                    auto operandType = operand->getInstType();
+                    switch (operandType)
+                    {
+                        case InstType::IntConst:
+                        {
+                            auto intConstInst = std::dynamic_pointer_cast<IntConstInst>(operand);
+                            auto val = intConstInst->getVal();
+                            cc.push(val);
+                            break;
+                        }
+                        case InstType::BoolConst:
+                        {
+                            auto boolConstInst = std::dynamic_pointer_cast<BoolConstInst>(operand);
+                            auto val = boolConstInst->getVal();
+                            cc.push(val);
+                            break;
+                        }
+                        case InstType::StrConst:
+                        {
+                            throw std::runtime_error("Cannot push StrConst!");
+                            break;
+                        }
+                        default:
+                        {
+                            //auto identifierInst = std::dynamic_pointer_cast<IdentInst>(operand);
+                            //auto identifierInst =
+                            //    std::dynamic_pointer_cast<IdentInst>(operand);
+                            //std::string result;
+                            //std::string st = identifierInst->getString();
+                            //auto dot_pos = st.find(".");
+                            //if (dot_pos != std::string::npos)
+                            //{
+                            //    result = st.substr(0, dot_pos);
+                            //}
+                            //else
+                            //{
+                            //    result = st;
+                            //}
+                            //auto& reg = registerMap[result];
+
+                          break;
+                      }
+
+                    }
+                    break;
+                }
+                case InstType::Pop:
+                {
+                    break;
+                }
+                case InstType::Return:
+                {
+                    break;
+                }
+                case InstType::Call:
+                {
                     break;
                 }
 

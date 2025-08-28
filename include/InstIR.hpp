@@ -41,6 +41,7 @@ enum class InstType
     Push,
     Pop,
     Return,
+    FuncSignature,
     Call,
     Phi,
     Undef,
@@ -86,7 +87,7 @@ public:
     IntConstInst& operator=(IntConstInst&&) noexcept = default;
 
     int getVal();
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -112,7 +113,7 @@ public:
     BoolConstInst& operator=(BoolConstInst&&) noexcept = default;
 
     bool getVal();
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -137,7 +138,7 @@ public:
     StrConstInst& operator=(const StrConstInst&) = delete;
     StrConstInst& operator=(StrConstInst&&) noexcept = default;
 
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -162,7 +163,7 @@ public:
     IdentInst& operator=(const IdentInst&) = delete;
     IdentInst& operator=(IdentInst&&) noexcept = default;
 
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -191,7 +192,7 @@ public:
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -221,7 +222,7 @@ public:
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -251,7 +252,7 @@ public:
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -281,7 +282,7 @@ public:
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -310,7 +311,7 @@ public:
     std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getOperand();
 
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -340,7 +341,7 @@ public:
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -370,7 +371,7 @@ public:
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
 
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -402,7 +403,7 @@ public:
     Type getType();
     unsigned int getSize();
     
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -434,7 +435,7 @@ public:
     std::shared_ptr<Inst> getIndex();
     Type getType() { return m_type; }
     
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -467,7 +468,7 @@ public:
     std::shared_ptr<Inst> getVal();
     Type getType() const { return m_type; }
     
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -496,7 +497,7 @@ public:
     std::shared_ptr<Inst> getTarget() override;
     std::shared_ptr<Inst> getSource();
   
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -526,7 +527,7 @@ public:
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
   
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -556,7 +557,7 @@ public:
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
   
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -586,7 +587,7 @@ public:
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
   
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -616,7 +617,7 @@ public:
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
     
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -646,7 +647,7 @@ public:
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
     
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -676,7 +677,7 @@ public:
     std::shared_ptr<Inst> getOperand1();
     std::shared_ptr<Inst> getOperand2();
   
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -703,7 +704,7 @@ public:
   
     std::shared_ptr<BasicBlock> getJumpTarget();
   
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -733,7 +734,7 @@ public:
     std::shared_ptr<BasicBlock> getTargetSuccess();
     std::shared_ptr<BasicBlock> getTargetFailed();
   
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -763,7 +764,7 @@ public:
     std::shared_ptr<BasicBlock> getTargetSuccess();
     std::shared_ptr<BasicBlock> getTargetFailed();
   
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -788,7 +789,7 @@ public:
   
     std::shared_ptr<Inst> getOperand();
   
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -814,7 +815,7 @@ public:
   
     std::shared_ptr<Inst> getTarget() override;
   
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -831,7 +832,7 @@ private:
 
 public:
     PushInst(std::shared_ptr<Inst> operand, std::shared_ptr<BasicBlock> block);
-  
+
     virtual ~PushInst() = default;
     PushInst(const PushInst&) = delete;
     PushInst(PushInst&&) noexcept = default;
@@ -840,7 +841,7 @@ public:
   
     std::shared_ptr<Inst> getOperand();
   
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -866,7 +867,7 @@ public:
   
     virtual std::shared_ptr<Inst> getTarget() override;
   
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -889,7 +890,36 @@ public:
     ReturnInst& operator=(const ReturnInst&) = delete;
     ReturnInst& operator=(ReturnInst&&) noexcept = default;
   
-    virtual std::string getString();
+    virtual std::string getString() override;
+    virtual void push_user(std::shared_ptr<Inst> user) override;
+    virtual void setup_def_use();
+    virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
+    virtual std::shared_ptr<BasicBlock> getBlock() override;
+    virtual InstType getInstType() const override;
+};
+
+class FuncSignature : public Inst
+{
+private:
+    std::string m_funcName;
+    FType m_fType;
+    Type m_retType;
+    std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
+
+public:
+    FuncSignature(std::string funcName, FType fType, Type retType,
+                  std::vector<std::shared_ptr<Inst>> parameters,
+                  std::shared_ptr<BasicBlock> block);
+    virtual ~FuncSignature() = default;
+    FuncSignature(const FuncSignature&) = delete;
+    FuncSignature(FuncSignature&&) noexcept = default;
+    FuncSignature& operator=(const FuncSignature&) = delete;
+    FuncSignature& operator=(FuncSignature&&) noexcept = default;
+
+    std::string getFuncName();
+
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -914,7 +944,7 @@ public:
   
     std::string getCalleeStr();
   
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
@@ -942,7 +972,7 @@ public:
     
     virtual std::shared_ptr<Inst> getTarget() override;
     virtual std::shared_ptr<BasicBlock> getBlock();
-    virtual std::string getString();
+    virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     std::vector<std::shared_ptr<Inst>>& get_users();

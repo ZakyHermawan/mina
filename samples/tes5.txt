@@ -1,7 +1,7 @@
 {
 	var a: integer
 ;
-    get(a)
+	a := 5
 	if a = 5 then
 		a := 1
 	else
