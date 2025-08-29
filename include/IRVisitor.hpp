@@ -97,11 +97,7 @@ public:
 
     std::shared_ptr<Inst> popInst();
 
-    std::string baseNameToSSA(const std::string& name);
-    std::string getCurrentSSAName(const std::string& name);
     void printCFG();
-    std::string getBaseName(std::string name);
-
     void writeVariable(std::string varName, std::shared_ptr<BasicBlock> block,
                        std::shared_ptr<Inst> value);
     std::shared_ptr<Inst> readVariable(std::string varName,
