@@ -299,6 +299,7 @@ std::shared_ptr<ProgramAST> Parser::program()
     if (sc == nullptr)
     {
         std::cout << "FAILED\n";
+        exit(1);
     }
     for (unsigned int i = 0; i < m_instructions.size(); ++i)
     {
