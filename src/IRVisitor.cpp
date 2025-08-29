@@ -93,7 +93,9 @@ void IRVisitor::visit(ProgramAST& v)
 {
     v.getScope()->accept(*this);
     sealBlock(m_currentBB);
-    
+
+    m_ssa.printCFG();
+
     DisjointSetUnion dsu;
 
     // BFS

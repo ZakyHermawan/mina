@@ -287,38 +287,37 @@ void Parser::printInstructions()
  * */
 std::shared_ptr<ProgramAST> Parser::program()
 {
-  ++m_sp;
-  m_bp = m_sp;
-  auto scopeAST = scope();
-  auto programAST = std::make_shared<ProgramAST>(std::move(scopeAST));
-  //assert(m_sp == 0);
-  m_functionTab.resize(1000);
+    ++m_sp;
+    m_bp = m_sp;
+    auto scopeAST = scope();
+    auto programAST = std::make_shared<ProgramAST>(std::move(scopeAST));
 
-  m_instructions.push_back(HALT);
+    m_functionTab.resize(1000);    
+    m_instructions.push_back(HALT);
+    
+    int *sc = (int *)malloc(sizeof(int) * m_instructions.size());
+    if (sc == nullptr)
+    {
+        std::cout << "FAILED\n";
+    }
+    for (unsigned int i = 0; i < m_instructions.size(); ++i)
+    {
+        sc[i] = m_instructions[i];
+    }
+    VM *vm = vm_create(sc, m_instructions.size(), 1000);
+    if (vm == nullptr)
+    {
+        std::cout << "VM FAILED\n";
+    }
+    
+    printInstructions();
 
-  int *sc = (int *)malloc(sizeof(int) * m_instructions.size());
-  if (sc == nullptr)
-  {
-    std::cout << "FAILED\n";
-  }
-  for (unsigned int i = 0; i < m_instructions.size(); ++i)
-  {
-    sc[i] = m_instructions[i];
-  }
-  VM *vm = vm_create(sc, m_instructions.size(), 1000);
-  if (vm == nullptr)
-  {
-    std::cout << "VM FAILED\n";
-  }
+    //vm_exec(vm, 0, false);
+    vm_free(vm);
+    IRVisitor dv;
+    programAST->accept(dv);
 
-  printInstructions();
-
-  //vm_exec(vm, 0, false);
-  vm_free(vm);
-  IRVisitor dv;
-  programAST->accept(dv);
-  dv.printCFG();
-  return programAST;
+    return programAST;
 }
 
   /*
