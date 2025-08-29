@@ -1,5 +1,6 @@
 #pragma once
 
+#include "SSA.hpp"
 #include "Visitors.hpp"
 #include "BasicBlock.hpp"
 #include "Types.hpp"
@@ -25,6 +26,8 @@ private:
     std::stack<std::string> m_temp;
     std::stack<std::shared_ptr<Inst>> m_instStack;
     std::stack<std::string> m_labels;
+
+    SSA m_ssa;
 
     std::shared_ptr<BasicBlock> m_cfg;
     std::shared_ptr<BasicBlock> m_currentBB; // current basic block

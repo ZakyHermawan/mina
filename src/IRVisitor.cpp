@@ -21,7 +21,6 @@ IRVisitor::IRVisitor()
     m_currBBNameWithoutCtr = "Entry";
     m_currBBCtr = 0;
     m_currentBB = m_cfg;
-    //m_sealedBlocks.insert(m_currentBB);
 }
 
 void IRVisitor::visit(StatementsAST& v)
@@ -294,8 +293,8 @@ void IRVisitor::visit(AssignmentAST& v)
 
     if (identifier->getIdentType() == IdentType::ARRAY)
     {
-        auto sourceSSAName = getCurrentSSAName(targetStr);
-        auto targetSSAName = baseNameToSSA(targetStr);
+        auto sourceSSAName = m_ssa.getCurrentSSAName(targetStr);
+        auto targetSSAName = m_ssa.baseNameToSSA(targetStr);
         auto sourceInst = readVariable(targetStr, m_currentBB);
         auto targetInst = std::make_shared<IdentInst>(targetSSAName, m_currentBB);
         targetInst->setup_def_use();
@@ -314,7 +313,7 @@ void IRVisitor::visit(AssignmentAST& v)
     }
     else if (identifier->getIdentType() == IdentType::VARIABLE)
     {
-        auto targetSSAName = baseNameToSSA(targetStr);
+        auto targetSSAName = m_ssa.baseNameToSSA(targetStr);
         auto targetSSAInst =
           std::make_shared<IdentInst>(targetSSAName, m_currentBB);
         targetSSAInst->setup_def_use();
@@ -416,7 +415,7 @@ void IRVisitor::visit(OutputsAST& v)
                 else
                 {
                     auto operand = std::make_shared<IdentInst>(
-                      getCurrentSSAName(temp), m_currentBB);
+                      m_ssa.getCurrentSSAName(temp), m_currentBB);
                     operand->setup_def_use();
                     auto inst = std::make_shared<PutInst>(std::move(operand),
                                                           m_currentBB);
@@ -441,7 +440,7 @@ void IRVisitor::visit(InputAST& v)
     auto input = v.getInput();
     std::string name = input->getName();
     m_temp.push(name);
-    auto target = baseNameToSSA(name);
+    auto target = m_ssa.baseNameToSSA(name);
     auto inst = std::make_shared<IdentInst>(target, m_currentBB);
     inst->setup_def_use();
     m_instStack.push(inst);
@@ -613,7 +612,7 @@ void IRVisitor::visit(ArrAccessAST& v)
 
     auto st = baseName + "[" + idxStr + "]";
 
-    auto sourceSSAName = getCurrentSSAName(baseName);
+    auto sourceSSAName = m_ssa.getCurrentSSAName(baseName);
     auto targetSSAName = getCurrentTemp();
     pushCurrentTemp();
     auto sourceInst =
@@ -667,7 +666,7 @@ void IRVisitor::visit(CallAST& v)
     m_funcBB[funcName]->pushPredecessor(m_currentBB);
 
     auto newBBLabel =
-        m_currBBNameWithoutCtr + "_" + std::to_string(++m_currBBCtr);
+        m_ssa.getCurrBBNameWithoutCtr() + "_" + std::to_string(++m_currBBCtr);
     auto newBB = std::make_shared<BasicBlock>(newBBLabel);
     newBB->pushPredecessor(m_funcBB[funcName]);
     m_funcBB[funcName]->pushSuccessor(newBB);
@@ -942,7 +941,7 @@ void IRVisitor::visit(VarDeclAST& v)
 {
     auto baseName = v.getIdentifier()->getName();
     
-    auto ssaName = baseNameToSSA(std::move(baseName));
+    auto ssaName = m_ssa.baseNameToSSA(baseName);
     auto targetIdentInst = std::make_shared<IdentInst>(ssaName, m_currentBB);
     targetIdentInst->setup_def_use();
 
@@ -977,7 +976,7 @@ void IRVisitor::visit(VarDeclAST& v)
 void IRVisitor::visit(ArrDeclAST& v)
 {
     std::string& baseName = v.getIdentifier()->getName();
-    auto ssaName = getCurrentSSAName(baseName);
+    auto ssaName = m_ssa.getCurrentSSAName(baseName);
     auto allocaIdentInst = std::make_shared<IdentInst>(ssaName, m_currentBB);
     allocaIdentInst->setup_def_use();
 
@@ -993,14 +992,14 @@ void IRVisitor::visit(ArrDeclAST& v)
     for (unsigned int i = 0; i < v.getSize(); ++i)
     {
         std::string& baseName = v.getIdentifier()->getName();
-        auto ssaName = getCurrentSSAName(baseName);
+        auto ssaName = m_ssa.getCurrentSSAName(baseName);
         auto sourceIdentInst =
             std::make_shared<IdentInst>(ssaName, m_currentBB);
         sourceIdentInst->setup_def_use();
 
         auto indexInst = std::make_shared<IntConstInst>((int)i, m_currentBB);
 
-        auto targetSsaName = baseNameToSSA(baseName);
+        auto targetSsaName = m_ssa.baseNameToSSA(baseName);
         auto targetIdentInst =
             std::make_shared<IdentInst>(targetSsaName, m_currentBB);
         targetIdentInst->setup_def_use();
@@ -1054,8 +1053,8 @@ void IRVisitor::visit(ParameterAST& v)
 {
     auto ident = v.getIdentifier();
     auto identName = ident->getName();
-    auto identInst =
-        std::make_shared<IdentInst>(baseNameToSSA(identName), m_currentBB);
+    auto identInst = std::make_shared<IdentInst>(m_ssa.baseNameToSSA(identName),
+                                                 m_currentBB);
     writeVariable(identName, m_currentBB, identInst);
 
     auto popInst = std::make_shared<PopInst>(identInst, m_currentBB);
@@ -1161,41 +1160,11 @@ std::shared_ptr<Inst> IRVisitor::popInst()
     if (m_instStack.size() == 0)
     {
         std::cerr << "instruction stack is empty!\n";
-        printCFG();
         exit(1);
     }
     std::shared_ptr<Inst> inst = m_instStack.top();
     m_instStack.pop();
     return inst;
-}
-
-std::string IRVisitor::baseNameToSSA(const std::string& name)
-{
-    auto it = m_nameCtr.find(name);
-    if (it == m_nameCtr.end())
-    {
-        m_nameCtr[name] = 0;
-        return name + "." + std::to_string(0);
-    }
-    else
-    {
-        ++m_nameCtr[name];
-        return name + "." + std::to_string(m_nameCtr[name]);
-    }
-}
-
-std::string IRVisitor::getCurrentSSAName(const std::string& name)
-{
-    auto it = m_nameCtr.find(name);
-    if (it == m_nameCtr.end())
-    {
-        m_nameCtr[name] = 0;
-        return name + "." + std::to_string(0);
-    }
-    else
-    {
-        return name + "." + std::to_string(m_nameCtr[name]);
-    }
 }
 
 void IRVisitor::printCFG()
@@ -1251,12 +1220,6 @@ void IRVisitor::printCFG()
      std::cout << "\n--- End of CFG ---\n" << std::endl;
 }
 
-std::string IRVisitor::getBaseName(std::string name)
-{
-    auto pos = name.find_last_of(".");
-    return name.substr(0, pos);
-}
-
 void IRVisitor::writeVariable(std::string varName,
     std::shared_ptr<BasicBlock> block,
     std::shared_ptr<Inst> value)
@@ -1279,8 +1242,8 @@ std::shared_ptr<Inst> IRVisitor::readVariableRecursive(
 {
   if (m_sealedBlocks.find(block) == m_sealedBlocks.end())
     {
-        auto baseName = getBaseName(varName);
-        auto phiName = baseNameToSSA(baseName);
+        auto baseName = m_ssa.getBaseName(varName);
+        auto phiName = m_ssa.baseNameToSSA(baseName);
         auto val = std::make_shared<PhiInst>(phiName, block);
         val->setup_def_use();
         block->pushInstBegin(val);
@@ -1298,8 +1261,8 @@ std::shared_ptr<Inst> IRVisitor::readVariableRecursive(
     }
     else
     {
-        auto baseName = getBaseName(varName);
-        auto phiName = baseNameToSSA(baseName);
+        auto baseName = m_ssa.getBaseName(varName);
+        auto phiName = m_ssa.baseNameToSSA(baseName);
         auto val = std::make_shared<PhiInst>(phiName, block);
         val->setup_def_use();
 
@@ -1391,7 +1354,6 @@ std::shared_ptr<Inst> IRVisitor::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> ph
             }
         }
     }
-
 
     // remove phi from the hash table
     auto& block = phi->getBlock();
@@ -2752,7 +2714,6 @@ void IRVisitor::generateX86()
                     for (int i = 0; i < operands.size(); ++i)
                     {
                         auto& operand = operands[i]->getTarget();
-                        std::cout << putInst->getString() << std::endl;
                         auto operandType = operand->getInstType();
                         switch (operandType)
                         {
@@ -2895,8 +2856,7 @@ void IRVisitor::generateX86()
                             //auto& reg = registerMap[result];
 
                           break;
-                      }
-
+                        }
                     }
                     break;
                 }
