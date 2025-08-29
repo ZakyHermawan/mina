@@ -19,20 +19,15 @@ class IRVisitor : public Visitor
 private:
     int m_tempCounter;
     int m_labelCounter;
-    int m_currBBCtr;
     std::vector<std::shared_ptr<Inst>> m_arguments;
     std::vector<std::string> m_argNames;
-    std::string m_currBBNameWithoutCtr;
     std::stack<std::string> m_temp;
     std::stack<std::shared_ptr<Inst>> m_instStack;
     std::stack<std::string> m_labels;
 
     SSA m_ssa;
 
-    std::shared_ptr<BasicBlock> m_cfg;
     std::shared_ptr<BasicBlock> m_currentBB; // current basic block
-
-    std::unordered_map<std::string, int> m_nameCtr;
     std::unordered_map<std::string, std::shared_ptr<BasicBlock>> m_funcBB;
 
     std::unordered_set<std::shared_ptr<BasicBlock>> m_sealedBlocks;

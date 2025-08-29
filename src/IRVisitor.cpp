@@ -17,10 +17,7 @@ IRVisitor::IRVisitor()
       m_assembler(&m_codeHolder),
       m_logger(stdout)
 {
-    m_cfg = std::make_shared<BasicBlock>("Entry_0");
-    m_currBBNameWithoutCtr = "Entry";
-    m_currBBCtr = 0;
-    m_currentBB = m_cfg;
+    m_currentBB = m_ssa.getCFG();
 }
 
 void IRVisitor::visit(StatementsAST& v)
@@ -102,8 +99,8 @@ void IRVisitor::visit(ProgramAST& v)
     // BFS
     std::queue<std::shared_ptr<BasicBlock>> worklist;
     std::set<std::shared_ptr<BasicBlock>> visited;
-    worklist.push(m_cfg);
-    visited.insert(m_cfg);
+    worklist.push(m_ssa.getCFG());
+    visited.insert(m_ssa.getCFG());
     std::vector<std::string> variables;
 
     while (!worklist.empty())
@@ -167,7 +164,7 @@ void IRVisitor::visit(ProgramAST& v)
     worklist = {};
     visited = {};
 
-    worklist.push(m_cfg);
+    worklist.push(m_ssa.getCFG());
 
     while (!worklist.empty())
     {
@@ -665,8 +662,9 @@ void IRVisitor::visit(CallAST& v)
     m_currentBB->pushSuccessor(m_funcBB[funcName]);
     m_funcBB[funcName]->pushPredecessor(m_currentBB);
 
+    m_ssa.incCurrBBCtr();
     auto newBBLabel =
-        m_ssa.getCurrBBNameWithoutCtr() + "_" + std::to_string(++m_currBBCtr);
+        m_ssa.getCurrBBNameWithoutCtr() + "_" + std::to_string(m_ssa.getCurrBBCtr());
     auto newBB = std::make_shared<BasicBlock>(newBBLabel);
     newBB->pushPredecessor(m_funcBB[funcName]);
     m_funcBB[funcName]->pushSuccessor(newBB);
@@ -1170,7 +1168,7 @@ std::shared_ptr<Inst> IRVisitor::popInst()
 void IRVisitor::printCFG()
 {
     // --- Step 0: Handle the case of an empty CFG ---
-    if (!m_cfg) {
+    if (!m_ssa.getCFG()) {
         std::cerr << "CFG is empty or not initialized." << std::endl;
         return;
     }
@@ -1180,8 +1178,8 @@ void IRVisitor::printCFG()
     std::set<std::shared_ptr<BasicBlock>> visited;
 
     // --- Step 2: Start the traversal from the entry block ---
-    worklist.push(m_cfg);
-    visited.insert(m_cfg);
+    worklist.push(m_ssa.getCFG());
+    visited.insert(m_ssa.getCFG());
 
     std::cout << "--- Control Flow Graph (BFS Traversal) ---" << std::endl;
 
@@ -1394,8 +1392,8 @@ void IRVisitor::generateX86()
     // BFS
     std::queue<std::shared_ptr<BasicBlock>> worklist;
     std::set<std::shared_ptr<BasicBlock>> visited;
-    worklist.push(m_cfg);
-    visited.insert(m_cfg);
+    worklist.push(m_ssa.getCFG());
+    visited.insert(m_ssa.getCFG());
     
     std::vector<std::string> variables;
 
