@@ -84,8 +84,6 @@ public:
     void visit(FuncDeclAST& v) override;
 
     std::string getCurrentTemp();
-    void generateCurrentTemp();
-
     void pushCurrentTemp();
     std::string popTemp();
     std::string getLastTemp();

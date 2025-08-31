@@ -696,7 +696,6 @@ void IRVisitor::visit(FactorAST& v)
     currentTempInst->setup_def_use();
     m_instStack.push(currentTempInst);
 
-    generateCurrentTemp();
     pushCurrentTemp();
 
 
@@ -733,7 +732,6 @@ void IRVisitor::visit(FactorsAST& v)
     currentTempInst->setup_def_use();
     m_instStack.push(currentTempInst);
 
-    generateCurrentTemp();
     pushCurrentTemp();
 
     if (op == "*")
@@ -796,7 +794,6 @@ void IRVisitor::visit(TermsAST& v)
     currentTempInst->setup_def_use();
     m_instStack.push(currentTempInst);
 
-    generateCurrentTemp();
     pushCurrentTemp();
 
     if (op == "+")
@@ -846,7 +843,6 @@ void IRVisitor::visit(OptRelationAST& v)
 {
     auto op = v.getOp().getLexme();
     v.getTerms()->accept(*this);
-    generateCurrentTemp();
     auto currentTempStr = getCurrentTemp();
     auto targetInst = std::make_shared<IdentInst>(currentTempStr, m_currentBB);
     targetInst->setup_def_use();
@@ -1128,8 +1124,6 @@ std::string IRVisitor::getCurrentTemp()
 {
   return "t" + std::to_string(m_tempCounter);
 }
-
-void IRVisitor::generateCurrentTemp() {  }
 
 void IRVisitor::pushCurrentTemp()
 {
