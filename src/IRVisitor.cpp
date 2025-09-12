@@ -1,6 +1,8 @@
 #include "IRVisitor.hpp"
 #include "Ast.hpp"
 #include "InstIR.hpp"
+#include "DisjointSetUnion.hpp"
+
 #include <queue>
 #include <set>
 #include <memory>
