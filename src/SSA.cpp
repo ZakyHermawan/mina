@@ -111,3 +111,170 @@ void SSA::setCurrBB(std::shared_ptr<BasicBlock> bb) { m_currentBB = bb; }
 std::shared_ptr<BasicBlock> SSA::getCurrBB() { return m_currentBB; }
 
 std::shared_ptr<BasicBlock> SSA::getCFG() { return m_cfg; }
+
+void SSA::writeVariable(
+    std::string varName,
+    std::shared_ptr<BasicBlock> block,
+    std::shared_ptr<Inst> value)
+{
+    m_currDef[block][varName] = value;
+}
+std::shared_ptr<Inst> SSA::readVariable(
+    std::string varName,
+    std::shared_ptr<BasicBlock> block)
+{
+    if (m_currDef[block].find(varName) != m_currDef[block].end())
+    {
+        return m_currDef[block][varName];
+    }
+    return readVariableRecursive(varName, block);
+}
+std::shared_ptr<Inst> SSA::readVariableRecursive(
+    std::string varName,
+    std::shared_ptr<BasicBlock> block)
+{
+  if (m_sealedBlocks.find(block) == m_sealedBlocks.end())
+    {
+        auto baseName = getBaseName(varName);
+        auto phiName = baseNameToSSA(baseName);
+        auto val = std::make_shared<PhiInst>(phiName, block);
+        val->setup_def_use();
+        block->pushInstBegin(val);
+
+        m_incompletePhis[block][varName] = val;
+        writeVariable(varName, block, val);
+        return val;
+    }
+    else if (block->getPredecessors().size() == 1)
+    {
+        auto val = readVariable(varName, block->getPredecessors()[0]);
+        writeVariable(varName, block, val);
+        return val;
+    }
+    else
+    {
+        auto baseName = getBaseName(varName);
+        auto phiName = baseNameToSSA(baseName);
+        auto val = std::make_shared<PhiInst>(phiName, block);
+        val->setup_def_use();
+
+        writeVariable(varName, block, val);
+        block->pushInstBegin(val);
+        auto aval = addPhiOperands(baseName, val);
+        writeVariable(varName, block, aval);
+        return aval;
+    }
+}
+std::shared_ptr<Inst> SSA::addPhiOperands(
+    std::string varName,
+    std::shared_ptr<PhiInst> phi)
+{
+    auto preds = phi->getBlock()->getPredecessors();
+    for (auto& pred : preds)
+    {
+        auto val = readVariable(varName, pred);
+        phi->appendOperand(val);
+    }
+
+    return tryRemoveTrivialPhi(phi);
+}
+std::shared_ptr<Inst> SSA::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> phi)
+{
+    std::shared_ptr<Inst> same = nullptr;
+    auto& operan = phi->getOperands();
+    for (auto& op : operan)
+    {
+        if (op == same || op == phi)
+        {
+            continue;
+        }
+        if (same != nullptr)
+        {
+            return phi;
+        }
+        same = op;
+    }
+
+    if (same == nullptr)
+    {
+        same = std::shared_ptr<UndefInst>();
+    }
+
+    auto& users = phi->get_users();
+    auto users_without_phi = std::vector<std::shared_ptr<Inst>>();
+
+    // get every users of phi except phi itself
+    for (const auto& user : users)
+    {
+        if (user != phi)
+        {
+            users_without_phi.push_back(user);
+        }
+    }
+
+    // replace all uses of phi with same
+    for (auto& user : users_without_phi)
+    {
+        auto& block = user->getBlock();
+        auto& instructions = block->getInstructions();
+        for (int i = 0; i < instructions.size(); ++i)
+        {
+            if (instructions[i] == user)
+            {
+                auto& inst = instructions[i];
+                auto& operands = inst->getOperands();
+
+                for (int i = 0; i < operands.size(); ++i)
+                {
+                    if (operands[i] == phi)
+                    {
+                        operands[i] = same;
+                        same->push_user(inst);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // remove phi from the hash table
+    auto& block = phi->getBlock();
+    for (auto& [varName, value] : m_currDef[block])
+    {
+        if (value == phi)
+        {
+          m_currDef[block][varName] = same;
+        }
+    }
+
+    // remove phi from instructions
+    for (auto it = block->getInstructions().begin(); it != block->getInstructions().end(); )
+    {
+        if (*it == phi) // Compare shared_ptr directly for equality
+        {
+            // erase returns an iterator to the next element
+            it = block->getInstructions().erase(it);
+        }
+        else
+        {
+            ++it; // Move to the next element only if not erased
+        }
+    }
+
+    for (auto& user : users)
+    {
+        if (user && user->isPhi())
+        {
+            tryRemoveTrivialPhi(std::dynamic_pointer_cast<PhiInst>(user));
+        }
+    }
+    return same;
+}
+void SSA::sealBlock(std::shared_ptr<BasicBlock> block)
+{
+    for (const auto& [var, val] : m_incompletePhis[block])
+    {
+        addPhiOperands(var, m_incompletePhis[block][var]);
+    }
+    m_sealedBlocks.insert(block);
+}

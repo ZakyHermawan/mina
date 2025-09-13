@@ -90,17 +90,6 @@ public:
 
     std::shared_ptr<Inst> popInst();
 
-    void printCFG();
-    void writeVariable(std::string varName, std::shared_ptr<BasicBlock> block,
-                       std::shared_ptr<Inst> value);
-    std::shared_ptr<Inst> readVariable(std::string varName,
-                                       std::shared_ptr<BasicBlock> block);
-    std::shared_ptr<Inst> readVariableRecursive(std::string varName,
-                                       std::shared_ptr<BasicBlock> block);
-    std::shared_ptr<Inst> addPhiOperands(std::string varName,
-                                         std::shared_ptr<PhiInst> phi);
-    std::shared_ptr<Inst> tryRemoveTrivialPhi(std::shared_ptr<PhiInst> phi);
-    void sealBlock(std::shared_ptr<BasicBlock> block);
     void generateX86();
     asmjit::x86::Gp getFirstArgumentRegister(asmjit::x86::Compiler& cc);
     asmjit::x86::Gp getSecondArgumentRegister(asmjit::x86::Compiler& cc);

@@ -86,7 +86,7 @@ void IRVisitor::visit(StringAST& v)
 void IRVisitor::visit(VariableAST& v)
 {
     auto& val = v.getName();
-    auto valInst = readVariable(val, m_currentBB);
+    auto valInst = m_ssa.readVariable(val, m_currentBB);
     m_temp.push(val);
     m_instStack.push(valInst);
 }
@@ -94,7 +94,7 @@ void IRVisitor::visit(VariableAST& v)
 void IRVisitor::visit(ProgramAST& v)
 {
     v.getScope()->accept(*this);
-    sealBlock(m_currentBB);
+    m_ssa.sealBlock(m_currentBB);
 
     m_ssa.printCFG();
 
@@ -296,7 +296,7 @@ void IRVisitor::visit(AssignmentAST& v)
     {
         auto sourceSSAName = m_ssa.getCurrentSSAName(targetStr);
         auto targetSSAName = m_ssa.baseNameToSSA(targetStr);
-        auto sourceInst = readVariable(targetStr, m_currentBB);
+        auto sourceInst = m_ssa.readVariable(targetStr, m_currentBB);
         auto targetInst = std::make_shared<IdentInst>(targetSSAName, m_currentBB);
         targetInst->setup_def_use();
 
@@ -309,7 +309,7 @@ void IRVisitor::visit(AssignmentAST& v)
         auto arrayUpdateInst = std::make_shared<ArrUpdateInst>(
             targetInst, sourceInst, subsInst, exprInst, m_currentBB, type);
         arrayUpdateInst->setup_def_use();
-        writeVariable(targetStr, m_currentBB, arrayUpdateInst);
+        m_ssa.writeVariable(targetStr, m_currentBB, arrayUpdateInst);
         m_currentBB->pushInst(arrayUpdateInst);
     }
     else if (identifier->getIdentType() == IdentType::VARIABLE)
@@ -320,7 +320,7 @@ void IRVisitor::visit(AssignmentAST& v)
         targetSSAInst->setup_def_use();
         auto assignInst = std::make_shared<AssignInst>(targetSSAInst, exprInst, m_currentBB);
         assignInst->setup_def_use();
-        writeVariable(targetStr, m_currentBB, assignInst);
+        m_ssa.writeVariable(targetStr, m_currentBB, assignInst);
         m_currentBB->pushInst(std::move(assignInst));
     }
     else
@@ -445,7 +445,7 @@ void IRVisitor::visit(InputAST& v)
     auto inst = std::make_shared<IdentInst>(target, m_currentBB);
     inst->setup_def_use();
     m_instStack.push(inst);
-    writeVariable(name, m_currentBB, inst);
+    m_ssa.writeVariable(name, m_currentBB, inst);
 }
 
 void IRVisitor::visit(InputsAST& v)
@@ -475,7 +475,7 @@ void IRVisitor::visit(IfAST& v)
     m_currentBB->pushSuccessor(ifExprBB);
     ifExprBB->pushPredecessor(m_currentBB);
 
-    sealBlock(m_currentBB);
+    m_ssa.sealBlock(m_currentBB);
     m_currentBB = ifExprBB;
     //sealBlock(m_currentBB);
 
@@ -511,7 +511,7 @@ void IRVisitor::visit(IfAST& v)
     m_currentBB->pushSuccessor(elseBB);
 
 
-    sealBlock(m_currentBB);
+    m_ssa.sealBlock(m_currentBB);
     m_currentBB = thenBB;
     //sealBlock(m_currentBB);
 
@@ -522,7 +522,7 @@ void IRVisitor::visit(IfAST& v)
     m_currentBB->pushInst(otherjumpInst);
     m_currentBB->pushSuccessor(mergeBB);
 
-    sealBlock(m_currentBB);
+    m_ssa.sealBlock(m_currentBB);
     m_currentBB = elseBB;
     //sealBlock(m_currentBB);
 
@@ -535,7 +535,7 @@ void IRVisitor::visit(IfAST& v)
     m_currentBB->pushInst(moreJumpInst);
     m_currentBB->pushSuccessor(mergeBB);
 
-    sealBlock(m_currentBB);
+    m_ssa.sealBlock(m_currentBB);
     m_currentBB = mergeBB;
     //sealBlock(m_currentBB);
 
@@ -554,7 +554,7 @@ void IRVisitor::visit(RepeatUntilAST& v)
     repeatUntilBB->pushPredecessor(m_currentBB);
     repeatUntilBB->pushPredecessor(repeatUntilBB);
     repeatUntilBB->pushSuccessor(repeatUntilBB);
-    sealBlock(m_currentBB);
+    m_ssa.sealBlock(m_currentBB);
     m_currentBB = repeatUntilBB;
     //sealBlock(m_currentBB);
 
@@ -573,7 +573,7 @@ void IRVisitor::visit(RepeatUntilAST& v)
     m_currentBB->pushSuccessor(repeatUntilExitBB);
     repeatUntilExitBB->pushPredecessor(m_currentBB);
     repeatUntilExitBB->pushSuccessor(repeatUntilExitBB);
-    sealBlock(m_currentBB);
+    m_ssa.sealBlock(m_currentBB);
     m_currentBB = repeatUntilExitBB;
     //sealBlock(m_currentBB);
 }
@@ -608,7 +608,7 @@ void IRVisitor::visit(ArrAccessAST& v)
 
     auto idxInst = popInst();
     auto& baseName = v.getName();
-    auto readVal = readVariable(baseName, m_currentBB);
+    auto readVal = m_ssa.readVariable(baseName, m_currentBB);
     auto idxStr = popTemp();
 
     auto st = baseName + "[" + idxStr + "]";
@@ -804,7 +804,7 @@ void IRVisitor::visit(TermsAST& v)
             std::make_shared<AddInst>(currentTempInst, leftInst,
                                             rightInst, m_currentBB);
         inst->setup_def_use();
-        writeVariable(currentTempStr, m_currentBB, inst);
+        m_ssa.writeVariable(currentTempStr, m_currentBB, inst);
         m_currentBB->pushInst(inst);
     }
     else if (op == "-")
@@ -813,7 +813,7 @@ void IRVisitor::visit(TermsAST& v)
             std::make_shared<SubInst>(currentTempInst, leftInst,
                                             rightInst, m_currentBB);
         inst->setup_def_use();
-        writeVariable(currentTempStr, m_currentBB, inst);
+        m_ssa.writeVariable(currentTempStr, m_currentBB, inst);
         m_currentBB->pushInst(inst);
     }
     else
@@ -822,7 +822,7 @@ void IRVisitor::visit(TermsAST& v)
             std::make_shared<OrInst>(currentTempInst, leftInst, rightInst,
                                            m_currentBB);
         inst->setup_def_use();
-        writeVariable(currentTempStr, m_currentBB, inst);
+        m_ssa.writeVariable(currentTempStr, m_currentBB, inst);
         m_currentBB->pushInst(inst);
     }
 
@@ -861,7 +861,7 @@ void IRVisitor::visit(OptRelationAST& v)
             std::move(targetInst), std::move(leftInst), std::move(rightInst),
             m_currentBB);
         compInst->setup_def_use();
-        writeVariable(currentTempStr, m_currentBB, compInst);
+        m_ssa.writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
     }
     else if (op == "!=")
@@ -870,7 +870,7 @@ void IRVisitor::visit(OptRelationAST& v)
             std::move(targetInst), std::move(leftInst), std::move(rightInst),
             m_currentBB);
         compInst->setup_def_use();
-        writeVariable(currentTempStr, m_currentBB, compInst);
+        m_ssa.writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
     }
     else if (op == "<")
@@ -879,7 +879,7 @@ void IRVisitor::visit(OptRelationAST& v)
             std::move(targetInst), std::move(leftInst), std::move(rightInst),
             m_currentBB);
         compInst->setup_def_use();
-        writeVariable(currentTempStr, m_currentBB, compInst);
+        m_ssa.writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
     }
     else if (op == "<=")
@@ -888,7 +888,7 @@ void IRVisitor::visit(OptRelationAST& v)
             std::move(targetInst), std::move(leftInst), std::move(rightInst),
             m_currentBB);
         compInst->setup_def_use();
-        writeVariable(currentTempStr, m_currentBB, compInst);
+        m_ssa.writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
 
     }
@@ -898,7 +898,7 @@ void IRVisitor::visit(OptRelationAST& v)
             std::move(targetInst), std::move(leftInst), std::move(rightInst),
             m_currentBB);
         compInst->setup_def_use();
-        writeVariable(currentTempStr, m_currentBB, compInst);
+        m_ssa.writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
 
     }
@@ -908,7 +908,7 @@ void IRVisitor::visit(OptRelationAST& v)
             std::move(targetInst), std::move(leftInst), std::move(rightInst),
             m_currentBB);
         compInst->setup_def_use();
-        writeVariable(currentTempStr, m_currentBB, compInst);
+        m_ssa.writeVariable(currentTempStr, m_currentBB, compInst);
         m_currentBB->pushInst(compInst);
     }
     else
@@ -951,7 +951,7 @@ void IRVisitor::visit(VarDeclAST& v)
         auto inst = std::make_shared<AssignInst>(
             std::move(targetIdentInst), std::move(boolConstInst), m_currentBB);
         inst->setup_def_use();
-        writeVariable(baseName, m_currentBB, inst);
+        m_ssa.writeVariable(baseName, m_currentBB, inst);
         m_currentBB->pushInst(inst);
     }
     else if (type == Type::INTEGER)
@@ -962,7 +962,7 @@ void IRVisitor::visit(VarDeclAST& v)
         auto inst = std::make_shared<AssignInst>(std::move(targetIdentInst), std::move(intConstInst), m_currentBB);
         inst->setup_def_use();
 
-        writeVariable(baseName, m_currentBB, inst);
+        m_ssa.writeVariable(baseName, m_currentBB, inst);
         m_currentBB->pushInst(inst);
     }
     else
@@ -983,7 +983,7 @@ void IRVisitor::visit(ArrDeclAST& v)
     auto allocaInst = std::make_shared<AllocaInst>(std::move(allocaIdentInst),
                                                    type, size, m_currentBB);
     allocaInst->setup_def_use();
-    writeVariable(baseName, m_currentBB, allocaInst);
+    m_ssa.writeVariable(baseName, m_currentBB, allocaInst);
 
     m_currentBB->pushInst(allocaInst);
 
@@ -1012,7 +1012,7 @@ void IRVisitor::visit(ArrDeclAST& v)
                 std::move(targetIdentInst), std::move(sourceIdentInst),
                 std::move(indexInst), std::move(boolConstInst), m_currentBB, Type::BOOLEAN);
             inst->setup_def_use();
-            writeVariable(baseName, m_currentBB, inst);
+            m_ssa.writeVariable(baseName, m_currentBB, inst);
 
             m_currentBB->pushInst(inst);
         }
@@ -1025,7 +1025,7 @@ void IRVisitor::visit(ArrDeclAST& v)
                 std::move(targetIdentInst), std::move(sourceIdentInst),
                 std::move(indexInst), std::move(intConstInst), m_currentBB, Type::INTEGER);
             inst->setup_def_use();
-            writeVariable(baseName, m_currentBB, inst);
+            m_ssa.writeVariable(baseName, m_currentBB, inst);
 
             m_currentBB->pushInst(inst);
         }
@@ -1053,7 +1053,7 @@ void IRVisitor::visit(ParameterAST& v)
     auto identName = ident->getName();
     auto identInst = std::make_shared<IdentInst>(m_ssa.baseNameToSSA(identName),
                                                  m_currentBB);
-    writeVariable(identName, m_currentBB, identInst);
+    m_ssa.writeVariable(identName, m_currentBB, identInst);
 
     auto popInst = std::make_shared<PopInst>(identInst, m_currentBB);
     popInst->setup_def_use();
@@ -1161,228 +1161,6 @@ std::shared_ptr<Inst> IRVisitor::popInst()
     std::shared_ptr<Inst> inst = m_instStack.top();
     m_instStack.pop();
     return inst;
-}
-
-void IRVisitor::printCFG()
-{
-    // --- Step 0: Handle the case of an empty CFG ---
-    if (!m_ssa.getCFG()) {
-        std::cerr << "CFG is empty or not initialized." << std::endl;
-        return;
-    }
-
-    // --- Step 1: Initialize BFS data structures ---
-    std::queue<std::shared_ptr<BasicBlock>> worklist;
-    std::set<std::shared_ptr<BasicBlock>> visited;
-
-    // --- Step 2: Start the traversal from the entry block ---
-    worklist.push(m_ssa.getCFG());
-    visited.insert(m_ssa.getCFG());
-
-    std::cout << "--- Control Flow Graph (BFS Traversal) ---" << std::endl;
-
-    // --- Step 3: Loop as long as there are blocks to process ---
-    while (!worklist.empty())
-    {
-        // Get the next block from the front of the queue
-        std::shared_ptr<BasicBlock> current_bb = worklist.front();
-        worklist.pop();
-
-        // --- Process the current block (print its contents) ---
-        std::cout << "\n" << current_bb->getName() << ":" << std::endl;
-        auto instructions = current_bb->getInstructions();
-        if (instructions.empty()) {
-            std::cout << "  (no instructions)" << std::endl;
-        } else {
-            for (const auto& inst : instructions) {
-                // Indenting instructions makes the output much clearer
-                std::cout << "  " << inst->getString() << std::endl;
-            }
-        }
-        
-        // --- Step 4: Add its unvisited successors to the queue ---
-        for (const auto& successor : current_bb->getSuccessors())
-        {
-            // The 'find' method on a set is an efficient way to check for existence.
-            // If the successor is NOT in our visited set...
-            if (visited.find(successor) == visited.end())
-            {
-                // ...then mark it as visited and add it to the queue to be processed later.
-                visited.insert(successor);
-                worklist.push(successor);
-            }
-        }
-    }
-     std::cout << "\n--- End of CFG ---\n" << std::endl;
-}
-
-void IRVisitor::writeVariable(std::string varName,
-    std::shared_ptr<BasicBlock> block,
-    std::shared_ptr<Inst> value)
-{
-    m_currDef[block][varName] = value;
-}
-
-std::shared_ptr<Inst> IRVisitor::readVariable(std::string varName,
-    std::shared_ptr<BasicBlock> block)
-{
-    if (m_currDef[block].find(varName) != m_currDef[block].end())
-    {
-        return m_currDef[block][varName];
-    }
-    return readVariableRecursive(varName, block);
-}
-
-std::shared_ptr<Inst> IRVisitor::readVariableRecursive(
-    std::string varName, std::shared_ptr<BasicBlock> block)
-{
-  if (m_sealedBlocks.find(block) == m_sealedBlocks.end())
-    {
-        auto baseName = m_ssa.getBaseName(varName);
-        auto phiName = m_ssa.baseNameToSSA(baseName);
-        auto val = std::make_shared<PhiInst>(phiName, block);
-        val->setup_def_use();
-        block->pushInstBegin(val);
-
-        m_incompletePhis[block][varName] = val;
-        writeVariable(varName, block, val);
-        return val;
-
-    }
-    else if (block->getPredecessors().size() == 1)
-    {
-        auto val = readVariable(varName, block->getPredecessors()[0]);
-        writeVariable(varName, block, val);
-        return val;
-    }
-    else
-    {
-        auto baseName = m_ssa.getBaseName(varName);
-        auto phiName = m_ssa.baseNameToSSA(baseName);
-        auto val = std::make_shared<PhiInst>(phiName, block);
-        val->setup_def_use();
-
-        writeVariable(varName, block, val);
-        block->pushInstBegin(val);
-        auto aval = addPhiOperands(baseName, val);
-        writeVariable(varName, block, aval);
-        return aval;
-    }
-}
-
-std::shared_ptr<Inst> IRVisitor::addPhiOperands(std::string varName,
-    std::shared_ptr<PhiInst> phi)
-{
-    auto preds = phi->getBlock()->getPredecessors();
-    for (auto pred : preds)
-    {
-        auto val = readVariable(varName, pred);
-        phi->appendOperand(val);
-    }
-
-    return tryRemoveTrivialPhi(phi);
-}
-
-void IRVisitor::sealBlock(std::shared_ptr<BasicBlock> block)
-{
-    for (const auto& [var, val] : m_incompletePhis[block])
-    {
-        addPhiOperands(var, m_incompletePhis[block][var]);
-    }
-    m_sealedBlocks.insert(block);
-}
-
-std::shared_ptr<Inst> IRVisitor::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> phi)
-{
-    std::shared_ptr<Inst> same = nullptr;
-    auto& operan = phi->getOperands();
-    for (auto& op : operan)
-    {
-        if (op == same || op == phi)
-        {
-            continue;
-        }
-        if (same != nullptr)
-        {
-            return phi;
-        }
-        same = op;
-    }
-
-    if (same == nullptr)
-    {
-        same = std::shared_ptr<UndefInst>();
-    }
-
-    auto& users = phi->get_users();
-    auto users_without_phi = std::vector<std::shared_ptr<Inst>>();
-
-    // get every users of phi except phi itself
-    for (const auto& user : users)
-    {
-        if (user != phi)
-        {
-            users_without_phi.push_back(user);
-        }
-    }
-
-    // replace all uses of phi with same
-    for (auto& user : users_without_phi)
-    {
-        auto& block = user->getBlock();
-        auto& instructions = block->getInstructions();
-        for (int i = 0; i < instructions.size(); ++i)
-        {
-            if (instructions[i] == user)
-            {
-                auto& inst = instructions[i];
-                auto& operands = inst->getOperands();
-
-                for (int i = 0; i < operands.size(); ++i)
-                {
-                    if (operands[i] == phi)
-                    {
-                        operands[i] = same;
-                        same->push_user(inst);
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    // remove phi from the hash table
-    auto& block = phi->getBlock();
-    for (auto& [varName, value] : m_currDef[block])
-    {
-        if (value == phi)
-        {
-          m_currDef[block][varName] = same;
-        }
-    }
-
-    // remove phi from instructions
-    for (auto it = block->getInstructions().begin(); it != block->getInstructions().end(); )
-    {
-        if (*it == phi) // Compare shared_ptr directly for equality
-        {
-            // erase returns an iterator to the next element
-            it = block->getInstructions().erase(it);
-        }
-        else
-        {
-            ++it; // Move to the next element only if not erased
-        }
-    }
-
-    for (auto& user : users)
-    {
-        if (user && user->isPhi())
-        {
-            tryRemoveTrivialPhi(std::dynamic_pointer_cast<PhiInst>(user));
-        }
-    }
-    return same;
 }
 
 void IRVisitor::generateX86()
