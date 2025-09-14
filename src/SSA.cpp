@@ -133,7 +133,7 @@ std::shared_ptr<Inst> SSA::readVariableRecursive(
     std::string varName,
     std::shared_ptr<BasicBlock> block)
 {
-  if (m_sealedBlocks.find(block) == m_sealedBlocks.end())
+    if (m_sealedBlocks.find(block) == m_sealedBlocks.end())
     {
         auto baseName = getBaseName(varName);
         auto phiName = baseNameToSSA(baseName);
@@ -178,6 +178,7 @@ std::shared_ptr<Inst> SSA::addPhiOperands(
 
     return tryRemoveTrivialPhi(phi);
 }
+
 std::shared_ptr<Inst> SSA::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> phi)
 {
     std::shared_ptr<Inst> same = nullptr;
@@ -270,6 +271,7 @@ std::shared_ptr<Inst> SSA::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> phi)
     }
     return same;
 }
+
 void SSA::sealBlock(std::shared_ptr<BasicBlock> block)
 {
     for (const auto& [var, val] : m_incompletePhis[block])

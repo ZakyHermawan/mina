@@ -30,14 +30,6 @@ private:
     std::shared_ptr<BasicBlock> m_currentBB; // current basic block
     std::unordered_map<std::string, std::shared_ptr<BasicBlock>> m_funcBB;
 
-    std::unordered_set<std::shared_ptr<BasicBlock>> m_sealedBlocks;
-    
-    using subMap = std::unordered_map<std::string, std::shared_ptr<Inst>>;
-    using subPhi = std::unordered_map<std::string, std::shared_ptr<PhiInst>>;
-
-    std::unordered_map<std::shared_ptr<BasicBlock>, subMap> m_currDef;
-    std::unordered_map<std::shared_ptr<BasicBlock>, subPhi> m_incompletePhis;
-
     asmjit::JitRuntime m_jitRuntime;
     asmjit::CodeHolder m_codeHolder;
     asmjit::x86::Assembler m_assembler;
