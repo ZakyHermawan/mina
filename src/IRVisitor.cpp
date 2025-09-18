@@ -2613,22 +2613,6 @@ void IRVisitor::generateX86()
                         }
                         default:
                         {
-                            //auto identifierInst = std::dynamic_pointer_cast<IdentInst>(operand);
-                            //auto identifierInst =
-                            //    std::dynamic_pointer_cast<IdentInst>(operand);
-                            //std::string result;
-                            //std::string st = identifierInst->getString();
-                            //auto dot_pos = st.find(".");
-                            //if (dot_pos != std::string::npos)
-                            //{
-                            //    result = st.substr(0, dot_pos);
-                            //}
-                            //else
-                            //{
-                            //    result = st;
-                            //}
-                            //auto& reg = registerMap[result];
-
                           break;
                         }
                     }
