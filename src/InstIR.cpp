@@ -1104,34 +1104,29 @@ FuncSignature::FuncSignature(std::string funcName, FType fType, Type retType,
 std::string FuncSignature::getFuncName() { return m_funcName; }
 std::string FuncSignature::getString()
 {
-  // std::cout <<;
-  // std::string res;
-  // if (m_fType == FType::PROC)
-  //{
-  //     res += "proc ";
-  // }
-  // else if (m_fType == FType::FUNC)
-  //{
-  //     res += "func ";
-  // }
-  // else
-  //{
-  //     throw std::runtime_error("Function signature cannot be undefined!\n");
-  // }
+    std::string res;
+    if (m_fType == FType::PROC)
+    {
+        res += "proc ";
+    }
+    else
+    {
+        res += "func ";
+    }
+    res += m_funcName + "(";
 
-  // res += m_funcName + "(";
-  // for (unsigned int i = 0; i < m_operands.size(); ++i)
-  //{
-  //     if (i)
-  //     {
-  //         res += ", ";
-  //     }
-  //     auto& param = m_operands[i]->getTarget();
-  //     auto& paramString = param->getString();
-  //     res += paramString;
-  // }
-  // res += ")";
-    return "Function signature of " + m_funcName + "!\n";
+    for (unsigned int i = 0; i < m_parameters.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        auto param = m_parameters[i]->getName();
+        res += param;
+    }
+
+    res += "):\n";
+    return res;
 }
 void FuncSignature::push_user(std::shared_ptr<Inst> user)
 {
@@ -1141,11 +1136,7 @@ void FuncSignature::setup_def_use()
 {
     // do nothing, since function signature did not use anything
 }
-//std::vector<std::shared_ptr<Inst>>& FuncSignature::getOperands()
-//{
-    //return m_operands;
-    //return std::vector<std::shared_ptr<Inst>;
-//}
+
 std::shared_ptr<BasicBlock> FuncSignature::getBlock() { return m_block; }
 InstType FuncSignature::getInstType() const { return InstType::FuncSignature; }
 

@@ -1079,8 +1079,8 @@ void IRVisitor::visit(ProcDeclAST& v)
 
     auto basicBlock = std::make_shared<BasicBlock>(bbName);
     m_funcBB[bbName] = basicBlock;
-    auto& oldBB = m_currentBB;
-    m_currentBB = basicBlock;
+    //auto& oldBB = m_currentBB;
+    //m_currentBB = basicBlock;
 
     auto params = v.getParams();
     auto scope = v.getScope();
@@ -1089,7 +1089,14 @@ void IRVisitor::visit(ProcDeclAST& v)
         params->accept(*this);
     }
     scope->accept(*this);
+    auto funcSignature = std::make_shared<FuncSignature>(
+        procName, FType::PROC, Type::UNDEFINED, m_parameters, m_currentBB);
+    m_currentBB->pushInst(funcSignature);
 
+    //m_currentBB = oldBB;
+    return;
+
+    /*
     auto funcSignature =
         std::make_shared <FuncSignature>(procName, FType::PROC, Type::UNDEFINED,
                                          m_parameters, m_currentBB);
@@ -1107,6 +1114,7 @@ void IRVisitor::visit(ProcDeclAST& v)
     retInst->setup_def_use();
     m_currentBB->pushInst(retInst);
     m_currentBB = oldBB;
+    */
 }
 
 void IRVisitor::visit(FuncDeclAST& v)
