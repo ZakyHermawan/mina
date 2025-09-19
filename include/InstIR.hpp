@@ -4,6 +4,7 @@
 #include <vector>
 #include <iostream>
 
+#include "Ast.hpp"
 #include "Types.hpp"
 #include "BasicBlock.hpp"
 
@@ -898,18 +899,20 @@ public:
     virtual InstType getInstType() const override;
 };
 
+// object of this class does not execute
 class FuncSignature : public Inst
 {
 private:
     std::string m_funcName;
     FType m_fType;
     Type m_retType;
-    std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::vector<std::shared_ptr<Inst>> m_users;
+    std::vector<std::shared_ptr<VariableAST>> m_parameters;
     std::shared_ptr<BasicBlock> m_block;
 
 public:
     FuncSignature(std::string funcName, FType fType, Type retType,
-                  std::vector<std::shared_ptr<Inst>> parameters,
+                  std::vector<std::shared_ptr<VariableAST>> parameters,
                   std::shared_ptr<BasicBlock> block);
     virtual ~FuncSignature() = default;
     FuncSignature(const FuncSignature&) = delete;
@@ -922,7 +925,7 @@ public:
     virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
-    virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
+    //virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
     virtual std::shared_ptr<BasicBlock> getBlock() override;
     virtual InstType getInstType() const override;
 };

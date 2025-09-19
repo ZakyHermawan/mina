@@ -21,6 +21,7 @@ private:
     int m_labelCounter;
     std::vector<std::shared_ptr<Inst>> m_arguments;
     std::vector<std::string> m_argNames;
+    std::vector<std::shared_ptr<VariableAST>> m_parameters;
     std::stack<std::string> m_temp;
     std::stack<std::shared_ptr<Inst>> m_instStack;
     std::stack<std::string> m_labels;

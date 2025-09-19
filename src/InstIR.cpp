@@ -1,3 +1,4 @@
+#include "Ast.hpp"
 #include "InstIR.hpp"
 #include "BasicBlock.hpp"
 #include <iostream>
@@ -1091,44 +1092,46 @@ std::shared_ptr<BasicBlock> ReturnInst::getBlock() { return m_block; };
 InstType ReturnInst::getInstType() const { return InstType::Return; }
 
 FuncSignature::FuncSignature(std::string funcName, FType fType, Type retType,
-    std::vector<std::shared_ptr<Inst>> parameters,
+    std::vector<std::shared_ptr<VariableAST>> parameters,
     std::shared_ptr<BasicBlock> block)
     :   m_funcName(std::move(funcName)),
         m_fType(fType),
         m_retType(retType),
-        m_operands(std::move(parameters)),
+        m_parameters(std::move(parameters)),
         m_block(std::move(block))
 {
 }
 std::string FuncSignature::getFuncName() { return m_funcName; }
 std::string FuncSignature::getString()
 {
-    std::string res;
-    if (m_fType == FType::PROC)
-    {
-        res += "proc ";
-    }
-    else if (m_fType == FType::FUNC)
-    {
-        res += "func ";
-    }
-    else
-    {
-        throw std::runtime_error("Function signature cannot be undefined!\n");
-    }
+  // std::cout <<;
+  // std::string res;
+  // if (m_fType == FType::PROC)
+  //{
+  //     res += "proc ";
+  // }
+  // else if (m_fType == FType::FUNC)
+  //{
+  //     res += "func ";
+  // }
+  // else
+  //{
+  //     throw std::runtime_error("Function signature cannot be undefined!\n");
+  // }
 
-    res += m_funcName + "(";
-    for (unsigned int i = 0; i < m_operands.size(); ++i)
-    {
-        if (i)
-        {
-            res += ", ";
-        }
-        auto& param = m_operands[i]->getTarget();
-        auto& paramString = param->getString();
-        res += paramString;
-    }
-    res += ")";
+  // res += m_funcName + "(";
+  // for (unsigned int i = 0; i < m_operands.size(); ++i)
+  //{
+  //     if (i)
+  //     {
+  //         res += ", ";
+  //     }
+  //     auto& param = m_operands[i]->getTarget();
+  //     auto& paramString = param->getString();
+  //     res += paramString;
+  // }
+  // res += ")";
+    return "Function signature of " + m_funcName + "!\n";
 }
 void FuncSignature::push_user(std::shared_ptr<Inst> user)
 {
@@ -1138,10 +1141,11 @@ void FuncSignature::setup_def_use()
 {
     // do nothing, since function signature did not use anything
 }
-std::vector<std::shared_ptr<Inst>>& FuncSignature::getOperands()
-{
-    return m_operands;
-}
+//std::vector<std::shared_ptr<Inst>>& FuncSignature::getOperands()
+//{
+    //return m_operands;
+    //return std::vector<std::shared_ptr<Inst>;
+//}
 std::shared_ptr<BasicBlock> FuncSignature::getBlock() { return m_block; }
 InstType FuncSignature::getInstType() const { return InstType::FuncSignature; }
 

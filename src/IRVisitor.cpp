@@ -1050,6 +1050,7 @@ void IRVisitor::visit(DeclarationsAST& v)
 void IRVisitor::visit(ParameterAST& v)
 {
     auto ident = v.getIdentifier();
+    m_parameters.push_back(ident);
     auto identName = ident->getName();
     auto identInst = std::make_shared<IdentInst>(m_ssa.baseNameToSSA(identName),
                                                  m_currentBB);
@@ -1089,6 +1090,11 @@ void IRVisitor::visit(ProcDeclAST& v)
     }
     scope->accept(*this);
 
+    auto funcSignature =
+        std::make_shared <FuncSignature>(procName, FType::PROC, Type::UNDEFINED,
+                                         m_parameters, m_currentBB);
+    m_currentBB->pushInst(funcSignature);
+
     // make a push(0) instruction because proc have no return statement,
     // so we return 0 as default
     auto inst = std::make_shared<IntConstInst>(0, m_currentBB);
@@ -1114,6 +1120,7 @@ void IRVisitor::visit(FuncDeclAST& v)
     m_currentBB = basicBlock;
     auto params = v.getParams();
     auto scope = v.getScope();
+    m_parameters = {};
     if (params)
     {
         params->accept(*this);
@@ -2629,6 +2636,11 @@ void IRVisitor::generateX86()
                 case InstType::Call:
                 {
                     break;
+                }
+
+                case InstType::FuncSignature:
+                {
+                    std::cout << "func signature!\n";
                 }
 
                 default:
