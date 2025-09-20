@@ -1079,8 +1079,8 @@ void IRVisitor::visit(ProcDeclAST& v)
 
     auto basicBlock = std::make_shared<BasicBlock>(bbName);
     m_funcBB[bbName] = basicBlock;
-    //auto& oldBB = m_currentBB;
-    //m_currentBB = basicBlock;
+    std::shared_ptr<BasicBlock> oldBB = m_currentBB;
+    m_currentBB = basicBlock;
 
     auto params = v.getParams();
     auto scope = v.getScope();
@@ -1093,28 +1093,9 @@ void IRVisitor::visit(ProcDeclAST& v)
         procName, FType::PROC, Type::UNDEFINED, m_parameters, m_currentBB);
     m_currentBB->pushInst(funcSignature);
 
-    //m_currentBB = oldBB;
-    return;
-
-    /*
-    auto funcSignature =
-        std::make_shared <FuncSignature>(procName, FType::PROC, Type::UNDEFINED,
-                                         m_parameters, m_currentBB);
-    m_currentBB->pushInst(funcSignature);
-
-    // make a push(0) instruction because proc have no return statement,
-    // so we return 0 as default
-    auto inst = std::make_shared<IntConstInst>(0, m_currentBB);
-    inst->setup_def_use();
-    auto pushInst = std::make_shared<PushInst>(inst, m_currentBB);
-    pushInst->setup_def_use();
-    m_currentBB->pushInst(pushInst);
-
-    auto retInst = std::make_shared<ReturnInst>(m_currentBB);
-    retInst->setup_def_use();
-    m_currentBB->pushInst(retInst);
+    //generateX86(); try to generate the function here, but don't execute, save it so we can syscall later
     m_currentBB = oldBB;
-    */
+    return;
 }
 
 void IRVisitor::visit(FuncDeclAST& v)
