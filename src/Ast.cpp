@@ -354,11 +354,11 @@ void ProgramAST::accept(Visitor& v)
     v.visit(*this);
 }
 
-ParameterAST::ParameterAST(std::shared_ptr<VariableAST> identifier, Type type)
+ParameterAST::ParameterAST(std::shared_ptr<IdentifierAST> identifier, Type type)
     : m_identifier(std::move(identifier)), m_type(type)
 {
 }
-std::shared_ptr<VariableAST> ParameterAST::getIdentifier()
+std::shared_ptr<IdentifierAST> ParameterAST::getIdentifier()
 {
   return m_identifier;
 }

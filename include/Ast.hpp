@@ -14,7 +14,6 @@ public:
     virtual void accept(Visitor& v) = 0;
 };
 
-
 class StatementsAST: public StatementAST
 {
 private:
@@ -667,11 +666,11 @@ public:
 class ParameterAST
 {
 private:
-    std::shared_ptr<VariableAST> m_identifier;
+    std::shared_ptr<IdentifierAST> m_identifier;
     Type m_type;
   
 public:
-    ParameterAST(std::shared_ptr<VariableAST> identifier, Type type);
+    ParameterAST(std::shared_ptr<IdentifierAST> identifier, Type type);
   
     ~ParameterAST() = default;
     ParameterAST(const ParameterAST&) = delete;
@@ -679,7 +678,7 @@ public:
     ParameterAST& operator=(const ParameterAST&) = delete;
     ParameterAST& operator=(ParameterAST&&) noexcept = default;
   
-    std::shared_ptr<VariableAST> getIdentifier();
+    std::shared_ptr<IdentifierAST> getIdentifier();
     Type getType() const;
     void accept(Visitor& v);
 };

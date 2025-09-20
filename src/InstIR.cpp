@@ -1092,7 +1092,7 @@ std::shared_ptr<BasicBlock> ReturnInst::getBlock() { return m_block; };
 InstType ReturnInst::getInstType() const { return InstType::Return; }
 
 FuncSignature::FuncSignature(std::string funcName, FType fType, Type retType,
-    std::vector<std::shared_ptr<VariableAST>> parameters,
+    std::vector<std::shared_ptr<IdentifierAST>> parameters,
     std::shared_ptr<BasicBlock> block)
     :   m_funcName(std::move(funcName)),
         m_fType(fType),

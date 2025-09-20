@@ -1050,7 +1050,8 @@ void IRVisitor::visit(DeclarationsAST& v)
 void IRVisitor::visit(ParameterAST& v)
 {
     auto ident = v.getIdentifier();
-    m_parameters.push_back(ident);
+    auto identType = ident->getType();
+
     auto identName = ident->getName();
     auto identInst = std::make_shared<IdentInst>(m_ssa.baseNameToSSA(identName),
                                                  m_currentBB);
@@ -1084,6 +1085,8 @@ void IRVisitor::visit(ProcDeclAST& v)
 
     auto params = v.getParams();
     auto scope = v.getScope();
+    m_parameters = {};
+
     if (params)
     {
         params->accept(*this);
@@ -1109,7 +1112,6 @@ void IRVisitor::visit(FuncDeclAST& v)
     m_currentBB = basicBlock;
     auto params = v.getParams();
     auto scope = v.getScope();
-    m_parameters = {};
     if (params)
     {
         params->accept(*this);

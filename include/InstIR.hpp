@@ -907,12 +907,12 @@ private:
     FType m_fType;
     Type m_retType;
     std::vector<std::shared_ptr<Inst>> m_users;
-    std::vector<std::shared_ptr<VariableAST>> m_parameters;
+    std::vector<std::shared_ptr<IdentifierAST>> m_parameters;
     std::shared_ptr<BasicBlock> m_block;
 
 public:
     FuncSignature(std::string funcName, FType fType, Type retType,
-                  std::vector<std::shared_ptr<VariableAST>> parameters,
+                  std::vector<std::shared_ptr<IdentifierAST>> parameters,
                   std::shared_ptr<BasicBlock> block);
     virtual ~FuncSignature() = default;
     FuncSignature(const FuncSignature&) = delete;
