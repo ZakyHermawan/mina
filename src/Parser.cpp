@@ -305,16 +305,17 @@ std::shared_ptr<ProgramAST> Parser::program()
     {
         sc[i] = m_instructions[i];
     }
-    VM *vm = vm_create(sc, m_instructions.size(), 1000);
-    if (vm == nullptr)
-    {
-        std::cout << "VM FAILED\n";
-    }
+
+    //VM *vm = vm_create(sc, m_instructions.size(), 1000);
+    //if (vm == nullptr)
+    //{
+    //    std::cout << "VM FAILED\n";
+    //}
     
-    printInstructions();
+    //printInstructions();
 
     //vm_exec(vm, 0, false);
-    vm_free(vm);
+    //vm_free(vm);
     IRVisitor dv;
     programAST->accept(dv);
 

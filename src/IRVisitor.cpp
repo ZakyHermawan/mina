@@ -481,7 +481,6 @@ void IRVisitor::visit(IfAST& v)
 
     m_ssa.sealBlock(m_currentBB);
     m_currentBB = ifExprBB;
-    //sealBlock(m_currentBB);
 
     auto expr = v.getCondition();
     auto thenArm = v.getThen();
@@ -517,7 +516,6 @@ void IRVisitor::visit(IfAST& v)
 
     m_ssa.sealBlock(m_currentBB);
     m_currentBB = thenBB;
-    //sealBlock(m_currentBB);
 
     thenArm->accept(*this);
 
@@ -528,7 +526,6 @@ void IRVisitor::visit(IfAST& v)
 
     m_ssa.sealBlock(m_currentBB);
     m_currentBB = elseBB;
-    //sealBlock(m_currentBB);
 
     if (elseArm)
     {
@@ -541,7 +538,6 @@ void IRVisitor::visit(IfAST& v)
 
     m_ssa.sealBlock(m_currentBB);
     m_currentBB = mergeBB;
-    //sealBlock(m_currentBB);
 
     ++m_labelCounter;
 }
@@ -560,7 +556,6 @@ void IRVisitor::visit(RepeatUntilAST& v)
     repeatUntilBB->pushSuccessor(repeatUntilBB);
     m_ssa.sealBlock(m_currentBB);
     m_currentBB = repeatUntilBB;
-    //sealBlock(m_currentBB);
 
     auto statements = v.getStatements();
     auto expr = v.getExitCond();
@@ -579,7 +574,6 @@ void IRVisitor::visit(RepeatUntilAST& v)
     repeatUntilExitBB->pushSuccessor(repeatUntilExitBB);
     m_ssa.sealBlock(m_currentBB);
     m_currentBB = repeatUntilExitBB;
-    //sealBlock(m_currentBB);
 }
 
 void IRVisitor::visit(LoopAST& v)
