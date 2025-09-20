@@ -11,8 +11,6 @@
 #include <memory>
 #include <stdexcept>
 
-typedef int (*Func)(void);
-
 IRVisitor::IRVisitor()
     : m_tempCounter(0),
       m_labelCounter(0),

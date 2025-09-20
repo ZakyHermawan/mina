@@ -1,7 +1,7 @@
 {
 	var a: integer
-  proc something(x: integer) {
-;
+	proc something(x: integer) {
+	;
   }
 ;
 	a := 5
