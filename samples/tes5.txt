@@ -1,6 +1,6 @@
 {
 	var a: integer
-  proc something() {
+  proc something(x: integer) {
 ;
   }
 ;

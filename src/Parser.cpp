@@ -630,7 +630,7 @@ std::shared_ptr<ProcDeclAST> Parser::procBody()
         
         for (int i = 0; i < m_parameters.size(); ++i)
         {
-            m_functionTab[m_lexical_level + 1][m_procName].setSymTab(
+            m_functionTab[m_lexical_level][m_procName].setSymTab(
                 m_parameters[i], Bucket(0, i, m_parameterTypes[i]));
         }
         scopeAST = scope();

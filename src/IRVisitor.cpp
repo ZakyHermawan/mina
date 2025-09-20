@@ -1051,12 +1051,15 @@ void IRVisitor::visit(ParameterAST& v)
 {
     auto ident = v.getIdentifier();
     auto identType = ident->getType();
+    m_parameters.push_back(ident);
 
+    // curerntBB here is the basic block for the function declaration
     auto identName = ident->getName();
     auto identInst = std::make_shared<IdentInst>(m_ssa.baseNameToSSA(identName),
                                                  m_currentBB);
     m_ssa.writeVariable(identName, m_currentBB, identInst);
 
+    // we should remove this and implement lowerParam()
     auto popInst = std::make_shared<PopInst>(identInst, m_currentBB);
     popInst->setup_def_use();
     m_currentBB->pushInst(popInst);
@@ -1085,12 +1088,26 @@ void IRVisitor::visit(ProcDeclAST& v)
 
     auto params = v.getParams();
     auto scope = v.getScope();
-    m_parameters = {};
 
+    m_parameters = {};
     if (params)
     {
         params->accept(*this);
     }
+
+    for (auto& param : m_parameters)
+    {
+        auto identType = param->getIdentType();
+        if (identType == IdentType::VARIABLE)
+        {
+            std::cout << "var!\n";
+        }
+        else
+        {
+            std::runtime_error("array parameter is not implemented yet!\n");
+        }
+    }
+
     scope->accept(*this);
     auto funcSignature = std::make_shared<FuncSignature>(
         procName, FType::PROC, Type::UNDEFINED, m_parameters, m_currentBB);
