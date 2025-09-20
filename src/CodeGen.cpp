@@ -1,23 +1,28 @@
 #include "CodeGen.hpp"
 #include "BasicBlock.hpp"
 #include <asmjit/x86.h>
+#include <asmjit/core/globals.h>
 
 #include <memory>
 #include <queue>
 #include <set>
 
 typedef int (*Func)(void);
+//typedef int (*xFunc)(void, int);
+
+asmjit::FuncNode* fooFunc;
+auto fSig = asmjit::FuncSignature::build<void, int>();
 
 CodeGen::CodeGen(SSA ssa) : m_ssa{ssa}, m_logger{}, m_rt{}, m_code{}
 {
-    m_code.init(m_rt.environment(), m_rt.cpuFeatures());
-    m_code.setLogger(&m_logger);  // attach logger
+    m_code.init(m_rt.environment(), m_rt.cpu_features());
+    m_code.set_logger(&m_logger);  // attach logger
     m_cc = std::make_shared<asmjit::x86::Compiler>(&m_code);
 }
 
 asmjit::x86::Gp CodeGen::getFirstArgumentRegister(std::shared_ptr<asmjit::x86::Compiler> m_cc)
 {
-    asmjit::x86::Gp arg1_reg = (m_cc->environment().isPlatformWindows())
+    asmjit::x86::Gp arg1_reg = (m_cc->environment().is_platform_windows())
         ? asmjit::x86::rcx   // 1st argument on
                              // Windows
         : asmjit::x86::rdi;  // 1st argument on
@@ -26,7 +31,7 @@ asmjit::x86::Gp CodeGen::getFirstArgumentRegister(std::shared_ptr<asmjit::x86::C
 }
 asmjit::x86::Gp CodeGen::getSecondArgumentRegister(std::shared_ptr<asmjit::x86::Compiler> m_cc)
 {
-    asmjit::x86::Gp arg2_reg = (m_cc->environment().isPlatformWindows())
+    asmjit::x86::Gp arg2_reg = (m_cc->environment().is_platform_windows())
         ? asmjit::x86::rdx  // 2nd argument on
                             // Windows
         : asmjit::x86::rsi; // 2nd argument on
@@ -49,10 +54,10 @@ void CodeGen::syscallPrintInt(std::shared_ptr<asmjit::x86::Compiler> m_cc, int v
     asmjit::x86::Gp arg1_reg = getFirstArgumentRegister(m_cc);
     asmjit::x86::Gp arg2_reg = getSecondArgumentRegister(m_cc);
     
-    // Allocate 16 bytes on the stack for the format string and the integer.
+    //// Allocate 16 bytes on the stack for the format string and the integer.
     m_cc->sub(asmjit::x86::rsp, 16);
     
-    // Write "%d\0" as a string to [rsp]. "%d" is 0x6425, null terminator is 0.
+    //// Write "%d\0" as a string to [rsp]. "%d" is 0x6425, null terminator is 0.
     m_cc->mov(asmjit::x86::word_ptr(asmjit::x86::rsp), 0x6425);  // "%d"
     m_cc->mov(asmjit::x86::byte_ptr(asmjit::x86::rsp, 2), 0);    // null terminator
     
@@ -63,7 +68,7 @@ void CodeGen::syscallPrintInt(std::shared_ptr<asmjit::x86::Compiler> m_cc, int v
     m_cc->call(printf);
     m_cc->add(asmjit::x86::rsp, 32);
     
-    // Restore stack
+    //// Restore stack
     m_cc->add(asmjit::x86::rsp, 16);
 }
 
@@ -85,8 +90,105 @@ void CodeGen::syscallScanInt(std::shared_ptr<asmjit::x86::Compiler> m_cc,
     m_cc->sub(asmjit::x86::rsp, 32);
     m_cc->call(asmjit::Imm(getchar));
     m_cc->add(asmjit::x86::rsp, 32);
-    m_cc->sub(asmjit::x86::eax, '0');
-    m_cc->mov(reg, asmjit::x86::eax);
+    m_cc->sub(asmjit::x86::rax, '0');
+    m_cc->mov(reg, asmjit::x86::rax);
+}
+
+void CodeGen::generateFunc(bool haveRet, unsigned int numberOfArg)
+{
+    if (numberOfArg > 4)
+    {
+        throw std::runtime_error("Only support procedure up to 4 parameter");
+    }
+
+    switch (numberOfArg)
+    {
+        case 0:
+            if (haveRet)
+            {
+                m_cc->add_func(asmjit::FuncSignature::build<int>());
+            }
+            else
+            {
+                m_cc->add_func(asmjit::FuncSignature::build<void>());
+            }
+            break;
+        case 1:
+            if (haveRet)
+            {
+                m_cc->add_func(asmjit::FuncSignature::build<int, int>());
+            }
+            else
+            {
+
+                    // --- Generate foo function (not called) ---
+              {
+                fooFunc = m_cc->add_func(asmjit::FuncSignature::build<void, int>());
+                //m_cc->end_func();
+                // (foo does nothing, just returns 42)
+                //m_cc->mov(asmjit::x86::eax, asmjit::x86::eax);
+                //m_cc->ret();
+                //m_cc->endFunc();
+              }
+
+
+                //Func useless;
+                //asmjit::CodeHolder code;
+                //asmjit::x86::Compiler newCC;
+                //newCC.push(asmjit::x86 ::rbp);
+                //newCC.mov(asmjit::x86 ::rbp, asmjit::x86 ::rsp);
+                //newCC.pop(asmjit::x86 ::rbp);
+                 //m_cc->ret();
+                //asmjit::Error err = m_rt.add(&useless, &code);
+                // 
+                // 
+                //useless();
+                //auto funcLabel = m_cc->new_named_label("asd");
+                //auto firstReg = getFirstArgumentRegister(m_cc);
+                //m_cc->bind(funcLabel);
+                //m_cc->push(asmjit::x86 ::rbp);
+                //m_cc->mov(asmjit::x86 ::rbp, asmjit::x86 ::rsp);
+                //m_cc->pop(asmjit::x86 ::rbp);
+                //m_cc->ret();
+                //m_cc->addFunc(asmjit::FuncSignature::build<void, int>());
+                //m_cc->nop();
+                //m_cc->ret();
+                //m_cc->endFunc();
+            }
+            break;
+        case 2:
+            if (haveRet)
+            {
+                m_cc->add_func(asmjit::FuncSignature::build<int, int, int>());
+            }
+            else
+            {
+                m_cc->add_func(asmjit::FuncSignature::build<void, int, int>());
+            }
+            break;
+        case 3:
+            if (haveRet)
+            {
+                m_cc->add_func(asmjit::FuncSignature::build<int, int, int, int>());
+            }
+            else
+            {
+                m_cc->add_func(asmjit::FuncSignature::build<void, int, int, int>());
+            }
+            break;
+        case 4:
+            if (haveRet)
+            {
+                m_cc->add_func(asmjit::FuncSignature::build<int, int, int, int, int>());
+            }
+            else
+            {
+                m_cc->add_func(asmjit::FuncSignature::build<void, int, int, int, int>());
+            }
+            break;
+    }
+    //m_cc->ret();
+    //m_cc->endFunc();
 }
 
 void CodeGen::generateX86()
@@ -100,8 +202,21 @@ void CodeGen::generateX86()
     std::vector<std::string> variables;
 
     // fn(void)` signature.
-    m_cc->addFunc(asmjit::FuncSignature::build<void>());
+    m_cc->add_func(asmjit::FuncSignature::build<void>());
+    asmjit::InvokeNode* invoke_node;
+    asmjit::FuncNode* fooFunc;
+    auto fSig = asmjit::FuncSignature::build<void, int>();
 
+    //m_cc->invoke(asmjit::Out(invoke_node), fooFunc->label(), fSig);
+
+
+    //asmjit::InvokeNode* invoke_node;       // Function invocation:
+    //m_cc->call()
+    //m_cc->invoke(asmjit::Out(invoke_node),    //   - InvokeNode (output).
+    //          func_node->label(),  //   - Function address or Label.
+    //          FuncSignature::build<int, int>());  //   - Function signature.
+
+    //m_cc->invoke()
     std::unordered_map<std::string, asmjit::x86::Gp> registerMap;
     std::unordered_map<std::string, asmjit::Label> labelMap;
 
@@ -111,7 +226,7 @@ void CodeGen::generateX86()
         auto bbName = current_bb->getName();
         if (labelMap.find(bbName) == labelMap.end())
         {
-            labelMap[bbName] = m_cc->newNamedLabel(bbName.c_str());
+            labelMap[bbName] = m_cc->new_named_label(bbName.c_str());
         }
         auto& label = labelMap[bbName];
         m_cc->bind(label); // generate label and start writing code adter this label
@@ -155,7 +270,7 @@ void CodeGen::generateX86()
                     auto& targetName = target->getString();
                     if (registerMap.find(targetName) == registerMap.end())
                     {
-                        auto newReg = m_cc->newGp32(targetName.c_str());
+                        auto newReg = m_cc->new_gp64(targetName.c_str());
                         registerMap[targetName] = newReg;
                     }
 
@@ -224,7 +339,7 @@ void CodeGen::generateX86()
                     auto& targetName = target->getString();
                     if (registerMap.find(targetName) == registerMap.end())
                     {
-                        auto newReg = m_cc->newGp32(targetName.c_str());
+                        auto newReg = m_cc->new_gp64(targetName.c_str());
                         registerMap[targetName] = newReg;
                     }
 
@@ -292,7 +407,7 @@ void CodeGen::generateX86()
                     auto& targetName = target->getString();
                     if (registerMap.find(targetName) == registerMap.end())
                     {
-                        auto newReg = m_cc->newGp32(targetName.c_str());
+                        auto newReg = m_cc->new_gp64(targetName.c_str());
                         registerMap[targetName] = newReg;
                     }
 
@@ -330,7 +445,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<IntConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->imul(targetRegister, tempReg);
                             break;
@@ -339,7 +454,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<BoolConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->imul(targetRegister, tempReg);
                             break;
@@ -364,7 +479,7 @@ void CodeGen::generateX86()
                     auto& targetName = target->getString();
                     if (registerMap.find(targetName) == registerMap.end())
                     {
-                        auto newReg = m_cc->newGp32(targetName.c_str());
+                        auto newReg = m_cc->new_gp64(targetName.c_str());
                         registerMap[targetName] = newReg;
                     }
 
@@ -403,9 +518,9 @@ void CodeGen::generateX86()
                             auto casted =
                                 std::dynamic_pointer_cast<IntConstInst>(operand2);
 
-                            auto a = m_cc->newInt32("a");
-                            auto b = m_cc->newInt32("b");
-                            auto dummy = m_cc->newInt32("dummy");
+                            auto a = m_cc->new_gp64("a");
+                            auto b = m_cc->new_gp64("b");
+                            auto dummy = m_cc->new_gp64("dummy");
 
                             m_cc->xor_(dummy, dummy);
                             m_cc->mov(a, targetRegister);
@@ -420,9 +535,9 @@ void CodeGen::generateX86()
                             auto casted =
                                 std::dynamic_pointer_cast<BoolConstInst>(operand2);
 
-                            auto a = m_cc->newInt32("a");
-                            auto b = m_cc->newInt32("b");
-                            auto dummy = m_cc->newInt32("dummy");
+                            auto a = m_cc->new_gp64("a");
+                            auto b = m_cc->new_gp64("b");
+                            auto dummy = m_cc->new_gp64("dummy");
 
                             m_cc->xor_(dummy, dummy);
                             m_cc->mov(a, targetRegister);
@@ -434,9 +549,9 @@ void CodeGen::generateX86()
                         }
                         default:
                         {
-                            auto a = m_cc->newInt32("a");
-                            auto b = m_cc->newInt32("b");
-                            auto dummy = m_cc->newInt32("dummy");
+                            auto a = m_cc->new_gp64("a");
+                            auto b = m_cc->new_gp64("b");
+                            auto dummy = m_cc->new_gp64("dummy");
 
                             m_cc->xor_(dummy, dummy);
                             m_cc->mov(a, targetRegister);
@@ -458,7 +573,7 @@ void CodeGen::generateX86()
                     auto& targetName = target->getString();
                     if (registerMap.find(targetName) == registerMap.end())
                     {
-                        auto newReg = m_cc->newGp32(targetName.c_str());
+                        auto newReg = m_cc->new_gp64(targetName.c_str());
                         registerMap[targetName] = newReg;
                     }
 
@@ -503,7 +618,7 @@ void CodeGen::generateX86()
                     auto& targetName = target->getString();
                     if (registerMap.find(targetName) == registerMap.end())
                     {
-                        auto newReg = m_cc->newGp32(targetName.c_str());
+                        auto newReg = m_cc->new_gp64(targetName.c_str());
                         registerMap[targetName] = newReg;
                     }
 
@@ -541,7 +656,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<IntConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->and_(targetRegister, tempReg);
                             break;
@@ -550,7 +665,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<BoolConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->and_(targetRegister, tempReg);
                             break;
@@ -575,7 +690,7 @@ void CodeGen::generateX86()
                     auto& targetName = target->getString();
                     if (registerMap.find(targetName) == registerMap.end())
                     {
-                        auto newReg = m_cc->newGp32(targetName.c_str());
+                        auto newReg = m_cc->new_gp64(targetName.c_str());
                         registerMap[targetName] = newReg;
                     }
 
@@ -613,7 +728,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<IntConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->or_(targetRegister, tempReg);
                             break;
@@ -622,7 +737,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<BoolConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->or_(targetRegister, tempReg);
                             break;
@@ -649,7 +764,7 @@ void CodeGen::generateX86()
 
                     if (registerMap.find(targetName) == registerMap.end())
                     {
-                        auto newReg = m_cc->newGp32(targetName.c_str());
+                        auto newReg = m_cc->new_gp64(targetName.c_str());
                         registerMap[targetName] = newReg;
                     }
                     auto& targetRegister = registerMap[targetName];
@@ -679,7 +794,7 @@ void CodeGen::generateX86()
                     auto& index = castedInst->getIndex()->getTarget();
 
                     auto& sourceReg = registerMap[source->getString()];
-                    auto targetReg = m_cc->newGp32();
+                    auto targetReg = m_cc->new_gp64();
                     auto& targetName = target->getString();
                     registerMap[targetName] = targetReg;
 
@@ -692,7 +807,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<IntConstInst>(index);
-                            indexTempReg = m_cc->newGp32();
+                            indexTempReg = m_cc->new_gp64();
                             m_cc->mov(indexTempReg, casted->getVal() * 4);
                             break;
                         }
@@ -700,7 +815,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<IntConstInst>(index);
-                            indexTempReg = m_cc->newGp32();
+                            indexTempReg = m_cc->new_gp64();
                             m_cc->mov(indexTempReg, casted->getVal());
                             break;
                         }
@@ -747,7 +862,7 @@ void CodeGen::generateX86()
                             {
                                 throw std::runtime_error("error when casting pointer!\n");
                             }
-                            indexTempReg = m_cc->newGp32();
+                            indexTempReg = m_cc->new_gp64();
                             m_cc->mov(indexTempReg, casted->getVal() * 4);
                             break;
                         }
@@ -759,7 +874,7 @@ void CodeGen::generateX86()
                             {
                                 throw std::runtime_error("error when casting pointer!\n");
                             }
-                            indexTempReg = m_cc->newGp32();
+                            indexTempReg = m_cc->new_gp64();
                             m_cc->mov(indexTempReg, casted->getVal());
                             break;
                         }
@@ -785,7 +900,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<IntConstInst>(val);
-                            valueTempReg = m_cc->newGp32();
+                            valueTempReg = m_cc->new_gp64();
                             m_cc->mov(valueTempReg, casted->getVal());
                             break;
                         }
@@ -793,7 +908,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<BoolConstInst>(val);
-                            valueTempReg = m_cc->newGp32();
+                            valueTempReg = m_cc->new_gp64();
                             m_cc->mov(valueTempReg, casted->getVal());
                             break;
                         }
@@ -821,7 +936,7 @@ void CodeGen::generateX86()
                     auto& targetName = target->getString();
                     if (registerMap.find(targetName) == registerMap.end())
                     {
-                        auto newReg = m_cc->newGp32(targetName.c_str());
+                        auto newReg = m_cc->new_gp64(targetName.c_str());
                         registerMap[targetName] = newReg;
                     }
                     auto& targetRegister = registerMap[targetName];
@@ -863,7 +978,7 @@ void CodeGen::generateX86()
                     auto& targetName = target->getString();
                     if (registerMap.find(targetName) == registerMap.end())
                     {
-                        auto newReg = m_cc->newGp32(targetName.c_str());
+                        auto newReg = m_cc->new_gp64(targetName.c_str());
                         registerMap[targetName] = newReg;
                     }
 
@@ -901,7 +1016,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<IntConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->cmp(targetRegister, tempReg);
                             break;
@@ -910,7 +1025,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<BoolConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->cmp(targetRegister, tempReg);
                             break;
@@ -938,7 +1053,7 @@ void CodeGen::generateX86()
                     auto& targetName = target->getString();
                     if (registerMap.find(targetName) == registerMap.end())
                     {
-                        auto newReg = m_cc->newGp32(targetName.c_str());
+                        auto newReg = m_cc->new_gp64(targetName.c_str());
                         registerMap[targetName] = newReg;
                     }
 
@@ -976,7 +1091,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<IntConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->cmp(targetRegister, tempReg);
                             break;
@@ -985,7 +1100,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<BoolConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->cmp(targetRegister, tempReg);
                             break;
@@ -1013,7 +1128,7 @@ void CodeGen::generateX86()
                     auto& targetName = target->getString();
                     if (registerMap.find(targetName) == registerMap.end())
                     {
-                        auto newReg = m_cc->newGp32(targetName.c_str());
+                        auto newReg = m_cc->new_gp64(targetName.c_str());
                         registerMap[targetName] = newReg;
                     }
 
@@ -1051,7 +1166,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<IntConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->cmp(targetRegister, tempReg);
                             break;
@@ -1060,7 +1175,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<BoolConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->cmp(targetRegister, tempReg);
                             break;
@@ -1088,7 +1203,7 @@ void CodeGen::generateX86()
                     auto& targetName = target->getString();
                     if (registerMap.find(targetName) == registerMap.end())
                     {
-                        auto newReg = m_cc->newGp32(targetName.c_str());
+                        auto newReg = m_cc->new_gp64(targetName.c_str());
                         registerMap[targetName] = newReg;
                     }
 
@@ -1126,7 +1241,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<IntConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->cmp(targetRegister, tempReg);
                             break;
@@ -1135,7 +1250,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<BoolConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->cmp(targetRegister, tempReg);
                             break;
@@ -1163,7 +1278,7 @@ void CodeGen::generateX86()
                     auto& targetName = target->getString();
                     if (registerMap.find(targetName) == registerMap.end())
                     {
-                        auto newReg = m_cc->newGp32(targetName.c_str());
+                        auto newReg = m_cc->new_gp64(targetName.c_str());
                         registerMap[targetName] = newReg;
                     }
 
@@ -1201,7 +1316,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<IntConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->cmp(targetRegister, tempReg);
                             break;
@@ -1210,7 +1325,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<BoolConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->cmp(targetRegister, tempReg);
                             break;
@@ -1238,7 +1353,7 @@ void CodeGen::generateX86()
                     auto& targetName = target->getString();
                     if (registerMap.find(targetName) == registerMap.end())
                     {
-                        auto newReg = m_cc->newGp32(targetName.c_str());
+                        auto newReg = m_cc->new_gp64(targetName.c_str());
                         registerMap[targetName] = newReg;
                     }
 
@@ -1276,7 +1391,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<IntConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->cmp(targetRegister, tempReg);
                             break;
@@ -1285,7 +1400,7 @@ void CodeGen::generateX86()
                         {
                             auto casted =
                                 std::dynamic_pointer_cast<BoolConstInst>(operand2);
-                            auto tempReg = m_cc->newGp32();
+                            auto tempReg = m_cc->new_gp64();
                             m_cc->mov(tempReg, casted->getVal());
                             m_cc->cmp(targetRegister, tempReg);
                             break;
@@ -1310,7 +1425,7 @@ void CodeGen::generateX86()
                     if (labelMap.find(targetLabelName) == labelMap.end())
                     {
                         labelMap[targetLabelName] =
-                            m_cc->newNamedLabel(targetLabelName.c_str());
+                            m_cc->new_named_label(targetLabelName.c_str());
                     }
                     auto& label = labelMap[targetLabelName];
                     m_cc->jmp(label);
@@ -1325,7 +1440,7 @@ void CodeGen::generateX86()
                     if (labelMap.find(failLabelName) == labelMap.end())
                     {
                         labelMap[failLabelName] =
-                            m_cc->newNamedLabel(failLabelName.c_str());
+                            m_cc->new_named_label(failLabelName.c_str());
                     }
                     auto& label = labelMap[failLabelName];
                     switch (state.last_comparison_type)
@@ -1361,7 +1476,7 @@ void CodeGen::generateX86()
                     if (labelMap.find(failLabelName) == labelMap.end())
                     {
                         labelMap[failLabelName] =
-                            m_cc->newNamedLabel(failLabelName.c_str());
+                            m_cc->new_named_label(failLabelName.c_str());
                     }
                     auto& label = labelMap[failLabelName];
                     switch (state.last_comparison_type)
@@ -1391,6 +1506,7 @@ void CodeGen::generateX86()
 
                 case InstType::Put:
                 {
+                    //break;
                     auto putInst = std::dynamic_pointer_cast<PutInst>(currInst);
                     auto& operands = putInst->getOperands();
                     for (int i = 0; i < operands.size(); ++i)
@@ -1427,6 +1543,7 @@ void CodeGen::generateX86()
                             }
                             case InstType::StrConst:
                             {
+                                //break;
                                 auto strConstInst =
                                     std::dynamic_pointer_cast<StrConstInst>(
                                         operand);
@@ -1445,6 +1562,7 @@ void CodeGen::generateX86()
                             }
                             default:
                             {
+                                //break;
                                 // todo: check data type, and print true/false or integer based on data type
                                 // assume integer
                                 auto identifierInst =
@@ -1464,8 +1582,8 @@ void CodeGen::generateX86()
 
                                 auto& reg =
                                     registerMap[result];
-                                m_cc->mov(asmjit::x86::ecx, reg);
-                                m_cc->add(asmjit::x86::ecx, '0');
+                                m_cc->mov(asmjit::x86::rcx, reg);
+                                m_cc->add(asmjit::x86::rcx, '0');
                                 asmjit::Imm printWithParamAddr =
                                     asmjit::Imm((void*)putchar);
                                 m_cc->sub(asmjit::x86::rsp, 32);
@@ -1485,12 +1603,12 @@ void CodeGen::generateX86()
                     auto& targetName = target->getString();
                     if (registerMap.find(targetName) == registerMap.end())
                     {
-                        auto newReg = m_cc->newGp32(targetName.c_str());
+                        auto newReg = m_cc->new_gp64(targetName.c_str());
                         registerMap[targetName] = newReg;
                     }
                     auto& targetRegister = registerMap[targetName];
                     syscallScanInt(m_cc, targetRegister);
-                    m_cc->mov(targetRegister, asmjit::x86::eax);
+                    m_cc->mov(targetRegister, asmjit::x86::rax);
                     break;
                 }
                 case InstType::Push:
@@ -1563,7 +1681,16 @@ void CodeGen::generateX86()
     }
 
     m_cc->ret();
-    m_cc->endFunc();   // End of the function body.
+    m_cc->end_func();   // End of the function body.
+
+    //asmjit::FuncNode* func_node = m_cc->addFunc(
+    //              asmjit::FuncSignature::build<void, int>());
+    //              auto x = m_cc->newGp64();  // Function x argument.
+    //              m_cc->mov(x, x);
+    //              func_node->setArg(0, x);
+    //              m_cc->ret();
+    //              m_cc->endFunc();
+
     m_cc->finalize();  // Translate and assemble the whole 'm_cc' content.    
 
     std::cout << "==================================" << std::endl;
@@ -1571,11 +1698,11 @@ void CodeGen::generateX86()
     asmjit::Error err = m_rt.add(&fn, &m_code);
     std::cout << m_logger.content().data() << std::endl;
 
-    if (err)
+    if (err != asmjit::Error::kOk)
     {
-        printf("AsmJit failed: %s\n", asmjit::DebugUtils::errorAsString(err));
-        return;
+        return;  // Handle a possible error returned by AsmJit.
     }
+
 
     fn();
     std::cout << "JIT executed!\n";

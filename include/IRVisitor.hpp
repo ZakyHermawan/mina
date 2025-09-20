@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SSA.hpp"
+#include "CodeGen.hpp"
 #include "Visitors.hpp"
 #include "BasicBlock.hpp"
 #include "Types.hpp"
@@ -27,6 +28,7 @@ private:
     std::stack<std::string> m_labels;
 
     SSA m_ssa;
+    CodeGen m_cg;
 
     std::shared_ptr<BasicBlock> m_currentBB; // current basic block
     std::unordered_map<std::string, std::shared_ptr<BasicBlock>> m_funcBB;
@@ -37,8 +39,7 @@ private:
     asmjit::FileLogger m_logger;  // Logger should always survive CodeHolder.
 
     asmjit::x86::Gp m_tmp;
-
-public:
+   public:
     IRVisitor();
     void visit(StatementsAST& v) override;
     void visit(NumberAST& v) override;

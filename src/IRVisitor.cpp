@@ -17,8 +17,11 @@ IRVisitor::IRVisitor()
       m_jitRuntime(),
       m_codeHolder(),
       m_assembler(&m_codeHolder),
-      m_logger(stdout)
+      m_logger(stdout),
+      m_ssa{},
+      m_cg{m_ssa}
 {
+    //m_cg = CodeGen{m_ssa};
     m_currentBB = m_ssa.getCFG();
 }
 
@@ -245,8 +248,7 @@ void IRVisitor::visit(ProgramAST& v)
         }
     }
 
-    CodeGen cg(m_ssa);
-    cg.generateX86();
+    m_cg.generateX86();
 }
 
 void IRVisitor::visit(ScopeAST& v)
@@ -1111,6 +1113,9 @@ void IRVisitor::visit(ProcDeclAST& v)
     auto funcSignature = std::make_shared<FuncSignature>(
         procName, FType::PROC, Type::UNDEFINED, m_parameters, m_currentBB);
     m_currentBB->pushInst(funcSignature);
+
+    unsigned int paramSize = m_parameters.size();
+    //m_cg.generateFunc(false, paramSize);
 
     //generateX86(); try to generate the function here, but don't execute, save it so we can syscall later
     m_currentBB = oldBB;
