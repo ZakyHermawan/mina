@@ -65,7 +65,6 @@ int main(int argc, char* argv[])
     cc.invoke(Out(invoke_node), dummy->label(),
               FuncSignature::build<int>());
 
-
     invoke_node->set_ret(0, g);
     cc.mov(x86::rax, g);
 

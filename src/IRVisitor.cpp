@@ -1110,13 +1110,14 @@ void IRVisitor::visit(ProcDeclAST& v)
     }
 
     scope->accept(*this);
+
+    // generateX86(); try to generate the function here, but don't execute, save it so we can syscall later
+    m_currentBB = oldBB;
+
     auto funcSignature = std::make_shared<FuncSignature>(
         procName, FType::PROC, Type::UNDEFINED, m_parameters, m_currentBB);
     m_currentBB->pushInst(funcSignature);
     m_cg.generateFuncNode(false, m_parameters.size());
-
-    //generateX86(); try to generate the function here, but don't execute, save it so we can syscall later
-    m_currentBB = oldBB;
     return;
 }
 

@@ -1121,11 +1121,24 @@ std::string FuncSignature::getString()
         {
             res += ", ";
         }
-        auto param = m_parameters[i]->getName();
-        res += param;
+        std::shared_ptr<IdentifierAST> param = m_parameters[i];
+        std::string& paramName = param->getName();
+        res += paramName + " : ";
+        if (param->getType() == Type::INTEGER)
+        {
+            res += "integer";
+        }
+        else if (param->getType() == Type::BOOLEAN)
+        {
+            res += "boolean";
+        }
+        else
+        {
+            throw std::runtime_error("parameter should not have undefined type!");
+        }
     }
 
-    res += "):\n";
+    res += ")";
     return res;
 }
 void FuncSignature::push_user(std::shared_ptr<Inst> user)
