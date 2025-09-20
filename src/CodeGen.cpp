@@ -10,8 +10,6 @@
 typedef int (*Func)(void);
 //typedef int (*xFunc)(void, int);
 
-asmjit::FuncNode* fooFunc;
-auto fSig = asmjit::FuncSignature::build<void, int>();
 
 CodeGen::CodeGen(SSA ssa) : m_ssa{ssa}, m_logger{}, m_rt{}, m_code{}
 {
@@ -94,101 +92,69 @@ void CodeGen::syscallScanInt(std::shared_ptr<asmjit::x86::Compiler> m_cc,
     m_cc->mov(reg, asmjit::x86::rax);
 }
 
-void CodeGen::generateFunc(bool haveRet, unsigned int numberOfArg)
+void CodeGen::generateFuncNode(bool haveRet, unsigned int numberOfArg)
 {
     if (numberOfArg > 4)
     {
         throw std::runtime_error("Only support procedure up to 4 parameter");
     }
 
+    asmjit::FuncNode* funcNode = nullptr;
+
     switch (numberOfArg)
     {
         case 0:
             if (haveRet)
             {
-                m_cc->add_func(asmjit::FuncSignature::build<int>());
+                funcNode = m_cc->new_func(asmjit::FuncSignature::build<int>());
             }
             else
             {
-                m_cc->add_func(asmjit::FuncSignature::build<void>());
+                funcNode = m_cc->add_func(asmjit::FuncSignature::build<void>());
             }
             break;
         case 1:
             if (haveRet)
             {
-                m_cc->add_func(asmjit::FuncSignature::build<int, int>());
+                funcNode = m_cc->add_func(asmjit::FuncSignature::build<int, int>());
             }
             else
             {
-
-                    // --- Generate foo function (not called) ---
-              {
-                fooFunc = m_cc->add_func(asmjit::FuncSignature::build<void, int>());
-                //m_cc->end_func();
-                // (foo does nothing, just returns 42)
-                //m_cc->mov(asmjit::x86::eax, asmjit::x86::eax);
-                //m_cc->ret();
-                //m_cc->endFunc();
-              }
-
-
-                //Func useless;
-                //asmjit::CodeHolder code;
-                //asmjit::x86::Compiler newCC;
-                //newCC.push(asmjit::x86 ::rbp);
-                //newCC.mov(asmjit::x86 ::rbp, asmjit::x86 ::rsp);
-                //newCC.pop(asmjit::x86 ::rbp);
-                 //m_cc->ret();
-                //asmjit::Error err = m_rt.add(&useless, &code);
-                // 
-                // 
-                //useless();
-                //auto funcLabel = m_cc->new_named_label("asd");
-                //auto firstReg = getFirstArgumentRegister(m_cc);
-                //m_cc->bind(funcLabel);
-                //m_cc->push(asmjit::x86 ::rbp);
-                //m_cc->mov(asmjit::x86 ::rbp, asmjit::x86 ::rsp);
-                //m_cc->pop(asmjit::x86 ::rbp);
-                //m_cc->ret();
-                //m_cc->addFunc(asmjit::FuncSignature::build<void, int>());
-                //m_cc->nop();
-                //m_cc->ret();
-                //m_cc->endFunc();
+                funcNode = m_cc->new_func(asmjit::FuncSignature::build<void, int>());
             }
             break;
         case 2:
             if (haveRet)
             {
-                m_cc->add_func(asmjit::FuncSignature::build<int, int, int>());
+                funcNode = m_cc->add_func(asmjit::FuncSignature::build<int, int, int>());
             }
             else
             {
-                m_cc->add_func(asmjit::FuncSignature::build<void, int, int>());
+                funcNode = m_cc->add_func(asmjit::FuncSignature::build<void, int, int>());
             }
             break;
         case 3:
             if (haveRet)
             {
-                m_cc->add_func(asmjit::FuncSignature::build<int, int, int, int>());
+                funcNode = m_cc->add_func(asmjit::FuncSignature::build<int, int, int, int>());
             }
             else
             {
-                m_cc->add_func(asmjit::FuncSignature::build<void, int, int, int>());
+                funcNode = m_cc->add_func(asmjit::FuncSignature::build<void, int, int, int>());
             }
             break;
         case 4:
             if (haveRet)
             {
-                m_cc->add_func(asmjit::FuncSignature::build<int, int, int, int, int>());
+                funcNode = m_cc->add_func(asmjit::FuncSignature::build<int, int, int, int, int>());
             }
             else
             {
-                m_cc->add_func(asmjit::FuncSignature::build<void, int, int, int, int>());
+                funcNode = m_cc->add_func(asmjit::FuncSignature::build<void, int, int, int, int>());
             }
             break;
     }
-    //m_cc->ret();
-    //m_cc->endFunc();
+    m_funcNodes.push_back(funcNode);
 }
 
 void CodeGen::generateX86()
@@ -203,20 +169,7 @@ void CodeGen::generateX86()
 
     // fn(void)` signature.
     m_cc->add_func(asmjit::FuncSignature::build<void>());
-    asmjit::InvokeNode* invoke_node;
-    asmjit::FuncNode* fooFunc;
-    auto fSig = asmjit::FuncSignature::build<void, int>();
 
-    //m_cc->invoke(asmjit::Out(invoke_node), fooFunc->label(), fSig);
-
-
-    //asmjit::InvokeNode* invoke_node;       // Function invocation:
-    //m_cc->call()
-    //m_cc->invoke(asmjit::Out(invoke_node),    //   - InvokeNode (output).
-    //          func_node->label(),  //   - Function address or Label.
-    //          FuncSignature::build<int, int>());  //   - Function signature.
-
-    //m_cc->invoke()
     std::unordered_map<std::string, asmjit::x86::Gp> registerMap;
     std::unordered_map<std::string, asmjit::Label> labelMap;
 
@@ -1681,16 +1634,7 @@ void CodeGen::generateX86()
     }
 
     m_cc->ret();
-    m_cc->end_func();   // End of the function body.
-
-    //asmjit::FuncNode* func_node = m_cc->addFunc(
-    //              asmjit::FuncSignature::build<void, int>());
-    //              auto x = m_cc->newGp64();  // Function x argument.
-    //              m_cc->mov(x, x);
-    //              func_node->setArg(0, x);
-    //              m_cc->ret();
-    //              m_cc->endFunc();
-
+    m_cc->end_func();
     m_cc->finalize();  // Translate and assemble the whole 'm_cc' content.    
 
     std::cout << "==================================" << std::endl;

@@ -1113,9 +1113,7 @@ void IRVisitor::visit(ProcDeclAST& v)
     auto funcSignature = std::make_shared<FuncSignature>(
         procName, FType::PROC, Type::UNDEFINED, m_parameters, m_currentBB);
     m_currentBB->pushInst(funcSignature);
-
-    unsigned int paramSize = m_parameters.size();
-    //m_cg.generateFunc(false, paramSize);
+    m_cg.generateFuncNode(false, m_parameters.size());
 
     //generateX86(); try to generate the function here, but don't execute, save it so we can syscall later
     m_currentBB = oldBB;

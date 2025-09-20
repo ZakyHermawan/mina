@@ -21,6 +21,8 @@ class CodeGen
 	// compiler is used to generate code
 	std::shared_ptr<asmjit::x86::Compiler> m_cc;
 
+	std::vector<asmjit::FuncNode*> m_funcNodes;
+
 public:
 	CodeGen(SSA ssa);
 
@@ -34,6 +36,7 @@ public:
     void syscallPrintString(std::shared_ptr<asmjit::x86::Compiler> cc, std::string& str);
 	void syscallScanInt(std::shared_ptr<asmjit::x86::Compiler> cc, asmjit::x86::Gp reg);
 
-	void generateFunc(bool haveRet, unsigned int numberOfArg);
+	void generateFuncNode(bool haveRet, unsigned int numberOfArg);
+
 	void generateX86();
 };
