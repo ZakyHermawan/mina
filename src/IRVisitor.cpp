@@ -98,155 +98,13 @@ void IRVisitor::visit(ProgramAST& v)
     v.getScope()->accept(*this);
     m_ssa.sealBlock(m_currentBB);
 
+    std::cout << "Before renaming: \n";
+    m_ssa.printCFG();
+    m_ssa.renameSSA();
+
+    std::cout << "After renaming: \n";
     m_ssa.printCFG();
 
-    DisjointSetUnion dsu;
-
-    // BFS
-    std::queue<std::shared_ptr<BasicBlock>> worklist;
-    std::set<std::shared_ptr<BasicBlock>> visited;
-    worklist.push(m_ssa.getCFG());
-    visited.insert(m_ssa.getCFG());
-    std::vector<std::string> variables;
-
-    while (!worklist.empty())
-    {
-        std::shared_ptr<BasicBlock> current_bb = worklist.front();
-        visited.insert(current_bb);
-        worklist.pop();
-
-        auto& instructions = current_bb->getInstructions();
-
-        for (unsigned int i = 0; i < instructions.size(); ++i)
-        {
-            auto& currInst = instructions[i];
-            auto& target = currInst->getTarget();
-            auto& targetStr = target->getString();
-            dsu.make_set(targetStr);
-            if (currInst->isPhi())
-            {
-                auto& operands = currInst->getOperands();
-                for (int i = 0; i < operands.size(); ++i)
-                {
-                    auto& opStr = operands[i]->getString();
-                    dsu.unite(targetStr, opStr);
-                }
-            }
-            variables.push_back(targetStr);
-        }
-
-        for (const auto& successor : current_bb->getSuccessors())
-        {
-            if (visited.find(successor) == visited.end())
-            {
-                visited.insert(successor);
-                worklist.push(successor);
-            }
-        }
-    }
-
-    // 1. Create a map to hold the final name for each set's root.
-    std::unordered_map<std::string, std::string> root_to_new_name;
-
-    // 2. Choose a representative name for each set.
-    //    A common convention is to use the original name without the SSA suffix.
-    for (const auto& var : variables) {
-        std::string root = dsu.find(var);
-        if (root_to_new_name.find(root) == root_to_new_name.end()) {
-            // Example: if root is "x_1", new name becomes "x".
-            std::string base_name = root.substr(0, root.find('.')); 
-            root_to_new_name[root] = base_name;
-        }
-    }
-
-    // 3. Create the final, full renaming map for all variables.
-    std::unordered_map<std::string, std::string> final_rename_map;
-    for (const auto& var : variables) {
-        std::string root = dsu.find(var);
-        final_rename_map[var] = root_to_new_name[root];
-    }
-
-    // BFS
-    worklist = {};
-    visited = {};
-
-    worklist.push(m_ssa.getCFG());
-
-    while (!worklist.empty())
-    {
-        std::shared_ptr<BasicBlock> current_bb = worklist.front();
-        visited.insert(current_bb);
-        worklist.pop();
-
-        auto& instructions = current_bb->getInstructions();
-        if (instructions.size() == 0)
-        {
-            continue;
-        }
-
-        unsigned int instruction_idx = 0;
-        while (true)
-        {
-            if (instruction_idx == instructions.size())
-            {
-                break;
-            }
-
-            auto& currInst = instructions[instruction_idx];
-            auto& target = currInst->getTarget();
-            auto& operands = currInst->getOperands();
-            auto& targetStr = target->getString();
-
-            if (currInst->isPhi())
-            {
-                instructions.erase(instructions.begin() + instruction_idx);
-                continue;
-            }
-            else
-            {
-                if (root_to_new_name.find(targetStr) == root_to_new_name.end())
-                {
-                    throw std::runtime_error("can't find target str " + targetStr + "in the hashmap");
-                }
-                auto& new_target_str = root_to_new_name[targetStr];
-
-                std::shared_ptr<IdentInst> newTargetInst = std::make_shared<IdentInst>(new_target_str, currInst->getBlock());
-                auto& operands = currInst->getOperands();
-                for (int i = 0; i < operands.size(); ++i)
-                {
-                    if (operands[i]->canBeRenamed() == false)
-                    {
-                        continue;
-                    }
-                    auto& operandTarget = operands[i]->getTarget();
-                    auto& operandTargetStr = operandTarget->getString();
-                    if (root_to_new_name.find(operandTargetStr) ==
-                        root_to_new_name.end())
-                    {
-                        continue;
-                    }
-
-                    auto& new_operand_target_str = root_to_new_name[operandTargetStr];
-                    std::shared_ptr<IdentInst> newOperandTargetInst =
-                        std::make_shared<IdentInst>(new_operand_target_str,
-                                                    currInst->getBlock());
-                    operands[i] = newOperandTargetInst;
-                }
-                currInst->setTarget(newTargetInst);
-            }
-            ++instruction_idx;
-        }
-
-        for (const auto& successor : current_bb->getSuccessors())
-        {
-            if (visited.find(successor) == visited.end())
-            {
-                visited.insert(successor);
-                worklist.push(successor);
-            }
-        }
-    }
-    
     SSA old = m_ssa;
     m_cg.setSSA(old);
     m_cg.generateX86("main");
@@ -255,6 +113,13 @@ void IRVisitor::visit(ProgramAST& v)
     {
         SSA newSSA;
         newSSA.setCFG(func);
+
+        // todo: correctly implement rename for function signature,
+        // one of the solution:
+        // make special case for parameters in function signature,
+        // make every parameter declaration as definition a new variable
+        // then just do phiweb
+        newSSA.renameSSA();
         newSSA.printCFG();
         m_cg.setSSA(newSSA);
         m_cg.generateX86(key);

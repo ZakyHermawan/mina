@@ -1556,7 +1556,7 @@ void CodeGen::generateX86(std::string funcName)
                                 {
                                     result = st;
                                 }
-                                std::cout << "print var " << result << std::endl;
+
                                 auto it = registerMap.find(result);
                                 if (it == registerMap.end())
                                 {

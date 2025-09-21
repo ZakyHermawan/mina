@@ -41,6 +41,8 @@ public:
                                          std::shared_ptr<PhiInst> phi);
     std::shared_ptr<Inst> tryRemoveTrivialPhi(std::shared_ptr<PhiInst> phi);
     void sealBlock(std::shared_ptr<BasicBlock> block);
+    
+    void renameSSA();
 
 private:
     std::string m_currBBNameWithoutCtr;
