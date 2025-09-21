@@ -398,6 +398,30 @@ void SSA::renameSSA()
                 instructions.erase(instructions.begin() + instruction_idx);
                 continue;
             }
+            else if (currInst->getInstType() == InstType::Call)
+            {
+                auto& operands = currInst->getOperands();
+                for (int i = 0; i < operands.size(); ++i)
+                {
+                    if (operands[i]->canBeRenamed() == false)
+                    {
+                        continue;
+                    }
+                    auto& operandTarget = operands[i]->getTarget();
+                    auto& operandTargetStr = operandTarget->getString();
+                    if (root_to_new_name.find(operandTargetStr) ==
+                        root_to_new_name.end())
+                    {
+                        continue;
+                    }
+
+                    auto& new_operand_target_str = root_to_new_name[operandTargetStr];
+                    std::shared_ptr<IdentInst> newOperandTargetInst =
+                        std::make_shared<IdentInst>(new_operand_target_str,
+                                                    currInst->getBlock());
+                    operands[i] = newOperandTargetInst;
+                }
+            }
             else
             {
                 if (root_to_new_name.find(targetStr) == root_to_new_name.end())

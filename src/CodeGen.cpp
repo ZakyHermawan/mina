@@ -40,10 +40,19 @@ asmjit::x86::Gp CodeGen::getSecondArgumentRegister()
 void CodeGen::syscallPutChar(char c)
 {
     asmjit::x86::Gp arg1_reg = getFirstArgumentRegister();
+
+    // spill for caller saved register
+    m_cc->sub(asmjit::x86::rsp, 8);
+    m_cc->mov(asmjit::x86::dword_ptr(asmjit::x86::rsp), arg1_reg);
+
     m_cc->mov(arg1_reg, c);
     m_cc->sub(asmjit::x86::rsp, 32);
     m_cc->call(putchar);
     m_cc->add(asmjit::x86::rsp, 32);
+
+    // restore spilled register
+    m_cc->mov(arg1_reg, asmjit::x86::dword_ptr(asmjit::x86::rsp));
+    m_cc->add(asmjit::x86::rsp, 8);
 }
 
 // implement printf("%d", val);
@@ -52,6 +61,11 @@ void CodeGen::syscallPrintInt(int val)
     asmjit::x86::Gp arg1_reg = getFirstArgumentRegister();
     asmjit::x86::Gp arg2_reg = getSecondArgumentRegister();
     
+    // spill for caller saved register
+    m_cc->sub(asmjit::x86::rsp, 16);
+    m_cc->mov(asmjit::x86::dword_ptr(asmjit::x86::rsp), arg1_reg);
+    m_cc->mov(asmjit::x86::dword_ptr(asmjit::x86::rsp, 8), arg2_reg);
+
     //// Allocate 16 bytes on the stack for the format string and the integer.
     m_cc->sub(asmjit::x86::rsp, 16);
     
@@ -67,6 +81,11 @@ void CodeGen::syscallPrintInt(int val)
     m_cc->add(asmjit::x86::rsp, 32);
     
     //// Restore stack
+    m_cc->add(asmjit::x86::rsp, 16);
+
+    // restore spilled register
+    m_cc->mov(arg1_reg, asmjit::x86::dword_ptr(asmjit::x86::rsp));
+    m_cc->mov(arg2_reg, asmjit::x86::dword_ptr(asmjit::x86::rsp, 8));
     m_cc->add(asmjit::x86::rsp, 16);
 }
 
@@ -1563,15 +1582,47 @@ void CodeGen::generateX86(std::string funcName)
                                     exit(1);
                                 }
 
-                                auto& reg =
-                                    registerMap[result];
-                                m_cc->mov(asmjit::x86::rcx, reg);
-                                m_cc->add(asmjit::x86::rcx, '0');
-                                asmjit::Imm printWithParamAddr =
-                                    asmjit::Imm((void*)putchar);
+                                asmjit::x86::Gp arg1_reg = getFirstArgumentRegister();
+                                asmjit::x86::Gp arg2_reg = getSecondArgumentRegister();
+
+                                auto& newReg = m_cc->new_gp64();
+                                m_cc->mov(newReg, registerMap[result]);
+    
+                                // spill for caller saved register
+                                m_cc->sub(asmjit::x86::rsp, 16);
+                                m_cc->mov(
+                                    asmjit::x86::word_ptr(asmjit::x86::rsp),
+                                    arg1_reg);
+                                m_cc->mov(
+                                    asmjit::x86::word_ptr(asmjit::x86::rsp, 8),
+                                    arg2_reg);
+
+                                //// Allocate 16 bytes on the stack for the format string and the integer.
+                                m_cc->sub(asmjit::x86::rsp, 16);
+
+                                //// Write "%d\0" as a string to [rsp]. "%d" is 0x6425, null terminator is 0.
+                                m_cc->mov(asmjit::x86::word_ptr(asmjit::x86::rsp), 0x6425);  // "%d"
+                                m_cc->mov(asmjit::x86::byte_ptr(asmjit::x86::rsp, 2), 0);    // null terminator
+
+                                m_cc->lea(arg1_reg, asmjit::x86::ptr(
+                                                        asmjit::x86::rsp));
+                                m_cc->mov(arg2_reg, newReg);
+
                                 m_cc->sub(asmjit::x86::rsp, 32);
-                                m_cc->call(printWithParamAddr);
+                                m_cc->call(printf);
                                 m_cc->add(asmjit::x86::rsp, 32);
+
+                                //// Restore stack
+                                m_cc->add(asmjit::x86::rsp, 16);
+
+                                // restore spilled register
+                                m_cc->mov(arg1_reg,
+                                    asmjit::x86::word_ptr(asmjit::x86::rsp)
+                                );
+                                m_cc->mov(arg2_reg,
+                                    asmjit::x86::word_ptr(asmjit::x86::rsp, 8)
+                                );
+                                m_cc->add(asmjit::x86::rsp, 16);
                                 break;
                             }
                         }
@@ -1665,13 +1716,24 @@ void CodeGen::generateX86(std::string funcName)
                                          funcNode->label(), funcSig);
                             invoke_node->set_arg(0, newReg);
                         }
+                        else if (operand->getInstType() == InstType::Ident)
+                        {
+                            auto& identInst = std::dynamic_pointer_cast<IdentInst>(operand);
+                            std::string& identName = identInst->getString();
+                            auto it = registerMap.find(identName);
+                            if (it == registerMap.end())
+                            {
+                                throw std::runtime_error("unknown identifier");
+                            }
+                            m_cc->invoke(asmjit::Out(invoke_node),
+                                         funcNode->label(), funcSig);
+                            invoke_node->set_arg(0, registerMap[identName]);
+                        }
                         else
                         {
                             throw std::runtime_error("argument type other than int and identifier is not implemented yet");
                         }
                     }
-
-                    //invoke_node->set_ret(0, g);
                     break;
                 }
 
@@ -1698,8 +1760,11 @@ void CodeGen::generateX86(std::string funcName)
                             }
                             else
                             {
+                                // Assign register to parameter definition.
                                 std::string& name = identAST->getName();
-                                registerMap[name] = getFirstArgumentRegister();
+                                auto& newReg = m_cc->new_gp64();
+                                registerMap[name] = newReg;
+                                m_cc->mov(newReg, getFirstArgumentRegister());
                             }
                         }
                         else

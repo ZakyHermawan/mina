@@ -19,5 +19,6 @@
 	put(9123, skip)
 	put(true, skip)
 	empty()
-	something(3)
+	something(a)
+	something(19)
 }
