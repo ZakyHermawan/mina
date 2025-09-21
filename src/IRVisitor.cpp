@@ -1058,11 +1058,6 @@ void IRVisitor::visit(ParameterAST& v)
     auto identInst = std::make_shared<IdentInst>(m_ssa.baseNameToSSA(identName),
                                                  m_currentBB);
     m_ssa.writeVariable(identName, m_currentBB, identInst);
-
-    // we should remove this and implement lowerParam()
-    auto popInst = std::make_shared<PopInst>(identInst, m_currentBB);
-    popInst->setup_def_use();
-    m_currentBB->pushInst(popInst);
 }
 
 void IRVisitor::visit(ParametersAST& v)
