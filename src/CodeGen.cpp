@@ -37,7 +37,7 @@ asmjit::x86::Gp CodeGen::getSecondArgumentRegister(std::shared_ptr<asmjit::x86::
     return arg2_reg;
 }
 
-void CodeGen::syscallPutChar(std::shared_ptr<asmjit::x86::Compiler> m_cc, char c)
+void CodeGen::syscallPutChar(char c)
 {
     asmjit::x86::Gp arg1_reg = getFirstArgumentRegister(m_cc);
     m_cc->mov(arg1_reg, c);
@@ -47,7 +47,7 @@ void CodeGen::syscallPutChar(std::shared_ptr<asmjit::x86::Compiler> m_cc, char c
 }
 
 // implement printf("%d", val);
-void CodeGen::syscallPrintInt(std::shared_ptr<asmjit::x86::Compiler> m_cc, int val)
+void CodeGen::syscallPrintInt(int val)
 {
     asmjit::x86::Gp arg1_reg = getFirstArgumentRegister(m_cc);
     asmjit::x86::Gp arg2_reg = getSecondArgumentRegister(m_cc);
@@ -70,17 +70,15 @@ void CodeGen::syscallPrintInt(std::shared_ptr<asmjit::x86::Compiler> m_cc, int v
     m_cc->add(asmjit::x86::rsp, 16);
 }
 
-void CodeGen::syscallPrintString(std::shared_ptr<asmjit::x86::Compiler> m_cc,
-                                 std::string& str)
+void CodeGen::syscallPrintString(std::string& str)
 {
   for (int i = 0; i < str.size(); ++i)
   {
-      syscallPutChar(m_cc, str[i]);
+      syscallPutChar(str[i]);
   }
 }
 
-void CodeGen::syscallScanInt(std::shared_ptr<asmjit::x86::Compiler> m_cc,
-                             asmjit::x86::Gp reg)
+void CodeGen::syscallScanInt(asmjit::x86::Gp reg)
 {
     // currently, can only scan one digit integer
     asmjit::x86::Gp arg1_reg = getFirstArgumentRegister(m_cc);
@@ -1500,7 +1498,7 @@ void CodeGen::generateX86(std::string funcName)
                             {
                                 auto intConstInst = std::dynamic_pointer_cast<IntConstInst>(operand);
                                 auto val = intConstInst->getVal();
-                                syscallPrintInt(m_cc, val);
+                                syscallPrintInt(val);
                                 break;
                             }
                             case InstType::BoolConst:
@@ -1514,11 +1512,11 @@ void CodeGen::generateX86(std::string funcName)
                                 
                                 if (val)
                                 {
-                                    syscallPrintString(m_cc, std::string("true"));
+                                    syscallPrintString(std::string("true"));
                                 }
                                 else
                                 {
-                                    syscallPrintString(m_cc, std::string("false"));
+                                    syscallPrintString(std::string("false"));
                                 }
                                 break;
                             }
@@ -1530,13 +1528,13 @@ void CodeGen::generateX86(std::string funcName)
                                 auto& val = strConstInst->getString();
                                 if (val == "\'\\n\'")
                                 {
-                                    syscallPutChar(m_cc, '\n');
+                                    syscallPutChar('\n');
                                     break;
                                 }
                                 for (int i = 0; i < val.length(); ++i)
                                 {
                                     if(val[i] == '\"' || val[i] == '\'') continue;
-                                    syscallPutChar(m_cc, val[i]);
+                                    syscallPutChar(val[i]);
                                 }
                                 break;
                             }
@@ -1573,7 +1571,6 @@ void CodeGen::generateX86(std::string funcName)
                                     asmjit::Imm((void*)putchar);
                                 m_cc->sub(asmjit::x86::rsp, 32);
                                 m_cc->call(printWithParamAddr);
-                                //syscallPutChar(m_cc, );
                                 m_cc->add(asmjit::x86::rsp, 32);
                                 break;
                             }
@@ -1593,7 +1590,7 @@ void CodeGen::generateX86(std::string funcName)
                         registerMap[targetName] = newReg;
                     }
                     auto& targetRegister = registerMap[targetName];
-                    syscallScanInt(m_cc, targetRegister);
+                    syscallScanInt(targetRegister);
                     m_cc->mov(targetRegister, asmjit::x86::rax);
                     break;
                 }

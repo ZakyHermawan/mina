@@ -39,10 +39,10 @@ public:
 	asmjit::x86::Gp CodeGen::getSecondArgumentRegister(
 		std::shared_ptr<asmjit::x86::Compiler> cc);
 
-	void syscallPutChar(std::shared_ptr<asmjit::x86::Compiler> cc, char c);
-    void syscallPrintInt(std::shared_ptr<asmjit::x86::Compiler> cc, int val); // implement printf("%d", val);
-    void syscallPrintString(std::shared_ptr<asmjit::x86::Compiler> cc, std::string& str);
-	void syscallScanInt(std::shared_ptr<asmjit::x86::Compiler> cc, asmjit::x86::Gp reg);
+	void syscallPutChar(char c);
+    void syscallPrintInt(int val);
+    void syscallPrintString(std::string& str);
+	void syscallScanInt(asmjit::x86::Gp reg);
 
 	void generateFuncNode(std::string& funcName, bool haveRet,
 						  unsigned int numberOfArg);
