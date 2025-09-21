@@ -284,6 +284,12 @@ void SSA::sealBlock(std::shared_ptr<BasicBlock> block)
     m_sealedBlocks.insert(block);
 }
 
+// use DSU data structure to collect all related variable name
+// for example: x.0 and x.1 are related, so we group them together in one set
+// later, we rename all of these related variable
+
+// please improve this algorithm using better out of SSA algorithm before implementing optimizations,
+// some optimization like coalescing can make this algorithm wrong.
 void SSA::renameSSA()
 {
     DisjointSetUnion dsu;
@@ -309,12 +315,16 @@ void SSA::renameSSA()
             auto& target = currInst->getTarget();
             auto& targetStr = target->getString();
             dsu.make_set(targetStr);
+
             if (currInst->isPhi())
             {
                 auto& operands = currInst->getOperands();
                 for (int i = 0; i < operands.size(); ++i)
                 {
                     auto& opStr = operands[i]->getString();
+
+                    // Merges two sets that targetStr and opStr belong to.
+                    // Create phiweb.
                     dsu.unite(targetStr, opStr);
                 }
             }

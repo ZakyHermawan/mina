@@ -1149,7 +1149,6 @@ void FuncSignature::setup_def_use()
 {
     // do nothing, since function signature did not use anything
 }
-
 std::shared_ptr<BasicBlock> FuncSignature::getBlock() { return m_block; }
 InstType FuncSignature::getInstType() const { return InstType::FuncSignature; }
 
@@ -1215,7 +1214,6 @@ void LowerFunc::setup_def_use()
 {
     // do nothing, since function signature did not use anything
 }
-
 std::shared_ptr<BasicBlock> LowerFunc::getBlock() { return m_block; }
 InstType LowerFunc::getInstType() const { return InstType::LowerFunc; }
 

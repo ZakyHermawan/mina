@@ -286,6 +286,7 @@ void IRVisitor::visit(OutputsAST& v)
                 // This is clearly an identifier.
                 if (temp[0] == '\"')
                 {
+                    // this is a string const
                     auto operand =
                         std::make_shared<StrConstInst>(temp, m_currentBB);
                     operand->setup_def_use();
@@ -297,7 +298,7 @@ void IRVisitor::visit(OutputsAST& v)
                 else
                 {
                     auto operand = std::make_shared<IdentInst>(
-                      m_ssa.getCurrentSSAName(temp), m_currentBB);
+                        m_ssa.getCurrentSSAName(temp), m_currentBB);
                     operand->setup_def_use();
                     auto inst = std::make_shared<PutInst>(std::move(operand),
                                                           m_currentBB);
@@ -919,10 +920,12 @@ void IRVisitor::visit(ParameterAST& v)
     m_parameters.push_back(ident);
 
     // curerntBB here is the basic block for the function declaration
-    auto identName = ident->getName();
+    std::string& identName = ident->getName();
     auto identInst = std::make_shared<IdentInst>(m_ssa.baseNameToSSA(identName),
                                                  m_currentBB);
-    m_ssa.writeVariable(identName, m_currentBB, identInst);
+    // Each parameter is a definition.
+    m_ssa.writeVariable(m_ssa.baseNameToSSA(identName), m_currentBB,
+                        identInst);
 }
 
 void IRVisitor::visit(ParametersAST& v)
