@@ -43,6 +43,7 @@ enum class InstType
     Pop,
     Return,
     FuncSignature,
+    LowerFunc,
     Call,
     Phi,
     Undef,
@@ -925,7 +926,36 @@ public:
     virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
-    //virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
+    virtual std::shared_ptr<BasicBlock> getBlock() override;
+    virtual InstType getInstType() const override;
+};
+
+class LowerFunc : public Inst
+{
+private:
+    std::string m_funcName;
+    FType m_fType;
+    Type m_retType;
+    std::vector<std::shared_ptr<Inst>> m_users;
+    std::vector<std::shared_ptr<IdentifierAST>> m_parameters;
+    std::shared_ptr<BasicBlock> m_block;
+
+public:
+    LowerFunc(std::string funcName, FType fType, Type retType,
+                  std::vector<std::shared_ptr<IdentifierAST>> parameters,
+                  std::shared_ptr<BasicBlock> block);
+    virtual ~LowerFunc() = default;
+    LowerFunc(const LowerFunc&) = delete;
+    LowerFunc(LowerFunc&&) noexcept = default;
+    LowerFunc& operator=(const LowerFunc&) = delete;
+    LowerFunc& operator=(LowerFunc&&) noexcept = default;
+
+    std::string getFuncName();
+    std::vector<std::shared_ptr<IdentifierAST>>& getParameters();
+
+    virtual std::string getString() override;
+    virtual void push_user(std::shared_ptr<Inst> user) override;
+    virtual void setup_def_use();
     virtual std::shared_ptr<BasicBlock> getBlock() override;
     virtual InstType getInstType() const override;
 };

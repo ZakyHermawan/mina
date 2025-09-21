@@ -1095,6 +1095,7 @@ std::shared_ptr<ExprAST> Parser::subscript() { return simpleExpression(); }
 std::shared_ptr<ExprAST> Parser::expression()
 {
     auto termsAST = simpleExpression();
+    if(termsAST == nullptr) return nullptr;
     auto optRelationAST = optRelation();
     return std::make_shared<ExpressionAST>(termsAST, optRelationAST);
 }
@@ -1170,6 +1171,7 @@ std::shared_ptr<ExprAST> Parser::optRelation()
 std::shared_ptr<ExprAST> Parser::simpleExpression()
 {
     auto termAST = term();
+    if(termAST == nullptr) return nullptr;
     auto termsAST = terms();
     return std::make_shared<SimpleExprAST>(termAST, termsAST);
 }
@@ -1218,6 +1220,7 @@ std::shared_ptr<ExprAST> Parser::terms()
 std::shared_ptr<ExprAST> Parser::term()
 {
     auto factorAST = factor();
+    if (factorAST == nullptr) return nullptr;
     auto factorsAST = factors();
     return std::make_shared<TermAST>(factorAST, factorsAST);
 }
@@ -1395,6 +1398,10 @@ std::shared_ptr<ExprAST> Parser::subsOrCall(std::string &identifier)
     {
         advance();
         auto argumentsAST = arguments();
+        if (argumentsAST == nullptr)
+        {
+            std::cout << "nullarg\n";
+        }
 
         if (getCurrTokenType() != RIGHT_PAREN)
         {
@@ -1471,10 +1478,16 @@ std::shared_ptr<ExprAST> Parser::subsOrCall(std::string &identifier)
         if (m_parsing_function)
         {
             m_instructions.push_back(LOAD);
-            auto addr = m_functionTab[m_lexical_level][m_procName]
+            auto addr = m_functionTab[m_lexical_level - 1][m_procName]
                           .getSymTab(identifier)
                           .getStackAddr();
             m_instructions.push_back(addr);
+
+            auto& bucket =
+                m_functionTab[m_lexical_level - 1][m_procName].getSymTab(
+                    identifier);
+            return std::make_shared<VariableAST>(identifier, bucket.getType(),
+                                                 IdentType::VARIABLE);
         }
         else
         {
@@ -1493,8 +1506,10 @@ std::shared_ptr<ExprAST> Parser::subsOrCall(std::string &identifier)
  * */
 std::shared_ptr<ArgumentsAST> Parser::arguments()
 {
-    m_arguments.push_back(0);  // just to resize
     auto exprAST = expression();
+    if (exprAST == nullptr) return nullptr;
+    m_arguments.push_back(exprAST);
+    
     auto argumentsAST = moreArguments();
     return std::make_shared<ArgumentsAST>(exprAST, argumentsAST);
 }

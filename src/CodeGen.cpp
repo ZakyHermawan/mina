@@ -1558,6 +1558,12 @@ void CodeGen::generateX86(std::string funcName)
                                 {
                                     result = st;
                                 }
+                                std::cout << "print var " << result << std::endl;
+                                auto it = registerMap.find(result);
+                                if (it == registerMap.end())
+                                {
+                                    exit(1);
+                                }
 
                                 auto& reg =
                                     registerMap[result];
@@ -1567,6 +1573,7 @@ void CodeGen::generateX86(std::string funcName)
                                     asmjit::Imm((void*)putchar);
                                 m_cc->sub(asmjit::x86::rsp, 32);
                                 m_cc->call(printWithParamAddr);
+                                //syscallPutChar(m_cc, );
                                 m_cc->add(asmjit::x86::rsp, 32);
                                 break;
                             }
@@ -1592,7 +1599,7 @@ void CodeGen::generateX86(std::string funcName)
                 }
                 case InstType::Push:
                 {
-                    auto pushInst = std::dynamic_pointer_cast<GetInst>(currInst);
+                    auto pushInst = std::dynamic_pointer_cast<PushInst>(currInst);
                     auto operand = pushInst->getOperands()[0]->getTarget();
                     auto operandType = operand->getInstType();
                     switch (operandType)
@@ -1641,12 +1648,31 @@ void CodeGen::generateX86(std::string funcName)
                     {
                         throw std::runtime_error("function name " + funcName + " not found!");
                     }
-                    //std::cout << "calling " << funcName << std::endl;
+
                     asmjit::FuncNode* funcNode = m_funcMap[funcName].first;
                     asmjit::FuncSignature funcSig = m_funcMap[funcName].second;
 
-                    //std::cout << (uint64_t)(funcNode->label()) << std::endl;
-                    m_cc->invoke(asmjit::Out(invoke_node), funcNode->label(), funcSig);
+                    if (funcSig == asmjit::FuncSignature::build<void>())
+                    {
+                        m_cc->invoke(asmjit::Out(invoke_node), funcNode->label(), funcSig);
+                    }
+                    else if (funcSig == asmjit::FuncSignature::build<void, int>())
+                    {
+                        auto& operand = callInst->getOperands()[0]->getTarget();
+                        if (operand->getInstType() == InstType::IntConst)
+                        {
+                            auto val = std::dynamic_pointer_cast<IntConstInst>(operand)->getVal();
+                            auto newReg = m_cc->new_gp64();
+                            m_cc->mov(newReg, val);
+                            m_cc->invoke(asmjit::Out(invoke_node),
+                                         funcNode->label(), funcSig);
+                            invoke_node->set_arg(0, newReg);
+                        }
+                        else
+                        {
+                            throw std::runtime_error("argument type other than int and identifier is not implemented yet");
+                        }
+                    }
 
                     //invoke_node->set_ret(0, g);
                     break;
@@ -1654,7 +1680,37 @@ void CodeGen::generateX86(std::string funcName)
 
                 case InstType::FuncSignature:
                 {
-                    //std::cout << "func signature!\n";
+                    std::cout << "func signature!\n";
+                    break;
+                }
+
+                case InstType::LowerFunc:
+                {
+                    auto lowerInst = std::dynamic_pointer_cast<LowerFunc>(currInst);
+                    auto& parameters = lowerInst->getParameters();
+
+                    for (const auto& param : parameters)
+                    {
+                        auto paramType = param->getIdentType();
+                        if (paramType == IdentType::VARIABLE)
+                        {
+                            auto identAST = std::dynamic_pointer_cast<VariableAST>(param);
+                            if (identAST == nullptr)
+                            {
+                                throw std::runtime_error("error, should be variableAST");
+                            }
+                            else
+                            {
+                                std::string& name = identAST->getName();
+                                registerMap[name] = getFirstArgumentRegister(m_cc);
+                            }
+                        }
+                        else
+                        {
+                            throw std::runtime_error("lowering array is not implemented yet\n");
+                        }
+                    }
+                    std::cout << "lower func!\n";
                     break;
                 }
 

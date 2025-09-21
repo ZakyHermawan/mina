@@ -26,7 +26,7 @@ private:
     Type m_type; // data type for identifier
     arena::vector<std::string> m_parameters;
     arena::vector<Type> m_parameterTypes;
-    arena::vector<int> m_arguments;
+    arena::vector<std::shared_ptr<ExprAST>> m_arguments;
     unsigned int m_ip;  // instruction pointer
     int m_sp;           // stack pointer, always point to the next valid address
     int m_bp;           // base pointer for stack frame

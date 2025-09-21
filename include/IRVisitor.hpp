@@ -83,6 +83,4 @@ private:
     std::string getLastTemp();
 
     std::shared_ptr<Inst> popInst();
-
-    void generateX86();
 };

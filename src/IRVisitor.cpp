@@ -246,7 +246,6 @@ void IRVisitor::visit(ProgramAST& v)
             }
         }
     }
-
     
     SSA old = m_ssa;
     m_cg.setSSA(old);
@@ -256,10 +255,11 @@ void IRVisitor::visit(ProgramAST& v)
     {
         SSA newSSA;
         newSSA.setCFG(func);
+        newSSA.printCFG();
         m_cg.setSSA(newSSA);
         m_cg.generateX86(key);
     }
-    
+
     m_cg.executeJIT();
 }
 
@@ -646,11 +646,11 @@ void IRVisitor::visit(ArgumentsAST& v)
 {
     auto expr = v.getExpr();
     auto args = v.getArgs();
-    expr->accept(*this);
-    if (args)
+    if (expr)
     {
-        m_arguments.push_back(popInst());
-        m_argNames.push_back(popTemp());
+      expr->accept(*this);
+      m_arguments.push_back(popInst());
+      m_argNames.push_back(popTemp());
     }
 
     if (args)
@@ -661,40 +661,19 @@ void IRVisitor::visit(ArgumentsAST& v)
 
 void IRVisitor::visit(CallAST& v)
 {
-    m_arguments = std::vector<std::shared_ptr<Inst>>();
-    m_argNames = std::vector<std::string>();
+    m_arguments = {};
+    m_argNames = {};
 
+    auto funcName = v.getFuncName();
     auto args = v.getArgs();
     if (args)
     {
        args->accept(*this);
     }
 
-    auto funcName = v.getFuncName();
-
     auto callInst = std::make_shared<CallInst>(funcName, m_arguments, m_currentBB);
     callInst->setup_def_use();
     m_currentBB->pushInst(callInst);
-    //m_currentBB->pushSuccessor(m_funcBB[funcName]);
-    //m_funcBB[funcName]->pushPredecessor(m_currentBB);
-
-    //m_ssa.incCurrBBCtr();
-    //auto newBBLabel =
-        //m_ssa.getCurrBBNameWithoutCtr() + "_" + std::to_string(m_ssa.getCurrBBCtr());
-    //auto newBB = std::make_shared<BasicBlock>(newBBLabel);
-    //newBB->pushPredecessor(m_funcBB[funcName]);
-    //m_funcBB[funcName]->pushSuccessor(newBB);
-    //m_currentBB = newBB;
-
-    //auto temp = getCurrentTemp();
-    //pushCurrentTemp();
-
-    //auto tempInst = std::make_shared<IdentInst>(temp, m_currentBB);
-    //tempInst->setup_def_use();
-    //auto popInst = std::make_shared<PopInst>(tempInst, m_currentBB);
-    //popInst->setup_def_use();
-    //m_currentBB->pushInst(popInst);
-    //m_instStack.push(tempInst);
 }
 
 void IRVisitor::visit(FactorAST& v)
@@ -856,7 +835,8 @@ void IRVisitor::visit(TermsAST& v)
 
 void IRVisitor::visit(SimpleExprAST& v)
 {
-    v.getTerm()->accept(*this);
+    if (v.getTerm()) v.getTerm()->accept(*this);
+    //v.getTerm()->accept(*this);
     auto terms = v.getTerms();
     if (terms) terms->accept(*this);
 }
@@ -1106,6 +1086,7 @@ void IRVisitor::visit(ProcDeclAST& v)
     std::shared_ptr<BasicBlock> oldBB = m_currentBB;
     m_currentBB = basicBlock;
 
+
     auto params = v.getParams();
     auto scope = v.getScope();
 
@@ -1115,6 +1096,11 @@ void IRVisitor::visit(ProcDeclAST& v)
         params->accept(*this);
     }
 
+    auto lowerFunc = std::make_shared<LowerFunc>(
+        procName, FType::PROC, Type::UNDEFINED, m_parameters, m_currentBB);
+    lowerFunc->setup_def_use();
+    m_currentBB->pushInst(lowerFunc);
+
     // lower param
     for (int i=0; i < m_parameters.size(); ++i)
     {
@@ -1123,7 +1109,6 @@ void IRVisitor::visit(ProcDeclAST& v)
         if (identType == IdentType::VARIABLE)
         {
             auto variable = std::dynamic_pointer_cast<VariableAST>(param);
-            std::cout << variable->getName() << " var!\n";
         }
         else
         {

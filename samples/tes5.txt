@@ -1,9 +1,13 @@
 {
 	var a: integer
-	proc something() {
+	proc empty() {
 	;
-	put(11, skip)
-  }
+		put(13, skip)
+	}
+	proc something(x: integer) {
+	;
+		put(x, skip)
+	}
 ;
 	a := 5
 	if a = 5 then
@@ -14,5 +18,6 @@
 	put(a, skip)
 	put(9123, skip)
 	put(true, skip)
-	something()
+	empty()
+	something(3)
 }

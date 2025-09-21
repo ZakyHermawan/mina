@@ -1153,6 +1153,71 @@ void FuncSignature::setup_def_use()
 std::shared_ptr<BasicBlock> FuncSignature::getBlock() { return m_block; }
 InstType FuncSignature::getInstType() const { return InstType::FuncSignature; }
 
+LowerFunc::LowerFunc(std::string funcName, FType fType, Type retType,
+    std::vector<std::shared_ptr<IdentifierAST>> parameters,
+    std::shared_ptr<BasicBlock> block)
+    :   m_funcName(std::move(funcName)),
+        m_fType(fType),
+        m_retType(retType),
+        m_parameters(std::move(parameters)),
+        m_block(std::move(block))
+{
+}
+std::string LowerFunc::getFuncName() { return m_funcName; }
+std::vector<std::shared_ptr<IdentifierAST>>& LowerFunc::getParameters()
+{
+    return m_parameters;
+}
+std::string LowerFunc::getString()
+{
+    std::string res = "lower ";
+    if (m_fType == FType::PROC)
+    {
+        res += "proc ";
+    }
+    else
+    {
+        res += "func ";
+    }
+    res += m_funcName + "(";
+
+    for (unsigned int i = 0; i < m_parameters.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        std::shared_ptr<IdentifierAST> param = m_parameters[i];
+        std::string& paramName = param->getName();
+        res += paramName + " : ";
+        if (param->getType() == Type::INTEGER)
+        {
+            res += "integer";
+        }
+        else if (param->getType() == Type::BOOLEAN)
+        {
+            res += "boolean";
+        }
+        else
+        {
+            throw std::runtime_error("parameter should not have undefined type!");
+        }
+    }
+
+    res += ")";
+    return res;
+}
+void LowerFunc::push_user(std::shared_ptr<Inst> user)
+{
+    throw std::runtime_error("function signature should not use anything!\n");
+}
+void LowerFunc::setup_def_use()
+{
+    // do nothing, since function signature did not use anything
+}
+
+std::shared_ptr<BasicBlock> LowerFunc::getBlock() { return m_block; }
+InstType LowerFunc::getInstType() const { return InstType::LowerFunc; }
 
 CallInst::CallInst(std::string calleeStr,
                    std::vector<std::shared_ptr<Inst>> operands,
