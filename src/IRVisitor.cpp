@@ -21,7 +21,6 @@ IRVisitor::IRVisitor()
       m_ssa{},
       m_cg{m_ssa}
 {
-    //m_cg = CodeGen{m_ssa};
     m_currentBB = m_ssa.getCFG();
 }
 
@@ -248,7 +247,20 @@ void IRVisitor::visit(ProgramAST& v)
         }
     }
 
-    m_cg.generateX86();
+    
+    SSA old = m_ssa;
+    m_cg.setSSA(old);
+    m_cg.generateX86("main");
+
+    for (auto const& [key, func]: m_funcBB)
+    {
+        SSA newSSA;
+        newSSA.setCFG(func);
+        m_cg.setSSA(newSSA);
+        m_cg.generateX86(key);
+    }
+    
+    m_cg.executeJIT();
 }
 
 void IRVisitor::visit(ScopeAST& v)
@@ -635,9 +647,11 @@ void IRVisitor::visit(ArgumentsAST& v)
     auto expr = v.getExpr();
     auto args = v.getArgs();
     expr->accept(*this);
-
-    m_arguments.push_back(popInst());
-    m_argNames.push_back(popTemp());
+    if (args)
+    {
+        m_arguments.push_back(popInst());
+        m_argNames.push_back(popTemp());
+    }
 
     if (args)
     {
@@ -661,26 +675,26 @@ void IRVisitor::visit(CallAST& v)
     auto callInst = std::make_shared<CallInst>(funcName, m_arguments, m_currentBB);
     callInst->setup_def_use();
     m_currentBB->pushInst(callInst);
-    m_currentBB->pushSuccessor(m_funcBB[funcName]);
-    m_funcBB[funcName]->pushPredecessor(m_currentBB);
+    //m_currentBB->pushSuccessor(m_funcBB[funcName]);
+    //m_funcBB[funcName]->pushPredecessor(m_currentBB);
 
-    m_ssa.incCurrBBCtr();
-    auto newBBLabel =
-        m_ssa.getCurrBBNameWithoutCtr() + "_" + std::to_string(m_ssa.getCurrBBCtr());
-    auto newBB = std::make_shared<BasicBlock>(newBBLabel);
-    newBB->pushPredecessor(m_funcBB[funcName]);
-    m_funcBB[funcName]->pushSuccessor(newBB);
-    m_currentBB = newBB;
+    //m_ssa.incCurrBBCtr();
+    //auto newBBLabel =
+        //m_ssa.getCurrBBNameWithoutCtr() + "_" + std::to_string(m_ssa.getCurrBBCtr());
+    //auto newBB = std::make_shared<BasicBlock>(newBBLabel);
+    //newBB->pushPredecessor(m_funcBB[funcName]);
+    //m_funcBB[funcName]->pushSuccessor(newBB);
+    //m_currentBB = newBB;
 
-    auto temp = getCurrentTemp();
-    pushCurrentTemp();
+    //auto temp = getCurrentTemp();
+    //pushCurrentTemp();
 
-    auto tempInst = std::make_shared<IdentInst>(temp, m_currentBB);
-    tempInst->setup_def_use();
-    auto popInst = std::make_shared<PopInst>(tempInst, m_currentBB);
-    popInst->setup_def_use();
-    m_currentBB->pushInst(popInst);
-    m_instStack.push(tempInst);
+    //auto tempInst = std::make_shared<IdentInst>(temp, m_currentBB);
+    //tempInst->setup_def_use();
+    //auto popInst = std::make_shared<PopInst>(tempInst, m_currentBB);
+    //popInst->setup_def_use();
+    //m_currentBB->pushInst(popInst);
+    //m_instStack.push(tempInst);
 }
 
 void IRVisitor::visit(FactorAST& v)
@@ -773,7 +787,15 @@ void IRVisitor::visit(FactorsAST& v)
 
 void IRVisitor::visit(TermAST& v)
 {
-    v.getFactor()->accept(*this);
+    auto term = v.getFactor();
+    if (term)
+    {
+        term->accept(*this);
+    }
+    else
+    {
+        return;
+    }
     auto factors = v.getFactors();
     if (factors) factors->accept(*this);
 }
@@ -1110,14 +1132,12 @@ void IRVisitor::visit(ProcDeclAST& v)
     }
 
     scope->accept(*this);
-
-    // generateX86(); try to generate the function here, but don't execute, save it so we can syscall later
     m_currentBB = oldBB;
 
     auto funcSignature = std::make_shared<FuncSignature>(
         procName, FType::PROC, Type::UNDEFINED, m_parameters, m_currentBB);
     m_currentBB->pushInst(funcSignature);
-    m_cg.generateFuncNode(false, m_parameters.size());
+    m_cg.generateFuncNode(procName, false, m_parameters.size());
     return;
 }
 

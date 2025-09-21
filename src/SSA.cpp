@@ -12,6 +12,8 @@ SSA::SSA()
       m_currentBB{}
     {}
 
+void SSA::setCFG(std::shared_ptr<BasicBlock> cfg) { m_cfg = cfg; }
+
 std::string SSA::baseNameToSSA(const std::string& name)
 {
     auto it = m_nameCtr.find(name);

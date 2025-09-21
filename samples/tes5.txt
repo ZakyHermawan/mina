@@ -1,7 +1,8 @@
 {
 	var a: integer
-	proc something(x: integer) {
+	proc something() {
 	;
+	put(11, skip)
   }
 ;
 	a := 5
@@ -13,4 +14,5 @@
 	put(a, skip)
 	put(9123, skip)
 	put(true, skip)
+	something()
 }

@@ -15,6 +15,7 @@ class SSA
 {
 public:
 	SSA();
+    void setCFG(std::shared_ptr<BasicBlock>);
 
     std::string baseNameToSSA(const std::string& name);
     std::string getCurrentSSAName(const std::string& name);

@@ -8,8 +8,6 @@
 #include <set>
 
 typedef int (*Func)(void);
-//typedef int (*xFunc)(void, int);
-
 
 CodeGen::CodeGen(SSA ssa) : m_ssa{ssa}, m_logger{}, m_rt{}, m_code{}
 {
@@ -17,6 +15,8 @@ CodeGen::CodeGen(SSA ssa) : m_ssa{ssa}, m_logger{}, m_rt{}, m_code{}
     m_code.set_logger(&m_logger);  // attach logger
     m_cc = std::make_shared<asmjit::x86::Compiler>(&m_code);
 }
+
+void CodeGen::setSSA(SSA& ssa) { m_ssa = ssa; }
 
 asmjit::x86::Gp CodeGen::getFirstArgumentRegister(std::shared_ptr<asmjit::x86::Compiler> m_cc)
 {
@@ -92,7 +92,7 @@ void CodeGen::syscallScanInt(std::shared_ptr<asmjit::x86::Compiler> m_cc,
     m_cc->mov(reg, asmjit::x86::rax);
 }
 
-void CodeGen::generateFuncNode(bool haveRet, unsigned int numberOfArg)
+void CodeGen::generateFuncNode(std::string& funcName, bool haveRet, unsigned int numberOfArg)
 {
     if (numberOfArg > 4)
     {
@@ -100,64 +100,86 @@ void CodeGen::generateFuncNode(bool haveRet, unsigned int numberOfArg)
     }
 
     asmjit::FuncNode* funcNode = nullptr;
+    asmjit::FuncSignature funcSignature;
 
     switch (numberOfArg)
     {
         case 0:
             if (haveRet)
             {
-                funcNode = m_cc->new_func(asmjit::FuncSignature::build<int>());
+                funcSignature = asmjit::FuncSignature::build<int>();
+                funcNode = m_cc->new_func(funcSignature);
             }
             else
             {
-                funcNode = m_cc->add_func(asmjit::FuncSignature::build<void>());
+                funcSignature = asmjit::FuncSignature::build<void>();
+                funcNode = m_cc->new_func(asmjit::FuncSignature::build<void>());
             }
             break;
         case 1:
             if (haveRet)
             {
-                funcNode = m_cc->add_func(asmjit::FuncSignature::build<int, int>());
+                funcSignature = asmjit::FuncSignature::build<int, int>();
+                funcNode = m_cc->new_func(funcSignature);
             }
             else
             {
-                funcNode = m_cc->new_func(asmjit::FuncSignature::build<void, int>());
+                funcSignature = asmjit::FuncSignature::build<void, int>();
+                funcNode = m_cc->new_func(funcSignature);
             }
             break;
         case 2:
             if (haveRet)
             {
-                funcNode = m_cc->add_func(asmjit::FuncSignature::build<int, int, int>());
+                funcSignature = asmjit::FuncSignature::build<int, int, int>();
+                funcNode = m_cc->new_func(funcSignature);
             }
             else
             {
-                funcNode = m_cc->add_func(asmjit::FuncSignature::build<void, int, int>());
+                funcSignature = asmjit::FuncSignature::build<void, int, int>();
+                funcNode = m_cc->new_func(funcSignature);
             }
             break;
         case 3:
             if (haveRet)
             {
-                funcNode = m_cc->add_func(asmjit::FuncSignature::build<int, int, int, int>());
+                funcSignature = asmjit::FuncSignature::build<int, int, int, int>();
+                funcNode = m_cc->new_func(funcSignature);
             }
             else
             {
-                funcNode = m_cc->add_func(asmjit::FuncSignature::build<void, int, int, int>());
+                funcSignature = asmjit::FuncSignature::build<void, int, int, int>();
+                funcNode = m_cc->new_func(funcSignature);
             }
             break;
         case 4:
             if (haveRet)
             {
-                funcNode = m_cc->add_func(asmjit::FuncSignature::build<int, int, int, int, int>());
+                funcSignature = asmjit::FuncSignature::build<int, int, int, int, int>();
+                funcNode = m_cc->new_func(funcSignature);
             }
             else
             {
-                funcNode = m_cc->add_func(asmjit::FuncSignature::build<void, int, int, int, int>());
+                funcSignature = asmjit::FuncSignature::build<void, int, int, int, int>();
+                funcNode = m_cc->new_func(funcSignature);
             }
             break;
     }
-    m_funcNodes.push_back(funcNode);
+
+    auto& it = m_funcMap.find(funcName);
+    if (funcNode == nullptr)
+    {
+        throw std::runtime_error("func node nullptr");
+    }
+
+    if (it != m_funcMap.end())
+    {
+        throw std::runtime_error("function name in the IR already defined!");
+    }
+    m_funcMap[funcName] = std::make_pair(funcNode, funcSignature);
 }
 
-void CodeGen::generateX86()
+void CodeGen::generateX86(std::string funcName)
 {
     // BFS
     std::queue<std::shared_ptr<BasicBlock>> worklist;
@@ -166,9 +188,16 @@ void CodeGen::generateX86()
     visited.insert(m_ssa.getCFG());
     
     std::vector<std::string> variables;
-
-    // fn(void)` signature.
-    m_cc->add_func(asmjit::FuncSignature::build<void>());
+    auto it = m_funcMap.find(funcName);
+    if (it == m_funcMap.end())
+    {
+        m_cc->add_func(asmjit::FuncSignature::build<void>());
+    }
+    else
+    {
+        auto node = m_funcMap[funcName].first;
+        m_cc->add_func(node);
+    }
 
     std::unordered_map<std::string, asmjit::x86::Gp> registerMap;
     std::unordered_map<std::string, asmjit::Label> labelMap;
@@ -177,6 +206,7 @@ void CodeGen::generateX86()
     {
         std::shared_ptr<BasicBlock> current_bb = worklist.front();
         auto bbName = current_bb->getName();
+
         if (labelMap.find(bbName) == labelMap.end())
         {
             labelMap[bbName] = m_cc->new_named_label(bbName.c_str());
@@ -185,7 +215,6 @@ void CodeGen::generateX86()
         m_cc->bind(label); // generate label and start writing code adter this label
 
         visited.insert(current_bb);
-
         worklist.pop();
 
         auto& instructions = current_bb->getInstructions();
@@ -1459,7 +1488,6 @@ void CodeGen::generateX86()
 
                 case InstType::Put:
                 {
-                    //break;
                     auto putInst = std::dynamic_pointer_cast<PutInst>(currInst);
                     auto& operands = putInst->getOperands();
                     for (int i = 0; i < operands.size(); ++i)
@@ -1496,7 +1524,6 @@ void CodeGen::generateX86()
                             }
                             case InstType::StrConst:
                             {
-                                //break;
                                 auto strConstInst =
                                     std::dynamic_pointer_cast<StrConstInst>(
                                         operand);
@@ -1515,7 +1542,6 @@ void CodeGen::generateX86()
                             }
                             default:
                             {
-                                //break;
                                 // todo: check data type, and print true/false or integer based on data type
                                 // assume integer
                                 auto identifierInst =
@@ -1607,12 +1633,29 @@ void CodeGen::generateX86()
                 }
                 case InstType::Call:
                 {
+                    auto callInst = std::dynamic_pointer_cast<CallInst>(currInst);
+                    std::string& funcName = callInst->getCalleeStr();
+                    asmjit::InvokeNode* invoke_node{nullptr};
+                    auto it = m_funcMap.find(funcName);
+                    if (it == m_funcMap.end())
+                    {
+                        throw std::runtime_error("function name " + funcName + " not found!");
+                    }
+                    //std::cout << "calling " << funcName << std::endl;
+                    asmjit::FuncNode* funcNode = m_funcMap[funcName].first;
+                    asmjit::FuncSignature funcSig = m_funcMap[funcName].second;
+
+                    //std::cout << (uint64_t)(funcNode->label()) << std::endl;
+                    m_cc->invoke(asmjit::Out(invoke_node), funcNode->label(), funcSig);
+
+                    //invoke_node->set_ret(0, g);
                     break;
                 }
 
                 case InstType::FuncSignature:
                 {
-                    std::cout << "func signature!\n";
+                    //std::cout << "func signature!\n";
+                    break;
                 }
 
                 default:
@@ -1620,21 +1663,22 @@ void CodeGen::generateX86()
             }
         }
 
-
         for (const auto& successor : current_bb->getSuccessors())
         {
             if (visited.find(successor) == visited.end())
             {
-              auto newSuccessor =
-                  std::make_shared<BasicBlock>(successor->getName());
+                auto newSuccessor =
+                    std::make_shared<BasicBlock>(successor->getName());
                 visited.insert(successor);
                 worklist.push(successor);
             }
         }
     }
-
-    m_cc->ret();
     m_cc->end_func();
+}
+
+void CodeGen::executeJIT()
+{
     m_cc->finalize();  // Translate and assemble the whole 'm_cc' content.    
 
     std::cout << "==================================" << std::endl;
@@ -1646,7 +1690,6 @@ void CodeGen::generateX86()
     {
         return;  // Handle a possible error returned by AsmJit.
     }
-
 
     fn();
     std::cout << "JIT executed!\n";

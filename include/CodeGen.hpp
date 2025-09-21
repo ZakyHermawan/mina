@@ -4,6 +4,10 @@
 
 #include <asmjit/x86.h>
 
+#include <map>
+#include <utility>
+#include <string>
+
 class CodeGen
 {
 	SSA m_ssa;
@@ -23,8 +27,12 @@ class CodeGen
 
 	std::vector<asmjit::FuncNode*> m_funcNodes;
 
+	using funcNodePair = std::pair<asmjit::FuncNode*, asmjit::FuncSignature>;
+	std::map<std::string, funcNodePair> m_funcMap;
+
 public:
 	CodeGen(SSA ssa);
+	void setSSA(SSA& SSA);
 
 	asmjit::x86::Gp CodeGen::getFirstArgumentRegister(
         std::shared_ptr<asmjit::x86::Compiler> cc);
@@ -36,7 +44,9 @@ public:
     void syscallPrintString(std::shared_ptr<asmjit::x86::Compiler> cc, std::string& str);
 	void syscallScanInt(std::shared_ptr<asmjit::x86::Compiler> cc, asmjit::x86::Gp reg);
 
-	void generateFuncNode(bool haveRet, unsigned int numberOfArg);
+	void generateFuncNode(std::string& funcName, bool haveRet,
+						  unsigned int numberOfArg);
 
-	void generateX86();
+	void generateX86(std::string functionName);
+	void executeJIT();
 };

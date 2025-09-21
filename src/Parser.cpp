@@ -1378,7 +1378,7 @@ std::shared_ptr<ExprAST> Parser::primary()
     }
     else
     {
-        exitParse("Unknown token");
+        //exitParse("Unknown token");
         return nullptr;
     }
 }
