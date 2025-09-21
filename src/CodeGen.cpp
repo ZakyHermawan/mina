@@ -18,7 +18,7 @@ CodeGen::CodeGen(SSA ssa) : m_ssa{ssa}, m_logger{}, m_rt{}, m_code{}
 
 void CodeGen::setSSA(SSA& ssa) { m_ssa = ssa; }
 
-asmjit::x86::Gp CodeGen::getFirstArgumentRegister(std::shared_ptr<asmjit::x86::Compiler> m_cc)
+asmjit::x86::Gp CodeGen::getFirstArgumentRegister()
 {
     asmjit::x86::Gp arg1_reg = (m_cc->environment().is_platform_windows())
         ? asmjit::x86::rcx   // 1st argument on
@@ -27,7 +27,7 @@ asmjit::x86::Gp CodeGen::getFirstArgumentRegister(std::shared_ptr<asmjit::x86::C
                              // Linux/macOS
     return arg1_reg;
 }
-asmjit::x86::Gp CodeGen::getSecondArgumentRegister(std::shared_ptr<asmjit::x86::Compiler> m_cc)
+asmjit::x86::Gp CodeGen::getSecondArgumentRegister()
 {
     asmjit::x86::Gp arg2_reg = (m_cc->environment().is_platform_windows())
         ? asmjit::x86::rdx  // 2nd argument on
@@ -39,7 +39,7 @@ asmjit::x86::Gp CodeGen::getSecondArgumentRegister(std::shared_ptr<asmjit::x86::
 
 void CodeGen::syscallPutChar(char c)
 {
-    asmjit::x86::Gp arg1_reg = getFirstArgumentRegister(m_cc);
+    asmjit::x86::Gp arg1_reg = getFirstArgumentRegister();
     m_cc->mov(arg1_reg, c);
     m_cc->sub(asmjit::x86::rsp, 32);
     m_cc->call(putchar);
@@ -49,8 +49,8 @@ void CodeGen::syscallPutChar(char c)
 // implement printf("%d", val);
 void CodeGen::syscallPrintInt(int val)
 {
-    asmjit::x86::Gp arg1_reg = getFirstArgumentRegister(m_cc);
-    asmjit::x86::Gp arg2_reg = getSecondArgumentRegister(m_cc);
+    asmjit::x86::Gp arg1_reg = getFirstArgumentRegister();
+    asmjit::x86::Gp arg2_reg = getSecondArgumentRegister();
     
     //// Allocate 16 bytes on the stack for the format string and the integer.
     m_cc->sub(asmjit::x86::rsp, 16);
@@ -81,7 +81,7 @@ void CodeGen::syscallPrintString(std::string& str)
 void CodeGen::syscallScanInt(asmjit::x86::Gp reg)
 {
     // currently, can only scan one digit integer
-    asmjit::x86::Gp arg1_reg = getFirstArgumentRegister(m_cc);
+    asmjit::x86::Gp arg1_reg = getFirstArgumentRegister();
 
     m_cc->sub(asmjit::x86::rsp, 32);
     m_cc->call(asmjit::Imm(getchar));
@@ -1699,7 +1699,7 @@ void CodeGen::generateX86(std::string funcName)
                             else
                             {
                                 std::string& name = identAST->getName();
-                                registerMap[name] = getFirstArgumentRegister(m_cc);
+                                registerMap[name] = getFirstArgumentRegister();
                             }
                         }
                         else

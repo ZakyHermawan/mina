@@ -34,10 +34,8 @@ public:
 	CodeGen(SSA ssa);
 	void setSSA(SSA& SSA);
 
-	asmjit::x86::Gp CodeGen::getFirstArgumentRegister(
-        std::shared_ptr<asmjit::x86::Compiler> cc);
-	asmjit::x86::Gp CodeGen::getSecondArgumentRegister(
-		std::shared_ptr<asmjit::x86::Compiler> cc);
+	asmjit::x86::Gp CodeGen::getFirstArgumentRegister();
+	asmjit::x86::Gp CodeGen::getSecondArgumentRegister();
 
 	void syscallPutChar(char c);
     void syscallPrintInt(int val);
