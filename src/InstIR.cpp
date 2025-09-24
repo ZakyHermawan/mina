@@ -1298,6 +1298,18 @@ bool PhiInst::isPhi() { return true; }
 void PhiInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
 InstType PhiInst::getInstType() const { return InstType::Phi; }
 
+HaltInst::HaltInst(std::shared_ptr<BasicBlock> block)
+    : m_block(std::move(block))
+{
+}
+std::string HaltInst::getString()
+{
+    std::string res = "Halt";
+    return res;
+}
+std::shared_ptr<BasicBlock> HaltInst::getBlock() { return m_block; };
+InstType HaltInst::getInstType() const { return InstType::Halt; }
+
 std::string UndefInst::getString() { return "Undef"; }
 std::shared_ptr<BasicBlock> UndefInst::getBlock() { return m_block; };
 InstType UndefInst::getInstType() const { return InstType::Undef; }

@@ -46,6 +46,7 @@ enum class InstType
     LowerFunc,
     Call,
     Phi,
+    Halt,
     Undef,
     Noop,
 
@@ -1012,6 +1013,26 @@ public:
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
     virtual bool isPhi() override;
     virtual void setTarget(std::shared_ptr<Inst> target);
+    virtual InstType getInstType() const override;
+};
+
+class HaltInst : public Inst
+{
+private:
+    std::shared_ptr<BasicBlock> m_block;
+
+public:
+    HaltInst(std::shared_ptr<BasicBlock> block);
+    virtual ~HaltInst() = default;
+    HaltInst(const HaltInst&) = delete;
+    HaltInst(HaltInst&&) noexcept = default;
+    HaltInst& operator=(const HaltInst&) = delete;
+    HaltInst& operator=(HaltInst&&) noexcept = default;
+  
+    std::string getCalleeStr();
+  
+    virtual std::string getString() override;
+    virtual std::shared_ptr<BasicBlock> getBlock() override;
     virtual InstType getInstType() const override;
 };
 

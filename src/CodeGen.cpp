@@ -1678,14 +1678,17 @@ void CodeGen::generateX86(std::string funcName)
                     }
                     break;
                 }
+                
                 case InstType::Pop:
                 {
                     break;
                 }
+
                 case InstType::Return:
                 {
                     break;
                 }
+
                 case InstType::Call:
                 {
                     auto callInst = std::dynamic_pointer_cast<CallInst>(currInst);
@@ -1735,6 +1738,11 @@ void CodeGen::generateX86(std::string funcName)
                         }
                     }
                     break;
+                }
+
+                case InstType::Halt:
+                {
+                    m_cc->ret();
                 }
 
                 case InstType::FuncSignature:

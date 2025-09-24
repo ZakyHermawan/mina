@@ -96,6 +96,9 @@ void IRVisitor::visit(VariableAST& v)
 void IRVisitor::visit(ProgramAST& v)
 {
     v.getScope()->accept(*this);
+    auto haltInst = std::make_shared<HaltInst>(m_currentBB);
+    m_currentBB->pushInst(haltInst);
+    
     m_ssa.sealBlock(m_currentBB);
 
     std::cout << "Before renaming: \n";
