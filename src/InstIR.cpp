@@ -960,7 +960,7 @@ std::string BRFInst::getString()
     auto targetSuccess = m_targetSuccess->getName();
     auto targetFailed = m_targetFailed->getName();
 
-    return "BRT(" + m_operands[0]->getTarget()->getString() + ", " +
+    return "BRF(" + m_operands[0]->getTarget()->getString() + ", " +
            targetSuccess + ", " + targetFailed + ")";
 }
 void BRFInst::push_user(std::shared_ptr<Inst> user)
