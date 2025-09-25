@@ -328,6 +328,12 @@ void SSA::renameSSA()
                     dsu.unite(targetStr, opStr);
                 }
             }
+            else if (currInst->getInstType() == InstType::Put)
+            {
+                auto& operandStr = currInst->getOperands()[0]->getTarget()->getString();
+                variables.push_back(operandStr);
+                dsu.make_set(operandStr);
+            }
             variables.push_back(targetStr);
         }
 
@@ -426,7 +432,8 @@ void SSA::renameSSA()
             {
                 if (root_to_new_name.find(targetStr) == root_to_new_name.end())
                 {
-                    throw std::runtime_error("can't find target str " + targetStr + "in the hashmap");
+                    throw std::runtime_error("can't find target str " + targetStr +
+                                             "in the hashmap");
                 }
                 auto& new_target_str = root_to_new_name[targetStr];
 
