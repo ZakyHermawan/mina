@@ -259,3 +259,133 @@ std::string CallMIR::getString() const
 {
     return "call " + m_calleeName;
 }
+
+// ==========================================
+// AddMIR
+// ==========================================
+
+AddMIR::AddMIR(std::vector<std::shared_ptr<MachineIR>> operands)
+    : m_operands{std::move(operands)}
+{
+    if (m_operands.size() != 2)
+    {
+        throw std::runtime_error("MovMIR should have exactly 2 operands!");
+    }
+}
+
+std::vector<std::shared_ptr<MachineIR>>& AddMIR::getOperands()
+{ 
+    return m_operands; 
+}
+
+MIRType AddMIR::getMIRType() const 
+{ 
+    return MIRType::Add;
+}
+
+std::string AddMIR::getString() const
+{
+    // Access operands safely assuming the constructor check passed
+    return "add " + m_operands[0]->getString() + ", " + m_operands[1]->getString();
+}
+
+// ==========================================
+// SubMIR
+// ==========================================
+
+SubMIR::SubMIR(std::vector<std::shared_ptr<MachineIR>> operands)
+    : m_operands{std::move(operands)}
+{
+    if (m_operands.size() != 2)
+    {
+        throw std::runtime_error("MovMIR should have exactly 2 operands!");
+    }
+}
+
+std::vector<std::shared_ptr<MachineIR>>& SubMIR::getOperands()
+{ 
+    return m_operands; 
+}
+
+MIRType SubMIR::getMIRType() const 
+{ 
+    return MIRType::Sub;
+}
+
+std::string SubMIR::getString() const
+{
+    // Access operands safely assuming the constructor check passed
+    return "sub " + m_operands[0]->getString() + ", " + m_operands[1]->getString();
+}
+
+// ==========================================
+// MulMIR
+// ==========================================
+
+MulMIR::MulMIR(std::vector<std::shared_ptr<MachineIR>> operands)
+    : m_operands{std::move(operands)}
+{
+    if (m_operands.size() != 2)
+    {
+        throw std::runtime_error("MovMIR should have exactly 2 operands!");
+    }
+}
+
+std::vector<std::shared_ptr<MachineIR>>& MulMIR::getOperands()
+{ 
+    return m_operands; 
+}
+
+MIRType MulMIR::getMIRType() const 
+{ 
+    return MIRType::Mul;
+}
+
+std::string MulMIR::getString() const
+{
+    // Access operands safely assuming the constructor check passed
+    return "imul " + m_operands[0]->getString() + ", " + m_operands[1]->getString();
+}
+
+// ==========================================
+// DivMIR
+// ==========================================
+
+DivMIR::DivMIR(std::shared_ptr<MemoryMIR> divisor)
+    : m_divisor{std::move(divisor)}
+{
+}
+
+std::vector<std::shared_ptr<MachineIR>>& DivMIR::getOperands()
+{ 
+    return std::vector<std::shared_ptr<MachineIR>>{m_divisor};
+}
+
+MIRType DivMIR::getMIRType() const 
+{ 
+    return MIRType::Div;
+}
+
+std::string DivMIR::getString() const
+{
+    // Access operands safely assuming the constructor check passed
+    return "idiv QWORD PTR [" + m_divisor->getString() + "]";
+}
+
+// ==========================================
+// CqoMIR
+// ==========================================
+
+CqoMIR::CqoMIR()
+{
+}
+
+MIRType CqoMIR::getMIRType() const
+{
+    return MIRType::Cqo;
+}
+
+std::string CqoMIR::getString() const
+{
+    return "cqo";
+}

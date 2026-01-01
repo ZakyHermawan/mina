@@ -1,0 +1,15 @@
+{
+	var a: integer
+	var b: integer
+	;
+	a := 100
+	b := 2
+	a := a + b
+	put(a, skip)
+	a := a - b
+	put(a, skip)
+	a := a * b
+	put(a, skip)
+	a := a / b
+	put(a, skip)
+}

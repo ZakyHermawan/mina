@@ -14,7 +14,12 @@ enum class MIRType
     Literal,
     Mov,
     Lea,
-    Call
+    Call,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Cqo
 };
 
 // Base Class
@@ -126,8 +131,61 @@ public:
 class CallMIR : public MachineIR
 {
     std::string m_calleeName;
+
 public:
     CallMIR(std::string calleeName);
     MIRType getMIRType() const override;
     std::string getString() const override; 
+};
+
+class AddMIR : public MachineIR
+{
+    std::vector<std::shared_ptr<MachineIR>> m_operands;
+
+public:
+    AddMIR(std::vector<std::shared_ptr<MachineIR>> operands);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+};
+
+class SubMIR : public MachineIR
+{
+    std::vector<std::shared_ptr<MachineIR>> m_operands;
+
+public:
+    SubMIR(std::vector<std::shared_ptr<MachineIR>> operands);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+};
+
+class MulMIR : public MachineIR
+{
+    std::vector<std::shared_ptr<MachineIR>> m_operands;
+
+public:
+    MulMIR(std::vector<std::shared_ptr<MachineIR>> operands);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+};
+
+class DivMIR : public MachineIR
+{
+    std::shared_ptr<MemoryMIR> m_divisor; // in a / b, b is divisor
+
+public:
+    DivMIR(std::shared_ptr<MemoryMIR> divisor);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+};
+
+class CqoMIR : public MachineIR
+{
+public:
+    CqoMIR();
+    MIRType getMIRType() const override;
+    std::string getString() const override;
 };
