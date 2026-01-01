@@ -1,4 +1,8 @@
+#include "Token.hpp"
 #include "Lexer.hpp"
+
+#include <cctype>
+#include <utility>
 
 Lexer::Lexer(std::string source)
     : m_source{std::move(source)},

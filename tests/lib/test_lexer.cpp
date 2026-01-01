@@ -1,7 +1,8 @@
 #include "tests/test_lexer.hpp"
-#include "Parser.hpp"
 #include "Token.hpp"
+#include "Lexer.hpp"
 
+#include <utility>
 #include <cassert>
 
 void tests_token()
@@ -184,7 +185,7 @@ void tests_token()
 
 void tests_lexer()
 {
-    std::string source = "{}  false !=true";
+    std::string source = "{}  false !=true myidentifier if then else end repeat until loop exit put get var func proc boolean integer skip return";
     Lexer lexer(source);
     
     assert(lexer.getCurrToken().getTokenType() == LEFT_BRACE);
@@ -200,7 +201,61 @@ void tests_lexer()
     
     lexer.advance();
     assert(lexer.getCurrToken().getTokenType() == BOOL);
-    
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == IDENTIFIER);
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == IF);
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == THEN);
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == ELSE);
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == END);
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == REPEAT);
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == UNTIL);
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == LOOP);
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == EXIT);
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == PUT);
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == GET);
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == VAR);
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == FUNC);
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == PROC);
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == BOOLEAN);
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == INTEGER);
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == SKIP);
+
+    lexer.advance();
+    assert(lexer.getCurrToken().getTokenType() == RETURN);
+
     Lexer l{std::move(std::string())};
     assert(l.getCurrToken().getTokenType() == TOK_BEGIN);
     
