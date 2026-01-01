@@ -1,13 +1,12 @@
-#define ASMJIT_STATIC
-#include <stdio.h>
-#include <asmjit/asmjit.h>
-
-#include <fstream>
 #include <sstream>
 
 #include "Lexer.hpp"
-#include "Parser.hpp"
 #include "Token.hpp"
+#include "Parser.hpp"
+
+#include "tests/test_lexer.hpp"
+
+#include <fstream>
 
 static void repl()
 {
@@ -45,6 +44,9 @@ static void runFile(const char* fileName)
 
 int main(int argc, char* argv[])
 {
+    tests_token();
+    tests_lexer();
+
     runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes6.txt");
     return 0;
 }
