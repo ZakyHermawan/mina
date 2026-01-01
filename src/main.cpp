@@ -45,6 +45,6 @@ static void runFile(const char* fileName)
 
 int main(int argc, char* argv[])
 {
-    runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes5.txt");
+    runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes6.txt");
     return 0;
 }

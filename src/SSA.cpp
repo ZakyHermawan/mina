@@ -5,6 +5,7 @@
 #include <queue>
 #include <set>
 #include <iostream>
+#include <functional>
 
 SSA::SSA()
     : m_cfg{std::make_shared<BasicBlock>("Entry_0")},
@@ -46,6 +47,42 @@ std::string SSA::getCurrentSSAName(const std::string& name)
 
 void SSA::printCFG()
 {
+    // Implement Reverse Post-Order Traversal to linearize the CFG
+    std::set<std::shared_ptr<BasicBlock>> visited;
+    std::vector<std::shared_ptr<BasicBlock>> linearizedBlocks;
+    std::function<void(std::shared_ptr<BasicBlock>)> dfs =
+        [&](std::shared_ptr<BasicBlock> bb)
+        {
+          visited.insert(bb);
+          auto& successors = bb->getSuccessors();
+          // Traverse successors in reverse order so the first element that is being inserted 
+          // into the successors vector is in front of successors that is added later,
+          // since we will reverse the linearizedBlocks at the end.
+          for (int i = successors.size() - 1; i >= 0; --i)
+          {
+              auto& succ = successors[i];
+              if (visited.find(succ) == visited.end())
+              {
+                  dfs(succ);
+              }
+          }
+          linearizedBlocks.push_back(bb);
+    };
+    dfs(m_cfg);
+    std::reverse(linearizedBlocks.begin(), linearizedBlocks.end());
+    std::cout << "Print CFG in Reverse Post-Order:\n";
+    for (int i = 0; i < linearizedBlocks.size(); ++i)
+    {
+        auto& currBlock = linearizedBlocks[i];
+        std::cout << currBlock->getName() << ":\n";
+        auto& inst = currBlock->getInstructions();
+        for (int j = 0; j < inst.size(); ++j)
+        {
+            std::cout << inst[j]->getString() << std::endl;
+        }
+    }
+
+    /*
     // --- Step 0: Handle the case of an empty CFG ---
     if (!m_cfg) {
         std::cerr << "CFG is empty or not initialized." << std::endl;
@@ -95,6 +132,7 @@ void SSA::printCFG()
         }
     }
      std::cout << "\n--- End of CFG ---\n" << std::endl;
+     */
 }
 
 std::string SSA::getBaseName(std::string name)

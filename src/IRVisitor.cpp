@@ -2,12 +2,8 @@
 #include "InstIR.hpp"
 #include "CodeGen.hpp"
 #include "IRVisitor.hpp"
-#include "DisjointSetUnion.hpp"
+#include "SSA.hpp"
 
-#include <asmjit/x86.h>
-
-#include <queue>
-#include <set>
 #include <memory>
 #include <stdexcept>
 
@@ -101,16 +97,18 @@ void IRVisitor::visit(ProgramAST& v)
     
     m_ssa.sealBlock(m_currentBB);
 
-    std::cout << "Before renaming: \n";
-    m_ssa.printCFG();
+    //std::cout << "Before renaming: \n";
+    //m_ssa.printCFG();
     m_ssa.renameSSA();
 
-    std::cout << "After renaming: \n";
-    m_ssa.printCFG();
+    //std::cout << "\n\nAfter renaming: \n";
+    //m_ssa.printCFG();
 
     SSA old = m_ssa;
     m_cg.setSSA(old);
-    m_cg.generateX86("main");
+    //m_cg.linearizeCFG();
+    m_cg.generateMIR();
+    //m_cg.generateX86("main");
 
     for (auto const& [key, func]: m_funcBB)
     {
@@ -124,11 +122,14 @@ void IRVisitor::visit(ProgramAST& v)
         // then just do phiweb
         newSSA.renameSSA();
         newSSA.printCFG();
-        m_cg.setSSA(newSSA);
-        m_cg.generateX86(key);
+        //CodeGen cg(newSSA);
+        //cg.generateX86(key);
+        //m_cg.setSSA(newSSA);
+        //m_cg.generateX86(key);
     }
+    //m_cg.linearizeCFG();
 
-    m_cg.executeJIT();
+    //m_cg.executeJIT();
 }
 
 void IRVisitor::visit(ScopeAST& v)
@@ -174,7 +175,6 @@ void IRVisitor::visit(AssignmentAST& v)
 
     auto identifier = v.getIdentifier();    
     auto& targetStr = identifier->getName();
-
 
     if (identifier->getIdentType() == IdentType::ARRAY)
     {
@@ -988,7 +988,7 @@ void IRVisitor::visit(ProcDeclAST& v)
     auto funcSignature = std::make_shared<FuncSignature>(
         procName, FType::PROC, Type::UNDEFINED, m_parameters, m_currentBB);
     m_currentBB->pushInst(funcSignature);
-    m_cg.generateFuncNode(procName, false, m_parameters.size());
+    //m_cg.generateFuncNode(procName, false, m_parameters.size());
     return;
 }
 

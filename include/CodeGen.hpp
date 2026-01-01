@@ -1,6 +1,8 @@
 #pragma once
 
 #include "SSA.hpp"
+#include "BasicBlock.hpp"
+#include "MachineIR.hpp"
 
 #include <asmjit/x86.h>
 
@@ -29,6 +31,8 @@ class CodeGen
 
 	using funcNodePair = std::pair<asmjit::FuncNode*, asmjit::FuncSignature>;
 	std::map<std::string, funcNodePair> m_funcMap;
+	std::vector<std::shared_ptr<BasicBlock>> m_linearizedBlocks;
+	std::vector<std::shared_ptr<BasicBlockMIR>> m_mirBlocks;
 
 public:
 	CodeGen(SSA ssa);
@@ -45,6 +49,8 @@ public:
 	void generateFuncNode(std::string& funcName, bool haveRet,
 						  unsigned int numberOfArg);
 
-	void generateX86(std::string functionName);
-	void executeJIT();
+	void linearizeCFG();
+	void generateMIR();
+	//void generateX86(std::string functionName);
+	//void executeJIT();
 };

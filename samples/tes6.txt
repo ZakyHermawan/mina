@@ -1,0 +1,7 @@
+{
+	var a: integer;
+	a := 100
+	put(a, skip)
+	get(a)
+	put(a, skip)
+}

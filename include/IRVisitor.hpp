@@ -4,15 +4,11 @@
 #include "CodeGen.hpp"
 #include "Visitors.hpp"
 #include "BasicBlock.hpp"
-#include "Types.hpp"
 #include "InstIR.hpp"
 
 #include <stack>
 #include <memory>
 #include <unordered_map>
-#include <unordered_set>
-
-#include <asmjit/asmjit.h>
 
 
 class IRVisitor : public Visitor

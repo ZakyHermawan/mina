@@ -1,11 +1,18 @@
 #include "CodeGen.hpp"
 #include "BasicBlock.hpp"
+#include "MachineIR.hpp"
+#include "InstIR.hpp"
+
 #include <asmjit/x86.h>
 #include <asmjit/core/globals.h>
 
+#include <functional>
+#include <iostream>
+#include <vector>
 #include <memory>
-#include <queue>
+#include <algorithm>
 #include <set>
+#include <map>
 
 typedef int (*Func)(void);
 
@@ -196,11 +203,212 @@ void CodeGen::generateFuncNode(std::string& funcName, bool haveRet, unsigned int
     m_funcMap[funcName] = std::make_pair(funcNode, funcSignature);
 }
 
+void CodeGen::linearizeCFG()
+{
+    // Implement Reverse Post-Order Traversal to linearize the CFG
+    std::set<std::shared_ptr<BasicBlock>> visited;
+    std::function<void(std::shared_ptr<BasicBlock>)> dfs =
+        [&](std::shared_ptr<BasicBlock> bb)
+        {
+          visited.insert(bb);
+          for (auto& succ : bb->getSuccessors())
+          {
+              if (visited.find(succ) == visited.end())
+              {
+                  dfs(succ);
+              }
+          }
+          m_linearizedBlocks.push_back(bb);
+    };
+    dfs(m_ssa.getCFG());
+    std::reverse(m_linearizedBlocks.begin(), m_linearizedBlocks.end());
+}
+
+void CodeGen::generateMIR()
+{
+    linearizeCFG();
+    std::cout << "Instructions in Reverse Post-Order:\n";
+    
+    // Print instructions in linearized order
+    for (unsigned int i = 0; i < m_linearizedBlocks.size(); ++i)
+    {
+      std::cout << m_linearizedBlocks[i]->getName() << ":\n";
+      for (unsigned int j = 0;
+           j < m_linearizedBlocks[i]->getInstructions().size(); ++j)
+      {
+        std::cout << "    "
+                  << m_linearizedBlocks[i]->getInstructions()[j]->getString()
+                  << std::endl;
+      }
+    }
+    std::cout << std::endl;
+    
+    std::shared_ptr<Register> rbp{new Register{0, "rbp"}};
+    std::shared_ptr<Register> rsp{new Register{1, "rsp"}};
+    std::shared_ptr<Register> rax{new Register{2, "rax"}};
+    std::shared_ptr<Register> rbx{new Register{3, "rbx"}};
+    std::shared_ptr<Register> rcx{new Register{4, "rcx"}};
+    std::shared_ptr<Register> rdx{new Register{5, "rdx"}};
+    std::shared_ptr<Register> rip{new Register{6, "rip"}};
+
+    std::map<std::string, unsigned int> vRegToOffset;
+    std::vector<std::string> strLiterals;
+    unsigned int strConstCtr = 0;
+
+    auto leaToLabel = [&](std::string format_str)
+    {
+        auto literalMIR = std::make_shared<LiteralMIR>(format_str);
+        auto memMIR = std::make_shared<MemoryMIR>(rip, literalMIR);
+        auto leaMIR = std::make_shared<LeaMIR>(
+            std::vector<std::shared_ptr<MachineIR>>{rcx, memMIR});
+        return leaMIR;
+    };
+
+    for (int i = 0; i < m_linearizedBlocks.size(); ++i)
+    {
+        auto& currBlock = m_linearizedBlocks[i];
+        std::shared_ptr<BasicBlockMIR> bbMIR{
+            new BasicBlockMIR{currBlock->getName()}};
+
+        auto& inst = currBlock->getInstructions();
+
+        for (int j = 0; j < inst.size(); ++j)
+        {
+            auto instType = inst[j]->getInstType();
+            if (instType == InstType::Assign)
+            {
+                std::vector<std::shared_ptr<MachineIR>> mirOperands;
+                auto assignInst = std::dynamic_pointer_cast<AssignInst>(inst[j]);
+                auto& operands = assignInst->getOperands();
+                auto targetStr = assignInst->getTarget()->getString();
+                auto source = assignInst->getSource();
+
+                if (vRegToOffset.find(targetStr) == vRegToOffset.end())
+                {
+                    vRegToOffset[targetStr] = (vRegToOffset.size() + 1) * 4;
+                }
+              
+                unsigned int offset = vRegToOffset[targetStr];
+                std::shared_ptr<MemoryMIR> mirTarget{
+                    new MemoryMIR{rbp, -static_cast<int>(offset)}};
+                mirOperands.push_back(mirTarget);
+              
+                auto sourceType = source->getInstType();
+                if (sourceType == InstType::IntConst)
+                {
+                    auto intConstInst = std::dynamic_pointer_cast<IntConstInst>(source);
+                    std::shared_ptr<MachineIR> mirSource{
+                        new ConstMIR{intConstInst->getVal()}};
+                    mirOperands.push_back(mirSource);
+                    MovMIR movMIR{std::move(mirOperands)};
+                    bbMIR->addInstruction(std::make_shared<MovMIR>(movMIR));
+                }
+            }
+            else if (instType == InstType::Put)
+            {
+                std::vector<std::shared_ptr<MachineIR>> mirOperands;
+                auto putInst = std::dynamic_pointer_cast<PutInst>(inst[j]);
+                auto& operands = putInst->getOperands();
+                auto outputType = operands[0]->getTarget()->getInstType();
+                if (outputType == InstType::IntConst)
+                {
+                    bbMIR->addInstruction(leaToLabel("fmt_str"));
+                    auto intConstInst =
+                        std::dynamic_pointer_cast<IntConstInst>(
+                            operands[0]->getTarget());
+                    auto constMIR =
+                        std::make_shared<ConstMIR>(intConstInst->getVal());
+                    auto movMIR = std::make_shared<MovMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rdx, constMIR});
+                    bbMIR->addInstruction(movMIR);
+                }
+                else if (outputType == InstType::Ident)
+                {
+                    bbMIR->addInstruction(leaToLabel("fmt_str"));
+                    auto identInst = std::dynamic_pointer_cast<IdentInst>(
+                        operands[0]->getTarget());
+                    auto offset = vRegToOffset[identInst->getString()];
+                    auto offsetMIR = std::make_shared<ConstMIR>(-offset);
+                    auto memoryMIR = std::make_shared<MemoryMIR>(rbp, offsetMIR);
+                    auto movMIR = std::make_shared<MovMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rdx,
+                                                                memoryMIR});
+                    bbMIR->addInstruction(movMIR);
+                }
+                else if (outputType == InstType::StrConst)
+                {
+                    auto outputInstr = std::dynamic_pointer_cast<StrConstInst>(
+                        operands[0]->getTarget());
+                    auto outputStr = outputInstr->getString();
+                    if (outputStr == "'\\n'")
+                    {
+                        bbMIR->addInstruction(leaToLabel("newline_str"));
+                    }
+                    else
+                    {
+                        std::string sectionName =
+                            "literal" + std::to_string(strConstCtr++);
+                        bbMIR->addInstruction(leaToLabel(sectionName));
+                        std::string literal = outputInstr->getString();
+                        strLiterals.push_back(outputStr);
+                    }
+                }
+                auto callMIR = std::make_shared<CallMIR>("printf");
+                bbMIR->addInstruction(callMIR);
+            }
+            else if (instType == InstType::Get)
+            {
+                std::vector<std::shared_ptr<MachineIR>> mirOperands;
+                auto getInst = std::dynamic_pointer_cast<GetInst>(inst[j]);
+                auto& target = getInst->getTarget();
+
+                bbMIR->addInstruction(leaToLabel("fmt_str"));
+
+                // Argument
+                auto targetStr = target->getString();
+                unsigned int offset = vRegToOffset[targetStr];
+                std::shared_ptr<MemoryMIR> mirTarget{
+                    new MemoryMIR{rbp, -static_cast<int>(offset)}};
+                auto argLeaMIR = std::make_shared<LeaMIR>(
+                    std::vector<std::shared_ptr<MachineIR>>{rdx, mirTarget});
+                bbMIR->addInstruction(argLeaMIR);
+                auto callMIR = std::make_shared<CallMIR>("scanf");
+                bbMIR->addInstruction(callMIR);
+            }
+        }
+        m_mirBlocks.push_back(std::move(bbMIR));
+    }
+
+    std::cout << ".intel_syntax noprefix\n.globl main\nfmt_str: .string \"%d\"\n";
+    for (unsigned int i = 0; i < strLiterals.size(); ++i)
+    {
+        std::cout << "literal" << std::to_string(i) << ": .string ";
+        std::cout << strLiterals[i] << std::endl;
+    }
+    std::cout << ".section .text\nmain: \n";
+    for (const auto& mirBlock : m_mirBlocks)
+    {
+        // Shadow space 32 byte and 4 byte for each variable
+        unsigned int offset = 32 + vRegToOffset.size() * 4;
+        unsigned int aligned_offset = (offset + 15) & ~15; // 16-byte alignment
+        std::cout << mirBlock->getName() << ": \n";
+        std::cout << "    push rbp\n    mov rbp, rsp\n";
+        std::cout << "    sub rsp, " << aligned_offset << std::endl;
+        mirBlock->printInstructions();
+        std::cout << "    add rsp, 48\n";
+        std::cout << "    mov rsp, rbp\n    pop rbp\n    ret\n";
+    }
+    std::cout << "\nnewline_str: .string \"\\n\"\n";
+    std::cout << "\n";
+}
+
+/*
 void CodeGen::generateX86(std::string funcName)
 {
     // BFS
     std::queue<std::shared_ptr<BasicBlock>> worklist;
     std::set<std::shared_ptr<BasicBlock>> visited;
+    //linearizeCFG();
     worklist.push(m_ssa.getCFG());
     visited.insert(m_ssa.getCFG());
     
@@ -1813,7 +2021,7 @@ void CodeGen::executeJIT()
     std::cout << m_logger.content().data() << std::endl;
 
     if (err != asmjit::Error::kOk)
-    {
+    {gen
         return;  // Handle a possible error returned by AsmJit.
     }
 
@@ -1822,3 +2030,4 @@ void CodeGen::executeJIT()
 
     m_rt.release(fn);
 }
+*/

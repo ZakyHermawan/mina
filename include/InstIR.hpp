@@ -62,6 +62,7 @@ public:
     Inst() {};
     virtual std::string getString() { return ""; };
     virtual std::shared_ptr<Inst> getTarget() { return shared_from_this(); }
+    virtual bool hasTarget() { return true; }
     virtual void setTarget(std::shared_ptr<Inst> target) { }
     virtual void push_user(std::shared_ptr<Inst> user) {};
     virtual void setup_def_use() {}
@@ -1029,7 +1030,7 @@ public:
     HaltInst& operator=(const HaltInst&) = delete;
     HaltInst& operator=(HaltInst&&) noexcept = default;
   
-    std::string getCalleeStr();
+    virtual bool hasTarget() override { return false; }
   
     virtual std::string getString() override;
     virtual std::shared_ptr<BasicBlock> getBlock() override;
