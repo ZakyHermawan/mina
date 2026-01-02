@@ -10,10 +10,6 @@
 IRVisitor::IRVisitor()
     : m_tempCounter(0),
       m_labelCounter(0),
-      m_jitRuntime(),
-      m_codeHolder(),
-      m_assembler(&m_codeHolder),
-      m_logger(stdout),
       m_ssa{},
       m_cg{m_ssa}
 {
@@ -108,7 +104,6 @@ void IRVisitor::visit(ProgramAST& v)
     m_cg.setSSA(old);
     //m_cg.linearizeCFG();
     m_cg.generateMIR();
-    //m_cg.generateX86("main");
 
     for (auto const& [key, func]: m_funcBB)
     {
@@ -122,14 +117,7 @@ void IRVisitor::visit(ProgramAST& v)
         // then just do phiweb
         newSSA.renameSSA();
         newSSA.printCFG();
-        //CodeGen cg(newSSA);
-        //cg.generateX86(key);
-        //m_cg.setSSA(newSSA);
-        //m_cg.generateX86(key);
     }
-    //m_cg.linearizeCFG();
-
-    //m_cg.executeJIT();
 }
 
 void IRVisitor::visit(ScopeAST& v)

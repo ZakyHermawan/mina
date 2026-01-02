@@ -29,13 +29,7 @@ private:
     std::shared_ptr<BasicBlock> m_currentBB; // current basic block
     std::unordered_map<std::string, std::shared_ptr<BasicBlock>> m_funcBB;
 
-    asmjit::JitRuntime m_jitRuntime;
-    asmjit::CodeHolder m_codeHolder;
-    asmjit::x86::Assembler m_assembler;
-    asmjit::FileLogger m_logger;  // Logger should always survive CodeHolder.
-
-    asmjit::x86::Gp m_tmp;
-   public:
+public:
     IRVisitor();
     void visit(StatementsAST& v) override;
     void visit(NumberAST& v) override;
