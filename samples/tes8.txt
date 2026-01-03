@@ -12,6 +12,6 @@
 	c := a | ~b
 	put(c, skip)
 
-	c := ~a & ~b
+	c := ~a & true
 	put(c, skip)
 }
