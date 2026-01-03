@@ -2,8 +2,9 @@
 #include "InstIR.hpp"
 #include "DisjointSetUnion.hpp"
 
-#include <queue>
 #include <set>
+#include <queue>
+#include <memory>
 #include <iostream>
 #include <functional>
 
@@ -81,58 +82,6 @@ void SSA::printCFG()
             std::cout << inst[j]->getString() << std::endl;
         }
     }
-
-    /*
-    // --- Step 0: Handle the case of an empty CFG ---
-    if (!m_cfg) {
-        std::cerr << "CFG is empty or not initialized." << std::endl;
-        return;
-    }
-
-    // --- Step 1: Initialize BFS data structures ---
-    std::queue<std::shared_ptr<BasicBlock>> worklist;
-    std::set<std::shared_ptr<BasicBlock>> visited;
-
-    // --- Step 2: Start the traversal from the entry block ---
-    worklist.push(m_cfg);
-    visited.insert(m_cfg);
-
-    std::cout << "--- Control Flow Graph (BFS Traversal) ---" << std::endl;
-
-    // --- Step 3: Loop as long as there are blocks to process ---
-    while (!worklist.empty())
-    {
-        // Get the next block from the front of the queue
-        std::shared_ptr<BasicBlock> current_bb = worklist.front();
-        worklist.pop();
-
-        // --- Process the current block (print its contents) ---
-        std::cout << "\n" << current_bb->getName() << ":" << std::endl;
-        auto instructions = current_bb->getInstructions();
-        if (instructions.empty()) {
-            std::cout << "  (no instructions)" << std::endl;
-        } else {
-            for (const auto& inst : instructions) {
-                // Indenting instructions makes the output much clearer
-                std::cout << "  " << inst->getString() << std::endl;
-            }
-        }
-        
-        // --- Step 4: Add its unvisited successors to the queue ---
-        for (const auto& successor : current_bb->getSuccessors())
-        {
-            // The 'find' method on a set is an efficient way to check for existence.
-            // If the successor is NOT in our visited set...
-            if (visited.find(successor) == visited.end())
-            {
-                // ...then mark it as visited and add it to the queue to be processed later.
-                visited.insert(successor);
-                worklist.push(successor);
-            }
-        }
-    }
-     std::cout << "\n--- End of CFG ---\n" << std::endl;
-     */
 }
 
 std::string SSA::getBaseName(std::string name)
@@ -322,11 +271,11 @@ void SSA::sealBlock(std::shared_ptr<BasicBlock> block)
     m_sealedBlocks.insert(block);
 }
 
-// use DSU data structure to collect all related variable name
+// Use DSU data structure to collect all related variable name
 // for example: x.0 and x.1 are related, so we group them together in one set
 // later, we rename all of these related variable
 
-// please improve this algorithm using better out of SSA algorithm before implementing optimizations,
+// Please improve this algorithm using better out of SSA algorithm before implementing optimizations,
 // some optimization like coalescing can make this algorithm wrong.
 void SSA::renameSSA()
 {
