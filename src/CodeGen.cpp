@@ -495,18 +495,22 @@ void CodeGen::generateMIR()
         std::cout << strLiterals[i] << std::endl;
     }
     std::cout << ".section .text\nmain: \n";
+
+    // Shadow space 32 byte and 4 byte for each variable
+    unsigned int offset = 32 + vRegToOffset.size() * 4;
+    unsigned int aligned_offset = (offset + 15) & ~15; // 16-byte alignment
+    std::cout << "    push rbp\n    mov rbp, rsp\n";
+    std::cout << "    sub rsp, " << aligned_offset << std::endl;
+
     for (const auto& mirBlock : m_mirBlocks)
     {
-        // Shadow space 32 byte and 4 byte for each variable
-        unsigned int offset = 32 + vRegToOffset.size() * 4;
-        unsigned int aligned_offset = (offset + 15) & ~15; // 16-byte alignment
         std::cout << mirBlock->getName() << ": \n";
-        std::cout << "    push rbp\n    mov rbp, rsp\n";
-        std::cout << "    sub rsp, " << aligned_offset << std::endl;
         mirBlock->printInstructions();
-        std::cout << "    add rsp, 48\n";
-        std::cout << "    mov rsp, rbp\n    pop rbp\n    ret\n";
     }
+
+    std::cout << "    add rsp, " << aligned_offset << std::endl;
+    std::cout << "    mov rsp, rbp\n    pop rbp\n    ret\n";
+
     std::cout << "\nnewline_str: .string \"\\n\"\n";
     std::cout << "\n";
 }
