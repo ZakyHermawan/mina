@@ -149,6 +149,20 @@ void CodeGen::generateMIR()
                             mirTarget, rax}}};
                     bbMIR->addInstruction(finalMovMIR);
                 }
+                else if (sourceType == InstType::BoolConst)
+                {
+                    auto boolConstInst =
+                        std::dynamic_pointer_cast<BoolConstInst>(source);
+                    int boolVal = boolConstInst->getVal() ? 1 : 0;
+                    std::shared_ptr<MachineIR> mirSource{
+                        new ConstMIR{boolVal}};
+
+                    // mov QWORD PTR [target], constant
+                    auto movMIR = std::make_shared<MovMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{mirTarget,
+                                                                mirSource});
+                    bbMIR->addInstruction(movMIR);
+                }
             }
             else if (instType == InstType::Put)
             {
