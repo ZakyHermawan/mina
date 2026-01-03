@@ -1,0 +1,13 @@
+{
+	var a: integer
+	var b: integer
+	var c: boolean
+	;
+	a := 1
+	b := 3
+	if a <= b then
+		put("exec", skip)
+    else
+		put("dont exec", skip)
+	end if
+}

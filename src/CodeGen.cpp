@@ -3,13 +3,14 @@
 #include "MachineIR.hpp"
 #include "InstIR.hpp"
 
-#include <functional>
-#include <iostream>
-#include <vector>
-#include <memory>
-#include <algorithm>
-#include <set>
 #include <map>
+#include <set>
+#include <memory>
+#include <vector>
+#include <iostream>
+#include <algorithm>
+#include <stdexcept>
+#include <functional>
 
 typedef int (*Func)(void);
 
@@ -243,7 +244,7 @@ void CodeGen::generateMIR()
                 auto callMIR = std::make_shared<CallMIR>("scanf");
                 bbMIR->addInstruction(callMIR);
             }
-            else if (instType == InstType::Add)
+            else if (instType == InstType::Add || instType == InstType::Sub || instType == InstType::Mul)
             {
                 auto addInst = std::dynamic_pointer_cast<AddInst>(inst[j]);
                 auto targetStr = addInst->getTarget()->getString(); // Temporary variable
@@ -254,105 +255,81 @@ void CodeGen::generateMIR()
 
                 assignVRegToOffsetIfDoesNotExist(targetStr);
 
-                auto op1MemMIR = memoryLocationForVReg(operand1->getString()); // rax
-                auto op2MemMIR = memoryLocationForVReg(operand2->getString()); // rbx
-                auto targetMemMIR = memoryLocationForVReg(targetStr);
+                if (operand1->getInstType() == InstType::IntConst)
+                {
+                    auto intConstInst =
+                        std::dynamic_pointer_cast<IntConstInst>(operand1);
+                    auto constMIR =
+                        std::make_shared<ConstMIR>(intConstInst->getVal());
 
-                // mov rax, op1
-                auto movMIR1 = std::make_shared<MovMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{rax,
-                                                            op1MemMIR});
-                bbMIR->addInstruction(movMIR1);
+                    // mov rax, constant
+                    auto movMIR = std::make_shared<MovMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rax, constMIR});
+                    bbMIR->addInstruction(movMIR);
+                }
+                else
+                {
+                    auto op1MemMIR = memoryLocationForVReg(
+                        operand1->getTarget()->getString());
 
-                // mov rbx, op2
-                auto movMIR2 = std::make_shared<MovMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{rbx,
-                                                            op2MemMIR});
-                bbMIR->addInstruction(movMIR2);
+                    // mov rax, QWORD PTR [op1]
+                    auto movMIR = std::make_shared<MovMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rax,
+                                                                op1MemMIR});
+                    bbMIR->addInstruction(movMIR);
+                }
 
-                // add rax, rbx
-                auto addMIR = std::make_shared<AddMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{rax, rbx});
-                bbMIR->addInstruction(addMIR);
+                if (operand2->getInstType() == InstType::IntConst)
+                {
+                    auto intConstInst =
+                        std::dynamic_pointer_cast<IntConstInst>(operand2);
+                    auto constMIR =
+                        std::make_shared<ConstMIR>(intConstInst->getVal());
 
-                // mov QOWRD PTR [target], rax
-                auto movMIR3 = std::make_shared<MovMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{targetMemMIR, rax});
-                bbMIR->addInstruction(movMIR3);
-            }
-            else if (instType == InstType::Sub)
-            {
-                auto subInst = std::dynamic_pointer_cast<SubInst>(inst[j]);
-                auto targetStr = subInst->getTarget()->getString(); // Temporary variable
+                    // mov rbx, constant
+                    auto movMIR = std::make_shared<MovMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rbx, constMIR});
+                    bbMIR->addInstruction(movMIR);
+                }
+                else
+                {
+                    auto op2MemMIR = memoryLocationForVReg(
+                        operand1->getTarget()->getString());
 
-                auto& operands = subInst->getOperands();
-                auto& operand1 = operands[0]->getTarget();
-                auto& operand2 = operands[1]->getTarget();
+                    // mov rbx, QWORD PTR [op1]
+                    auto movMIR = std::make_shared<MovMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rbx,
+                                                                op2MemMIR});
+                    bbMIR->addInstruction(movMIR);
+                }
 
-                assignVRegToOffsetIfDoesNotExist(targetStr);
-
-                auto op1MemMIR = memoryLocationForVReg(operand1->getString()); // rax
-                auto op2MemMIR = memoryLocationForVReg(operand2->getString()); // rbx
-                auto targetMemMIR = memoryLocationForVReg(targetStr);
-
-                // mov rax, op1
-                auto movMIR1 = std::make_shared<MovMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{rax,
-                                                            op1MemMIR});
-                bbMIR->addInstruction(movMIR1);
-
-                // mov rbx, op2
-                auto movMIR2 = std::make_shared<MovMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{rbx,
-                                                            op2MemMIR});
-                bbMIR->addInstruction(movMIR2);
-
-                // add rax, rbx
-                auto subMIR = std::make_shared<SubMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{rax, rbx});
-                bbMIR->addInstruction(subMIR);
-
-                // mov QOWRD PTR [target], rax
-                auto movMIR3 = std::make_shared<MovMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{targetMemMIR, rax});
-                bbMIR->addInstruction(movMIR3);
-            }
-            else if (instType == InstType::Mul)
-            {
-                auto mulInst = std::dynamic_pointer_cast<MulInst>(inst[j]);
-                auto targetStr = mulInst->getTarget()->getString(); // Temporary variable
-
-                auto& operands = mulInst->getOperands();
-                auto& operand1 = operands[0]->getTarget();
-                auto& operand2 = operands[1]->getTarget();
-
-                assignVRegToOffsetIfDoesNotExist(targetStr);
-
-                auto op1MemMIR = memoryLocationForVReg(operand1->getString()); // rax
-                auto op2MemMIR = memoryLocationForVReg(operand2->getString()); // rbx
-                auto targetMemMIR = memoryLocationForVReg(targetStr);
-
-                // mov rax, op1
-                auto movMIR1 = std::make_shared<MovMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{rax,
-                                                            op1MemMIR});
-                bbMIR->addInstruction(movMIR1);
-
-                // mov rbx, op2
-                auto movMIR2 = std::make_shared<MovMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{rbx,
-                                                            op2MemMIR});
-                bbMIR->addInstruction(movMIR2);
-
-                // imul rax, rbx
-                auto mulMIR = std::make_shared<MulMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{rax, rbx});
-                bbMIR->addInstruction(mulMIR);
+                if (instType == InstType::Add)
+                {
+                    // add rax, rbx
+                    auto addMIR = std::make_shared<AddMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rax, rbx});
+                    bbMIR->addInstruction(addMIR);
+                }
+                else if (instType == InstType::Sub)
+                {
+                    // sub rax, rbx
+                    auto subMIR = std::make_shared<SubMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rax, rbx});
+                    bbMIR->addInstruction(subMIR);
+                }
+                else
+                {
+                    // imul rax, rbx
+                    auto mulMIR = std::make_shared<MulMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rax, rbx});
+                    bbMIR->addInstruction(mulMIR);
+                }
 
                 // mov QOWRD PTR [target], rax
-                auto movMIR3 = std::make_shared<MovMIR>(
+                auto targetMemMIR = memoryLocationForVReg(targetStr);
+                auto movMIR = std::make_shared<MovMIR>(
                     std::vector<std::shared_ptr<MachineIR>>{targetMemMIR, rax});
-                bbMIR->addInstruction(movMIR3);
+                bbMIR->addInstruction(movMIR);
             }
             else if (instType == InstType::Div)
             {
@@ -365,29 +342,54 @@ void CodeGen::generateMIR()
 
                 assignVRegToOffsetIfDoesNotExist(targetStr);
 
-                auto op1MemMIR = memoryLocationForVReg(operand1->getString()); // rax
-                auto op2MemMIR = memoryLocationForVReg(operand2->getString()); // rbx
-                auto targetMemMIR = memoryLocationForVReg(targetStr);
+                if (operand1->getInstType() == InstType::IntConst)
+                {
+                    auto intConstInst =
+                        std::dynamic_pointer_cast<IntConstInst>(operand1);
+                    auto constMIR =
+                        std::make_shared<ConstMIR>(intConstInst->getVal());
 
-                // mov rax, op1
-                auto movMIR1 = std::make_shared<MovMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{rax,
-                                                            op1MemMIR});
-                bbMIR->addInstruction(movMIR1);
+                    // mov rax, constant
+                    auto movMIR = std::make_shared<MovMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rax, constMIR});
+                    bbMIR->addInstruction(movMIR);
+                }
+                else
+                {
+                    auto op1MemMIR = memoryLocationForVReg(
+                        operand1->getTarget()->getString());
+
+                    // mov rax, QWORD PTR [op1]
+                    auto movMIR = std::make_shared<MovMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rax,
+                                                                op1MemMIR});
+                    bbMIR->addInstruction(movMIR);
+                }
 
                 // cqo
                 auto cqoMIR = std::make_shared<CqoMIR>();
                 bbMIR->addInstruction(cqoMIR);
 
-                // idiv QWORD PTR [op2]
-                auto divMIR = std::make_shared<DivMIR>(op2MemMIR);
-                bbMIR->addInstruction(divMIR);
+                if (operand2->getInstType() == InstType::IntConst)
+                {
+                    throw std::runtime_error(
+                        "Division by constant not supported yet.");
+                }
+                else
+                {
+                    auto op2MemMIR =
+                        memoryLocationForVReg(operand2->getString());  // rbx
+
+                    auto divMIR = std::make_shared<DivMIR>(op2MemMIR);
+                    bbMIR->addInstruction(divMIR);
+                }
 
                 // mov QWORD PTR [target], rax
-                auto movMIR2 = std::make_shared<MovMIR>(
+                auto targetMemMIR = memoryLocationForVReg(targetStr);
+                auto movMIR = std::make_shared<MovMIR>(
                     std::vector<std::shared_ptr<MachineIR>>{targetMemMIR,
                                                             rax});
-                bbMIR->addInstruction(movMIR2);
+                bbMIR->addInstruction(movMIR);
             }
             else if (instType == InstType::Not)
             {
@@ -416,11 +418,11 @@ void CodeGen::generateMIR()
                     std::vector<std::shared_ptr<MachineIR>>{targetMemMIR, rax});
                 bbMIR->addInstruction(movMIR2);
             }
-            else if (instType == InstType::Or)
+            else if (instType == InstType::Or || instType == InstType::And)
             {
-                auto orInst = std::dynamic_pointer_cast<OrInst>(inst[j]);
-                auto targetStr = orInst->getTarget()->getString(); // Temporary variable
-                auto& operands = orInst->getOperands();
+                auto currInst = inst[j];
+                auto targetStr = currInst->getTarget()->getString(); // Temporary variable
+                auto& operands = currInst->getOperands();
                 auto& operand1 = operands[0]->getTarget();
                 auto& operand2 = operands[1]->getTarget();
                 assignVRegToOffsetIfDoesNotExist(targetStr);
@@ -439,44 +441,20 @@ void CodeGen::generateMIR()
                     std::vector<std::shared_ptr<MachineIR>>{rbx, op2MemMIR});
                 bbMIR->addInstruction(movMIR2);
 
-                // or rax, rbx
-                auto orMIR = std::make_shared<OrMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{rax, rbx});
-                bbMIR->addInstruction(orMIR);
-
-                // mov QWORD PTR [target], rax
-                auto targetMemMIR = memoryLocationForVReg(targetStr);
-                auto movMIR3 = std::make_shared<MovMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{targetMemMIR, rax});
-                bbMIR->addInstruction(movMIR3);
-            }
-            else if (instType == InstType::And)
-            {
-                auto andInst = std::dynamic_pointer_cast<AndInst>(inst[j]);
-                auto targetStr = andInst->getTarget()->getString(); // Temporary variable
-                auto& operands = andInst->getOperands();
-                auto& operand1 = operands[0]->getTarget();
-                auto& operand2 = operands[1]->getTarget();
-                assignVRegToOffsetIfDoesNotExist(targetStr);
-                auto op1MemMIR =
-                    memoryLocationForVReg(operand1->getString());  // rax
-                auto op2MemMIR =
-                    memoryLocationForVReg(operand2->getString());  // rbx
-                
-                // mov rax, QWORD PTR [operand1]
-                auto movMIR1 = std::make_shared<MovMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{rax, op1MemMIR});
-                bbMIR->addInstruction(movMIR1);
-
-                // mov rbx, QWORD PTR [operand2]
-                auto movMIR2 = std::make_shared<MovMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{rbx, op2MemMIR});
-                bbMIR->addInstruction(movMIR2);
-
-                // and rax, rbx
-                auto andMIR = std::make_shared<AndMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{rax, rbx});
-                bbMIR->addInstruction(andMIR);
+                if (instType == InstType::Or)
+                {
+                    // or rax, rbx
+                    auto orMIR = std::make_shared<OrMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rax, rbx});
+                    bbMIR->addInstruction(orMIR);
+                }
+                else
+                {
+                    // and rax, rbx
+                    auto andMIR = std::make_shared<AndMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rax, rbx});
+                    bbMIR->addInstruction(andMIR);
+                }
 
                 // mov QWORD PTR [target], rax
                 auto targetMemMIR = memoryLocationForVReg(targetStr);
