@@ -484,6 +484,136 @@ void CodeGen::generateMIR()
                     std::vector<std::shared_ptr<MachineIR>>{targetMemMIR, rax});
                 bbMIR->addInstruction(movMIR3);
             }
+            else if (instType == InstType::CmpEq  || instType == InstType::CmpNE  ||
+                     instType == InstType::CmpLT  || instType == InstType::CmpLTE ||
+                     instType == InstType::CmpGT  || instType == InstType::CmpGTE)
+            {
+                auto& currInst = inst[j];
+                auto target = currInst->getTarget();
+                auto targetStr = target->getString();  // Temporary variable
+                auto& operands = currInst->getOperands();
+                auto& operand1 = operands[0]->getTarget();
+                auto& operand2 = operands[1]->getTarget();
+
+                assignVRegToOffsetIfDoesNotExist(targetStr);
+
+                auto op1MemMIR =
+                    memoryLocationForVReg(operand1->getString());
+                auto op2MemMIR =
+                    memoryLocationForVReg(operand2->getString());
+
+                // mov rax, QWORD PTR [operand1]
+                auto movMIR1 = std::make_shared<MovMIR>(
+                    std::vector<std::shared_ptr<MachineIR>>{rax, op1MemMIR});
+                bbMIR->addInstruction(movMIR1);
+
+                // cmp rax, QWORD PTR [operand2]
+                auto cmpMIR = std::make_shared<CmpMIR>(
+                    std::vector<std::shared_ptr<MachineIR>>{rax, op2MemMIR});
+                bbMIR->addInstruction(cmpMIR);
+
+                // setcc al
+                std::shared_ptr<MachineIR> setccMIR;
+                switch (instType)
+                {
+                    case InstType::CmpEq:
+                        setccMIR = std::make_shared<SeteMIR>(rax);
+                        break;
+                    case InstType::CmpNE:
+                        setccMIR = std::make_shared<SetneMIR>(rax);
+                        break;
+                    case InstType::CmpLT:
+                        setccMIR = std::make_shared<SetlMIR>(rax);
+                        break;
+                    case InstType::CmpLTE:
+                        setccMIR = std::make_shared<SetleMIR>(rax);
+                        break;
+                    case InstType::CmpGT:
+                        setccMIR = std::make_shared<SetgMIR>(rax);
+                        break;
+                    case InstType::CmpGTE:
+                        setccMIR = std::make_shared<SetgeMIR>(rax);
+                        break;
+                    default:
+                        break;
+                }
+                bbMIR->addInstruction(setccMIR);
+
+                // movzx rax, al
+                auto movzxMIR = std::make_shared<MovzxMIR>(
+                    rax,
+                    /*toRegSize=*/64,
+                    /*fromRegSize=*/8,
+                    /*isFromRegLow=*/true);
+                bbMIR->addInstruction(movzxMIR);
+
+                // mov QWORD PTR [target], rax
+                auto targetMemMIR = memoryLocationForVReg(targetStr);
+                auto movMIR2 = std::make_shared<MovMIR>(
+                    std::vector<std::shared_ptr<MachineIR>>{targetMemMIR, rax});
+                bbMIR->addInstruction(movMIR2);
+            }
+            else if (instType == InstType::Jump)
+            {
+                auto jumpInst = std::dynamic_pointer_cast<JumpInst>(inst[j]);
+                auto targetBB = jumpInst->getJumpTarget();
+                auto jmpMIR = std::make_shared<JmpMIR>(targetBB->getName());
+                bbMIR->addInstruction(jmpMIR);
+            }
+            else if (instType == InstType::BRT)
+            {
+                auto brtInst = std::dynamic_pointer_cast<BRTInst>(inst[j]);
+                auto condInst = brtInst->getCond();
+                auto targetSuccessBB = brtInst->getTargetSuccess();
+                auto targetFailedBB = brtInst->getTargetFailed();
+                auto condMemMIR = memoryLocationForVReg(condInst->getString());
+
+                // mov rax, QWORD PTR [cond]
+                auto movMIR = std::make_shared<MovMIR>(
+                    std::vector<std::shared_ptr<MachineIR>>{rax, condMemMIR});
+                bbMIR->addInstruction(movMIR);
+
+                // test rax, rax
+                auto testMIR = std::make_shared<TestMIR>(rax, rax);
+                bbMIR->addInstruction(testMIR);
+
+                // jnz targetSuccess
+                auto jnzMIR =
+                    std::make_shared<JnzMIR>(targetSuccessBB->getName());
+                bbMIR->addInstruction(jnzMIR);
+
+                // jmp targetFailed
+                auto jmpMIR =
+                    std::make_shared<JmpMIR>(targetFailedBB->getName());
+                bbMIR->addInstruction(jmpMIR);
+            }
+            else if (instType == InstType::BRF)
+            {
+                auto brfInst = std::dynamic_pointer_cast<BRFInst>(inst[j]);
+                auto condInst = brfInst->getCond();
+                auto targetSuccessBB = brfInst->getTargetSuccess();
+                auto targetFailedBB = brfInst->getTargetFailed();
+                auto condMemMIR = memoryLocationForVReg(condInst->getString());
+
+                // mov rax, QWORD PTR [cond]
+                auto movMIR = std::make_shared<MovMIR>(
+                    std::vector<std::shared_ptr<MachineIR>>{rax, condMemMIR});
+                bbMIR->addInstruction(movMIR);
+
+                // test rax, rax
+                auto testMIR = std::make_shared<TestMIR>(rax, rax);
+                bbMIR->addInstruction(testMIR);
+
+                // jz targetSuccess
+                auto jzMIR =
+                    std::make_shared<JzMIR>(targetSuccessBB->getName());
+                bbMIR->addInstruction(jzMIR);
+
+                // jmp targetFailed
+                auto jmpMIR =
+                    std::make_shared<JmpMIR>(targetFailedBB->getName());
+                bbMIR->addInstruction(jmpMIR);
+            }
         }
         m_mirBlocks.push_back(std::move(bbMIR));
     }
