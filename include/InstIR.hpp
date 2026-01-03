@@ -12,7 +12,6 @@ class BasicBlock;
 
 enum class InstType
 {
-
     IntConst,
     BoolConst,
     StrConst,

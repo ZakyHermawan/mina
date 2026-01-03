@@ -22,7 +22,19 @@ enum class MIRType
     Cqo,
     Not,
     And,
-    Or
+    Or,
+    Jmp,
+    Cmp,
+    Sete,
+    Setne,
+    Setl,
+    Setle,
+    Setg,
+    Setge,
+    Movzx,
+    Test,
+    Jz,
+    Jnz
 };
 
 // Base Class
@@ -53,14 +65,26 @@ class Register : public MachineIR
 {
     unsigned int m_id;
     std::string m_regName;
+    std::string m_32BitName;
+    std::string m_16BitName;
+    std::string m_8BitHighName;
+    std::string m_8BitLowName;
 
 public:
+    Register(unsigned int id, std::string name, std::string _32bitName,
+             std::string _16BitName, std::string _8BitHighName,
+             std::string _8BitLowName);
     Register(unsigned int id, std::string name);
     Register(unsigned int id);
 
     MIRType getMIRType() const override;
     std::string getString() const override;
     unsigned int getID() const;
+
+    std::string get32BitName() const;
+    std::string get16BitName() const;
+    std::string get8BitHighName() const;
+    std::string get8BitLowName() const;
 };
 
 // Literal Class, to emit operand as is
@@ -228,4 +252,140 @@ public:
     MIRType getMIRType() const override;
     std::string getString() const override;
     std::vector<std::shared_ptr<MachineIR>>& getOperands();
+};
+
+class CmpMIR : public MachineIR
+{
+    std::vector<std::shared_ptr<MachineIR>> m_operands;
+
+ public:
+    CmpMIR(std::vector<std::shared_ptr<MachineIR>> operands);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+};
+
+class SeteMIR : public MachineIR
+{
+    std::shared_ptr<Register> m_reg;
+
+public:
+    SeteMIR(std::shared_ptr<Register> reg);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+};
+
+class SetneMIR : public MachineIR
+{
+    std::shared_ptr<Register> m_reg;
+
+public:
+    SetneMIR(std::shared_ptr<Register> reg);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+};
+
+class SetlMIR : public MachineIR
+{
+    std::shared_ptr<Register> m_reg;
+
+public:
+    SetlMIR(std::shared_ptr<Register> reg);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+};
+
+class SetleMIR : public MachineIR
+{
+    std::shared_ptr<Register> m_reg;
+
+public:
+    SetleMIR(std::shared_ptr<Register> reg);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+};
+
+class SetgMIR : public MachineIR
+{
+    std::shared_ptr<Register> m_reg;
+
+public:
+    SetgMIR(std::shared_ptr<Register> reg);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+};
+
+class SetgeMIR : public MachineIR
+{
+    std::shared_ptr<Register> m_reg;
+
+public:
+    SetgeMIR(std::shared_ptr<Register> reg);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+};
+
+class MovzxMIR : public MachineIR
+{
+    std::shared_ptr<Register> m_reg;
+    unsigned int m_toRegSize;
+    unsigned int m_fromRegSize;
+    unsigned int m_isFromRegLow;
+
+public:
+    MovzxMIR(std::shared_ptr<Register> reg, unsigned int toRegSize, unsigned int fromRegSize, bool isFromRegLow);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+};
+
+class TestMIR: public MachineIR
+{
+    std::shared_ptr<Register> m_reg1;
+    std::shared_ptr<Register> m_reg2;
+
+public:
+    TestMIR(std::shared_ptr<Register> reg1, std::shared_ptr<Register> reg2);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+};
+
+class JmpMIR : public MachineIR
+{
+    std::string m_targetLabel;
+
+ public:
+    JmpMIR(std::string targetLabel);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::string getTargetLabel() const;
+};
+
+class JzMIR : public MachineIR
+{
+    std::string m_targetLabel;
+
+public:
+    JzMIR(std::string targetLabel);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::string getTargetLabel() const;
+};
+
+class JnzMIR : public MachineIR
+{
+    std::string m_targetLabel;
+
+ public:
+    JnzMIR(std::string targetLabel);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::string getTargetLabel() const;
 };

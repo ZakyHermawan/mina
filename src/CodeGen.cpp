@@ -61,10 +61,14 @@ void CodeGen::generateMIR()
     
     std::shared_ptr<Register> rbp{new Register{0, "rbp"}};
     std::shared_ptr<Register> rsp{new Register{1, "rsp"}};
-    std::shared_ptr<Register> rax{new Register{2, "rax"}};
-    std::shared_ptr<Register> rbx{new Register{3, "rbx"}};
-    std::shared_ptr<Register> rcx{new Register{4, "rcx"}};
-    std::shared_ptr<Register> rdx{new Register{5, "rdx"}};
+    std::shared_ptr<Register> rax{
+        new Register{2, "rax", "eax", "ax", "ah", "al"}};
+    std::shared_ptr<Register> rbx{
+        new Register{3, "rbx", "ebx", "bx", "bh", "bl"}};
+    std::shared_ptr<Register> rcx{
+        new Register{4, "rcx", "ecx", "cx", "ch", "cl"}};
+    std::shared_ptr<Register> rdx{
+        new Register{5, "rdx", "edx", "dx", "dh", "dl"}};
     std::shared_ptr<Register> rip{new Register{6, "rip"}};
 
     std::map<std::string, unsigned int> vRegToOffset;

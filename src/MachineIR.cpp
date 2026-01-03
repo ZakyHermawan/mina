@@ -53,6 +53,17 @@ void BasicBlockMIR::addInstruction(std::shared_ptr<MachineIR> inst)
 // Register
 // ==========================================
 
+Register::Register(unsigned int id, std::string name, std::string _32bitName,
+                   std::string _16BitName, std::string _8BitHighName,
+                   std::string _8BitLowName)
+    : m_id(id),
+      m_regName(std::move(name)), m_32BitName(std::move(_32bitName)),
+      m_16BitName(std::move(_16BitName)),
+      m_8BitHighName(std::move(_8BitHighName)),
+      m_8BitLowName(std::move(_8BitLowName))
+{
+}
+
 Register::Register(unsigned int id, std::string name)
     : m_id(id), m_regName(std::move(name))
 {
@@ -77,6 +88,26 @@ std::string Register::getString() const
 unsigned int Register::getID() const 
 { 
     return m_id; 
+}
+
+std::string Register::get32BitName() const
+{
+    return m_32BitName;
+}
+
+std::string Register::get16BitName() const
+{
+    return m_16BitName;
+}
+
+std::string Register::get8BitHighName() const
+{
+    return m_8BitHighName;
+}
+
+std::string Register::get8BitLowName() const
+{
+    return m_8BitLowName;
 }
 
 // ==========================================
@@ -476,4 +507,350 @@ std::string OrMIR::getString() const
 {
     // Access operands safely assuming the constructor check passed
     return "or " + m_operands[0]->getString() + ", " + m_operands[1]->getString();
+}
+
+// ==========================================
+// CmpMIR
+// ==========================================
+
+CmpMIR::CmpMIR(std::vector<std::shared_ptr<MachineIR>> operands)
+    : m_operands{std::move(operands)}
+{
+    if (m_operands.size() != 2)
+    {
+        throw std::runtime_error("MovMIR should have exactly 2 operands!");
+    }
+}
+
+std::vector<std::shared_ptr<MachineIR>>& CmpMIR::getOperands()
+{ 
+    return m_operands; 
+}
+
+MIRType CmpMIR::getMIRType() const 
+{ 
+    return MIRType::Or;
+}
+
+std::string CmpMIR::getString() const
+{
+    // Access operands safely assuming the constructor check passed
+    return "cmp " + m_operands[0]->getString() + ", " + m_operands[1]->getString();
+}
+
+// ==========================================
+// SeteMIR
+// ==========================================
+
+SeteMIR::SeteMIR(std::shared_ptr<Register> reg)
+    : m_reg{std::move(reg)}
+{
+}
+
+MIRType SeteMIR::getMIRType() const
+{
+    return MIRType::Sete;
+}
+
+std::string SeteMIR::getString() const
+{
+    return "sete " + m_reg->get8BitLowName();
+}
+
+std::vector<std::shared_ptr<MachineIR>>& SeteMIR::getOperands()
+{
+    return std::vector<std::shared_ptr<MachineIR>>{m_reg};
+}
+
+// ==========================================
+// SetneMIR
+// ==========================================
+
+SetneMIR::SetneMIR(std::shared_ptr<Register> reg)
+    : m_reg{std::move(reg)}
+{
+}
+
+MIRType SetneMIR::getMIRType() const
+{
+    return MIRType::Setne;
+}
+
+std::string SetneMIR::getString() const
+{
+    return "setne " + m_reg->get8BitLowName();
+}
+
+std::vector<std::shared_ptr<MachineIR>>& SetneMIR::getOperands()
+{
+    return std::vector<std::shared_ptr<MachineIR>>{m_reg};
+}
+
+// ==========================================
+// SetlMIR
+// ==========================================
+
+SetlMIR::SetlMIR(std::shared_ptr<Register> reg)
+    : m_reg{std::move(reg)}
+{
+}
+
+MIRType SetlMIR::getMIRType() const
+{
+    return MIRType::Setl;
+}
+
+std::string SetlMIR::getString() const
+{
+    return "setl " + m_reg->get8BitLowName();
+}
+
+std::vector<std::shared_ptr<MachineIR>>& SetlMIR::getOperands()
+{
+    return std::vector<std::shared_ptr<MachineIR>>{m_reg};
+}
+
+// ==========================================
+// SetleMIR
+// ==========================================
+
+SetleMIR::SetleMIR(std::shared_ptr<Register> reg)
+    : m_reg{std::move(reg)}
+{
+}
+
+MIRType SetleMIR::getMIRType() const
+{
+    return MIRType::Setle;
+}
+
+std::string SetleMIR::getString() const
+{
+    return "setle " + m_reg->get8BitLowName();
+}
+
+std::vector<std::shared_ptr<MachineIR>>& SetleMIR::getOperands()
+{
+    return std::vector<std::shared_ptr<MachineIR>>{m_reg};
+}
+
+// ==========================================
+// SetgMIR
+// ==========================================
+
+SetgMIR::SetgMIR(std::shared_ptr<Register> reg)
+    : m_reg{std::move(reg)}
+{
+}
+
+MIRType SetgMIR::getMIRType() const
+{
+    return MIRType::Setg;
+}
+
+std::string SetgMIR::getString() const
+{
+    return "setg " + m_reg->get8BitLowName();
+}
+
+std::vector<std::shared_ptr<MachineIR>>& SetgMIR::getOperands()
+{
+    return std::vector<std::shared_ptr<MachineIR>>{m_reg};
+}
+
+// ==========================================
+// SetgeMIR
+// ==========================================
+
+SetgeMIR::SetgeMIR(std::shared_ptr<Register> reg)
+    : m_reg{std::move(reg)}
+{
+}
+
+MIRType SetgeMIR::getMIRType() const
+{
+    return MIRType::Setge;
+}
+
+std::string SetgeMIR::getString() const
+{
+    return "setge " + m_reg->get8BitLowName();
+}
+
+std::vector<std::shared_ptr<MachineIR>>& SetgeMIR::getOperands()
+{
+    return std::vector<std::shared_ptr<MachineIR>>{m_reg};
+}
+
+// ==========================================
+// MovzxMIR
+// ==========================================
+
+MovzxMIR::MovzxMIR(std::shared_ptr<Register> reg, unsigned int toRegSize,
+    unsigned int fromRegSize, bool isFromRegLow)
+    : m_reg{std::move(reg)},
+      m_toRegSize(toRegSize),
+      m_fromRegSize(fromRegSize),
+      m_isFromRegLow(isFromRegLow)
+{
+}
+
+MIRType MovzxMIR::getMIRType() const
+{
+    return MIRType::Movzx;
+}
+
+std::string MovzxMIR::getString() const
+{
+    std::string strRepr = "movzx ";
+    
+    // Determine destination register name based on size
+    if (m_toRegSize == 64)
+    {
+        strRepr += m_reg->getString(); // Full register name for 64-bit
+    }
+    else if (m_toRegSize == 32)
+    {
+        strRepr += m_reg->get32BitName();
+    }
+    else if (m_toRegSize == 16)
+    {
+        strRepr += m_reg->get16BitName();
+    }
+    else
+    {
+        throw std::runtime_error("Movzx can only accept source register with size 64, 32, or 16 bits!");
+    }
+    strRepr += ", ";
+
+    // Determine source register name based on size and low/high byte
+    if (m_fromRegSize == 8)
+    {
+        if (m_isFromRegLow)
+        {
+            strRepr += m_reg->get8BitLowName();
+        }
+        else
+        {
+            strRepr += m_reg->get8BitHighName();
+        }
+    }
+    else if (m_fromRegSize == 16)
+    {
+        strRepr += m_reg->get16BitName();
+    }
+    else if (m_fromRegSize == 32)
+    {
+        strRepr += m_reg->get32BitName();
+    }
+    else if (m_fromRegSize == 64)
+    {
+        strRepr += m_reg->getString();
+    }
+    else
+    {
+        throw std::runtime_error(
+            "Movzx can only accept source register with size 64, 32, 16, "
+            "or 8 bits!");
+    }
+
+    return strRepr;
+}
+
+std::vector<std::shared_ptr<MachineIR>>& MovzxMIR::getOperands()
+{
+    return std::vector<std::shared_ptr<MachineIR>>{m_reg};
+}
+
+// ==========================================
+// TestMIR
+// ==========================================
+
+TestMIR::TestMIR(std::shared_ptr<Register> reg1, std::shared_ptr<Register> reg2)
+    : m_reg1{std::move(reg1)}, m_reg2{std::move(reg2)}
+{
+}
+
+MIRType TestMIR::getMIRType() const
+{
+    return MIRType::Test;
+}
+
+std::string TestMIR::getString() const
+{
+    return "test " + m_reg1->getString() + ", " + m_reg2->getString();
+}
+
+std::vector<std::shared_ptr<MachineIR>>& TestMIR::getOperands()
+{
+    return std::vector<std::shared_ptr<MachineIR>>{m_reg1, m_reg2};
+}
+
+// ==========================================
+// JmpMIR
+// ==========================================
+
+JmpMIR::JmpMIR(std::string targetLabel) : m_targetLabel{targetLabel}
+{
+}
+
+MIRType JmpMIR::getMIRType() const
+{
+    return MIRType::Jmp;
+}
+
+std::string JmpMIR::getString() const
+{
+    return "jmp " + m_targetLabel;
+}
+
+std::string JmpMIR::getTargetLabel() const
+{
+    return m_targetLabel;
+}
+
+// ==========================================
+// JzMIR
+// ==========================================
+
+JzMIR::JzMIR(std::string targetLabel) : m_targetLabel{targetLabel}
+{
+}
+
+MIRType JzMIR::getMIRType() const
+{
+    return MIRType::Jz;
+}
+
+std::string JzMIR::getString() const
+{
+    return "jz " + m_targetLabel;
+}
+
+std::string JzMIR::getTargetLabel() const
+{
+    return m_targetLabel;
+}
+
+// ==========================================
+// JnzMIR
+// ==========================================
+
+JnzMIR::JnzMIR(std::string targetLabel) : m_targetLabel{targetLabel}
+{
+}
+
+MIRType JnzMIR::getMIRType() const
+{
+    return MIRType::Jmp;
+}
+
+std::string JnzMIR::getString() const
+{
+    return "jnz " + m_targetLabel;
+}
+
+std::string JnzMIR::getTargetLabel() const
+{
+    return m_targetLabel;
 }
