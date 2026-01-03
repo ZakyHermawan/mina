@@ -1,7 +1,7 @@
 #include "Ast.hpp"
 #include "InstIR.hpp"
 #include "BasicBlock.hpp"
-#include <iostream>
+#include <string>
 
 #include <stdexcept>
 
@@ -12,7 +12,6 @@ IntConstInst::IntConstInst(int val, std::shared_ptr<BasicBlock> block)
 int IntConstInst::getVal() { return m_val; }
 std::string IntConstInst::getString()
 {
-    //return "IntConst(" + std::to_string(m_val) + ")";
     return std::to_string(m_val);
 }
 void IntConstInst::push_user(std::shared_ptr<Inst> user)
@@ -375,7 +374,7 @@ OrInst::OrInst(std::shared_ptr<Inst> target, std::shared_ptr<Inst> operand1,
       m_operand2(std::move(operand2)),
       m_block(std::move(block))
 {
-    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand1};
+    m_operands = std::vector<std::shared_ptr<Inst>>{m_operand1, m_operand2};
 }
 std::shared_ptr<Inst> OrInst::getTarget() { return m_target; }
 std::shared_ptr<Inst> OrInst::getOperand1() { return m_operand1; }

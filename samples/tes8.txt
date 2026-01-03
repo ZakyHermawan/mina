@@ -1,0 +1,7 @@
+{
+	var a: boolean
+	var b: boolean
+	var c: boolean
+	;
+	b := a | b
+}

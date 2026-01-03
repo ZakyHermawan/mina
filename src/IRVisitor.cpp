@@ -94,7 +94,6 @@ void IRVisitor::visit(ProgramAST& v)
     m_ssa.sealBlock(m_currentBB);
 
     //std::cout << "Before renaming: \n";
-    //m_ssa.printCFG();
     m_ssa.renameSSA();
 
     //std::cout << "\n\nAfter renaming: \n";
@@ -618,7 +617,6 @@ void IRVisitor::visit(FactorsAST& v)
     {
         factors->accept(*this);
     }
-
 }
 
 void IRVisitor::visit(TermAST& v)
@@ -633,7 +631,10 @@ void IRVisitor::visit(TermAST& v)
         return;
     }
     auto factors = v.getFactors();
-    if (factors) factors->accept(*this);
+    if (factors)
+    {
+        factors->accept(*this);
+    }
 }
 
 void IRVisitor::visit(TermsAST& v)
@@ -693,7 +694,6 @@ void IRVisitor::visit(TermsAST& v)
 void IRVisitor::visit(SimpleExprAST& v)
 {
     if (v.getTerm()) v.getTerm()->accept(*this);
-    //v.getTerm()->accept(*this);
     auto terms = v.getTerms();
     if (terms) terms->accept(*this);
 }
