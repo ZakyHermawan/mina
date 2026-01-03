@@ -3,5 +3,9 @@
 	var b: boolean
 	var c: boolean
 	;
-	b := a | b
+	put(b, skip)
+	b := ~b
+	put(b, skip)
+	b := ~b
+	put(b, skip)
 }

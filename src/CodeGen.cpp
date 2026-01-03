@@ -385,6 +385,45 @@ void CodeGen::generateMIR()
                                                             rax});
                 bbMIR->addInstruction(movMIR2);
             }
+            else if (instType == InstType::Not)
+            {
+                auto notInst = std::dynamic_pointer_cast<NotInst>(inst[j]);
+
+                auto targetStr =
+                    notInst->getTarget()->getString();  // Temporary variable
+                assignVRegToOffsetIfDoesNotExist(targetStr);
+
+                auto operand = notInst->getOperand()->getTarget();
+                auto opMemMIR =
+                    memoryLocationForVReg(operand->getString());  // rax
+                
+                // mov rax, QWORD PTR [operand]
+                auto movMIR1 = std::make_shared<MovMIR>(
+                    std::vector<std::shared_ptr<MachineIR>>{rax, opMemMIR});
+                bbMIR->addInstruction(movMIR1);
+
+                // xor rax, 1
+                auto notMIR = std::make_shared<NotMIR>(rax);
+                bbMIR->addInstruction(notMIR);
+
+                // mov QWORD PTR [target], rax
+                auto targetMemMIR = memoryLocationForVReg(targetStr);
+                auto movMIR2 = std::make_shared<MovMIR>(
+                    std::vector<std::shared_ptr<MachineIR>>{targetMemMIR, rax});
+                bbMIR->addInstruction(movMIR2);
+            }
+            else if (instType == InstType::Or)
+            {
+            }
+            else if (instType == InstType::And)
+            {
+            }
+            /*
+                Not,
+    And,
+    Or,
+
+            */
         }
         m_mirBlocks.push_back(std::move(bbMIR));
     }

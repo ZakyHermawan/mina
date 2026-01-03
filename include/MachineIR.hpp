@@ -19,7 +19,8 @@ enum class MIRType
     Sub,
     Mul,
     Div,
-    Cqo
+    Cqo,
+    Not
 };
 
 // Base Class
@@ -123,6 +124,8 @@ public:
     // Override methods
     MIRType getMIRType() const override;
     std::string getString() const override;
+
+    std::vector<std::shared_ptr<MachineIR>>& getOperands();
     
     // Virtual destructor (good practice for inheritance)
     ~LeaMIR() override = default;
@@ -188,4 +191,16 @@ public:
     CqoMIR();
     MIRType getMIRType() const override;
     std::string getString() const override;
+};
+
+// To implement logical NOT, but using XOR instruction
+class NotMIR : public MachineIR
+{
+    std::shared_ptr<Register> m_operand;
+
+public:
+    NotMIR(std::shared_ptr<Register> operand);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::vector<std::shared_ptr<MachineIR>>& getOperands();
 };

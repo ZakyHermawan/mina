@@ -242,6 +242,12 @@ std::string LeaMIR::getString() const
     return ss.str();
 }
 
+std::vector<std::shared_ptr<MachineIR>>& LeaMIR::getOperands()
+{
+    return m_operands;
+}
+
+
 // ==========================================
 // CallMIR
 // ==========================================
@@ -388,4 +394,28 @@ MIRType CqoMIR::getMIRType() const
 std::string CqoMIR::getString() const
 {
     return "cqo";
+}
+
+// ==========================================
+// NotMIR
+// ==========================================
+
+NotMIR::NotMIR(std::shared_ptr<Register> operand)
+    : m_operand{std::move(operand)}
+{
+}
+
+std::vector<std::shared_ptr<MachineIR>>& NotMIR::getOperands()
+{
+    return std::vector<std::shared_ptr<MachineIR>>{m_operand};
+}
+
+MIRType NotMIR::getMIRType() const 
+{ 
+    return MIRType::Not;
+}
+
+std::string NotMIR::getString() const
+{
+    return "xor " + m_operand->getString() + ", 1";
 }
