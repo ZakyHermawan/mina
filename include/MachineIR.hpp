@@ -20,7 +20,9 @@ enum class MIRType
     Mul,
     Div,
     Cqo,
-    Not
+    Not,
+    And,
+    Or
 };
 
 // Base Class
@@ -200,6 +202,29 @@ class NotMIR : public MachineIR
 
 public:
     NotMIR(std::shared_ptr<Register> operand);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+};
+
+class AndMIR : public MachineIR
+{
+    std::vector<std::shared_ptr<MachineIR>> m_operands;
+
+public:
+    AndMIR(std::vector<std::shared_ptr<MachineIR>> operands);
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+};
+
+
+class OrMIR : public MachineIR
+{
+    std::vector<std::shared_ptr<MachineIR>> m_operands;
+
+public:
+    OrMIR(std::vector<std::shared_ptr<MachineIR>> operands);
     MIRType getMIRType() const override;
     std::string getString() const override;
     std::vector<std::shared_ptr<MachineIR>>& getOperands();

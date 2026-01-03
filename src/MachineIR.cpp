@@ -419,3 +419,61 @@ std::string NotMIR::getString() const
 {
     return "xor " + m_operand->getString() + ", 1";
 }
+
+// ==========================================
+// AndMIR
+// ==========================================
+
+AndMIR::AndMIR(std::vector<std::shared_ptr<MachineIR>> operands)
+    : m_operands{std::move(operands)}
+{
+    if (m_operands.size() != 2)
+    {
+        throw std::runtime_error("MovMIR should have exactly 2 operands!");
+    }
+}
+
+std::vector<std::shared_ptr<MachineIR>>& AndMIR::getOperands()
+{ 
+    return m_operands; 
+}
+
+MIRType AndMIR::getMIRType() const 
+{ 
+    return MIRType::And;
+}
+
+std::string AndMIR::getString() const
+{
+    // Access operands safely assuming the constructor check passed
+    return "and " + m_operands[0]->getString() + ", " + m_operands[1]->getString();
+}
+
+// ==========================================
+// OrMIR
+// ==========================================
+
+OrMIR::OrMIR(std::vector<std::shared_ptr<MachineIR>> operands)
+    : m_operands{std::move(operands)}
+{
+    if (m_operands.size() != 2)
+    {
+        throw std::runtime_error("MovMIR should have exactly 2 operands!");
+    }
+}
+
+std::vector<std::shared_ptr<MachineIR>>& OrMIR::getOperands()
+{ 
+    return m_operands; 
+}
+
+MIRType OrMIR::getMIRType() const 
+{ 
+    return MIRType::Or;
+}
+
+std::string OrMIR::getString() const
+{
+    // Access operands safely assuming the constructor check passed
+    return "or " + m_operands[0]->getString() + ", " + m_operands[1]->getString();
+}

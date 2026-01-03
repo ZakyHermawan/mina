@@ -8,4 +8,10 @@
 	put(b, skip)
 	b := ~b
 	put(b, skip)
+
+	c := a | ~b
+	put(c, skip)
+
+	c := ~a & ~b
+	put(c, skip)
 }
