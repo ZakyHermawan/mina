@@ -6,7 +6,9 @@
 #include <map>
 #include <set>
 #include <memory>
+#include <string>
 #include <vector>
+#include <utility>
 #include <iostream>
 #include <algorithm>
 #include <stdexcept>
@@ -73,15 +75,22 @@ void CodeGen::generateMIR()
     std::shared_ptr<Register> rip{new Register{6, "rip"}};
 
     std::map<std::string, unsigned int> vRegToOffset;
+    std::map<std::string, unsigned int> arrVRegToSize;
     std::vector<std::string> strLiterals;
     unsigned int strConstCtr = 0;
 
     auto assignVRegToOffsetIfDoesNotExist =
-        [&](std::string targetStr, unsigned int numOfElement = 1)
+        [&](std::string targetStr)
     {
         if (vRegToOffset.find(targetStr) == vRegToOffset.end())
         {
-            vRegToOffset[targetStr] = (vRegToOffset.size() + numOfElement) * 8;
+            auto offset = vRegToOffset.size() * 8;
+            for (const auto& arrPair : arrVRegToSize)
+            {
+                offset += static_cast<unsigned long long>(arrPair.second) * 8;
+            }
+
+            vRegToOffset[targetStr] = offset + 8;
         }
     };
 
@@ -96,6 +105,11 @@ void CodeGen::generateMIR()
     
     auto memoryLocationForVReg = [&](std::string vReg)
     {
+        if (vRegToOffset.find(vReg) == vRegToOffset.end())
+        {
+            std::cout << vReg << std::endl;
+            throw std::runtime_error("CodeGen Error: Variable '" + vReg + "' not found in stack map.");
+        }
         unsigned int offset = vRegToOffset[vReg];
         auto offsetMIR = std::make_shared<ConstMIR>(-static_cast<int>(offset));
         auto memoryMIR = std::make_shared<MemoryMIR>(rbp, offsetMIR);
@@ -427,7 +441,7 @@ void CodeGen::generateMIR()
                 auto& operand1 = operands[0]->getTarget();
                 auto& operand2 = operands[1]->getTarget();
                 assignVRegToOffsetIfDoesNotExist(targetStr);
-                
+
                 if (operand1->getInstType() == InstType::BoolConst)
                 {
                     auto boolConstInst =
@@ -499,61 +513,61 @@ void CodeGen::generateMIR()
             {
                 auto& currInst = inst[j];
                 auto target = currInst->getTarget();
-                auto targetStr = target->getString();  // Temporary variable
+                auto targetStr = target->getString();
                 auto& operands = currInst->getOperands();
                 auto& operand1 = operands[0]->getTarget();
                 auto& operand2 = operands[1]->getTarget();
 
                 assignVRegToOffsetIfDoesNotExist(targetStr);
 
-                auto op1MemMIR =
-                    memoryLocationForVReg(operand1->getString());
-                auto op2MemMIR =
-                    memoryLocationForVReg(operand2->getString());
+                if (operand1->getInstType() == InstType::IntConst)
+                {
+                    auto intConst = std::dynamic_pointer_cast<IntConstInst>(operand1);
+                    auto constMIR = std::make_shared<ConstMIR>(intConst->getVal());
 
-                // mov rax, QWORD PTR [operand1]
-                auto movMIR1 = std::make_shared<MovMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{rax, op1MemMIR});
-                bbMIR->addInstruction(movMIR1);
+                    // mov rax, constant
+                    bbMIR->addInstruction(std::make_shared<MovMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rax, constMIR}));
+                }
+                else {
+                    auto op1MemMIR = memoryLocationForVReg(operand1->getString());
 
-                // cmp rax, QWORD PTR [operand2]
-                auto cmpMIR = std::make_shared<CmpMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{rax, op2MemMIR});
-                bbMIR->addInstruction(cmpMIR);
+                    // mov rax, QWORD PTR [op1]
+                    bbMIR->addInstruction(std::make_shared<MovMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rax, op1MemMIR}));
+                }
+
+                if (operand2->getInstType() == InstType::IntConst) {
+                    auto intConst = std::dynamic_pointer_cast<IntConstInst>(operand2);
+                    auto constMIR = std::make_shared<ConstMIR>(intConst->getVal());
+
+                    // cmp rax, constant
+                    bbMIR->addInstruction(std::make_shared<CmpMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rax, constMIR}));
+                } else {
+                    auto op2MemMIR = memoryLocationForVReg(operand2->getString());
+
+                    // cmp rax, QWORD PTR [op2]
+                    bbMIR->addInstruction(std::make_shared<CmpMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rax, op2MemMIR}));
+                }
 
                 // setcc al
                 std::shared_ptr<MachineIR> setccMIR;
                 switch (instType)
                 {
-                    case InstType::CmpEq:
-                        setccMIR = std::make_shared<SeteMIR>(rax);
-                        break;
-                    case InstType::CmpNE:
-                        setccMIR = std::make_shared<SetneMIR>(rax);
-                        break;
-                    case InstType::CmpLT:
-                        setccMIR = std::make_shared<SetlMIR>(rax);
-                        break;
-                    case InstType::CmpLTE:
-                        setccMIR = std::make_shared<SetleMIR>(rax);
-                        break;
-                    case InstType::CmpGT:
-                        setccMIR = std::make_shared<SetgMIR>(rax);
-                        break;
-                    case InstType::CmpGTE:
-                        setccMIR = std::make_shared<SetgeMIR>(rax);
-                        break;
-                    default:
-                        break;
+                    case InstType::CmpEq:  setccMIR = std::make_shared<SeteMIR>(rax); break;
+                    case InstType::CmpNE:  setccMIR = std::make_shared<SetneMIR>(rax); break;
+                    case InstType::CmpLT:  setccMIR = std::make_shared<SetlMIR>(rax); break;
+                    case InstType::CmpLTE: setccMIR = std::make_shared<SetleMIR>(rax); break;
+                    case InstType::CmpGT:  setccMIR = std::make_shared<SetgMIR>(rax); break;
+                    case InstType::CmpGTE: setccMIR = std::make_shared<SetgeMIR>(rax); break;
+                    default: break;
                 }
                 bbMIR->addInstruction(setccMIR);
 
                 // movzx rax, al
-                auto movzxMIR = std::make_shared<MovzxMIR>(
-                    rax,
-                    /*toRegSize=*/64,
-                    /*fromRegSize=*/8,
-                    /*isFromRegLow=*/true);
+                auto movzxMIR = std::make_shared<MovzxMIR>(rax, 64, 8, true);
                 bbMIR->addInstruction(movzxMIR);
 
                 // mov QWORD PTR [target], rax
@@ -599,7 +613,7 @@ void CodeGen::generateMIR()
             else if (instType == InstType::BRF)
             {
                 auto brfInst = std::dynamic_pointer_cast<BRFInst>(inst[j]);
-                auto condInst = brfInst->getCond();
+                auto condInst = brfInst->getCond()->getTarget();
                 auto targetSuccessBB = brfInst->getTargetSuccess();
                 auto targetFailedBB = brfInst->getTargetFailed();
                 auto condMemMIR = memoryLocationForVReg(condInst->getString());
@@ -623,6 +637,134 @@ void CodeGen::generateMIR()
                     std::make_shared<JmpMIR>(targetFailedBB->getName());
                 bbMIR->addInstruction(jmpMIR);
             }
+            else if (instType == InstType::Alloca)
+            {
+                auto allocaInst = std::dynamic_pointer_cast<AllocaInst>(inst[j]);
+                auto targetStr = allocaInst->getTarget()->getString();
+                if (arrVRegToSize.find(targetStr) == arrVRegToSize.end() &&
+                    vRegToOffset.find(targetStr) == vRegToOffset.end())
+                {
+                    assignVRegToOffsetIfDoesNotExist(targetStr);
+                    arrVRegToSize[targetStr] = allocaInst->getSize();
+                }
+                else
+                {
+                    throw std::runtime_error("Array already allocated: " + targetStr);
+                }
+            }
+            else if (instType == InstType::ArrUpdate)
+            {
+                auto arrUpdateInst = std::dynamic_pointer_cast<ArrUpdateInst>(inst[j]);
+                auto& source = arrUpdateInst->getTarget();
+                auto& sourceName = source->getString();
+                auto& index = arrUpdateInst->getIndex()->getTarget();
+                auto& value = arrUpdateInst->getVal()->getTarget();
+
+                // Array Base Address Check
+                if (vRegToOffset.find(sourceName) == vRegToOffset.end())
+                {
+                    throw std::runtime_error("ArrUpdate: Array '" + sourceName + "' not allocated in stack.");
+                }
+                auto sourceOffset = vRegToOffset[sourceName];
+
+                // Save Value to RAX
+                if (value->getInstType() == InstType::IntConst)
+                {
+                    auto intConstInst = std::dynamic_pointer_cast<IntConstInst>(value);
+                    auto constMIR = std::make_shared<ConstMIR>(intConstInst->getVal());
+                    bbMIR->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{rax, constMIR}));
+                }
+                else if (value->getInstType() == InstType::Ident)
+                {
+                    std::string varName = value->getTarget()->getString();
+                    bbMIR->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{rax, memoryLocationForVReg(varName)}));
+                }
+
+                // Compute Offset into RBX
+                if (index->getInstType() == InstType::IntConst)
+                {
+                    auto intConstInst = std::dynamic_pointer_cast<IntConstInst>(index);
+                    int indexVal = intConstInst->getVal();
+                    unsigned int indexOffset = indexVal * 8;
+                    auto offsetMIR = std::make_shared<ConstMIR>(-static_cast<int>(sourceOffset + indexOffset));
+                    auto sourceMemMIR = std::make_shared<MemoryMIR>(rbp, offsetMIR);
+                    bbMIR->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{sourceMemMIR, rax}));
+                }
+                else if (index->getInstType() == InstType::Ident)
+                {
+                    std::string indexName = index->getTarget()->getString();
+
+                    // Safe Lookup for Index (e.g., Variable "A")
+                    auto indexMemMIR = memoryLocationForVReg(indexName);
+
+                    // mov rbx, QWORD PTR [index]
+                    bbMIR->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{rbx, indexMemMIR}));
+
+                    // imul rbx, 8
+                    bbMIR->addInstruction(std::make_shared<MulMIR>(std::vector<std::shared_ptr<MachineIR>>{rbx, std::make_shared<ConstMIR>(8)}));
+
+                    // lea rcx, [rbp - sourceOffset] (Base)
+                    auto sourceOffsetMIR = std::make_shared<ConstMIR>(-static_cast<int>(sourceOffset));
+                    bbMIR->addInstruction(std::make_shared<LeaMIR>(std::vector<std::shared_ptr<MachineIR>>{rcx, std::make_shared<MemoryMIR>(rbp, sourceOffsetMIR)}));
+
+                    // sub rcx, rbx
+                    bbMIR->addInstruction(std::make_shared<SubMIR>(std::vector<std::shared_ptr<MachineIR>>{rcx, rbx}));
+
+                    // mov [rcx], rax
+                    bbMIR->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{std::make_shared<MemoryMIR>(rcx, std::make_shared<ConstMIR>(0)), rax}));
+                }
+            }
+            else if (instType == InstType::ArrAccess)
+            {
+                auto arrAccessInst = std::dynamic_pointer_cast<ArrAccessInst>(inst[j]);
+                auto& target = arrAccessInst->getTarget();
+                auto& source = arrAccessInst->getSource()->getTarget();
+                auto& index = arrAccessInst->getIndex()->getTarget();
+
+                if (vRegToOffset.find(source->getString()) == vRegToOffset.end())
+                {
+                    throw std::runtime_error("ArrAccess: Array '" + source->getString() + "' not allocated.");
+                }
+                auto sourceOffset = vRegToOffset[source->getString()];
+
+                assignVRegToOffsetIfDoesNotExist(target->getString());
+
+                if (index->getInstType() == InstType::IntConst)
+                {
+                    auto intConstInst = std::dynamic_pointer_cast<IntConstInst>(index);
+                    int indexVal = intConstInst->getVal();
+                    unsigned int indexOffset = indexVal * 8;
+                    auto offsetMIR = std::make_shared<ConstMIR>(-static_cast<int>(sourceOffset + indexOffset));
+                    auto sourceMemMIR = std::make_shared<MemoryMIR>(rbp, offsetMIR);
+                    bbMIR->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{rax, sourceMemMIR}));
+                } 
+                else if (index->getInstType() == InstType::Ident) 
+                {
+                    std::string indexName = index->getTarget()->getString();
+
+                    // Safe lookup
+                    auto indexMemMIR = memoryLocationForVReg(indexName);
+
+                    // mov rbx, QWORD PTR [index]
+                    bbMIR->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{rbx, indexMemMIR}));
+
+                    // imul rbx, 8
+                    bbMIR->addInstruction(std::make_shared<MulMIR>(std::vector<std::shared_ptr<MachineIR>>{rbx, std::make_shared<ConstMIR>(8)}));
+
+                    // lea rcx, QWORD PTR [rbp - sourceOffset]
+                    auto sourceOffsetMIR = std::make_shared<ConstMIR>(-static_cast<int>(sourceOffset));
+                    bbMIR->addInstruction(std::make_shared<LeaMIR>(std::vector<std::shared_ptr<MachineIR>>{rcx, std::make_shared<MemoryMIR>(rbp, sourceOffsetMIR)}));
+
+                    // sub rcx, rbx
+                    bbMIR->addInstruction(std::make_shared<SubMIR>(std::vector<std::shared_ptr<MachineIR>>{rcx, rbx}));
+
+                    // mov rax, QWORD PTR [rcx]
+                    bbMIR->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{rax, std::make_shared<MemoryMIR>(rcx, std::make_shared<ConstMIR>(0))}));
+                }
+
+                auto targetMemMIR = memoryLocationForVReg(target->getString());
+                bbMIR->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{targetMemMIR, rax}));
+            }
         }
         m_mirBlocks.push_back(std::move(bbMIR));
     }
@@ -635,8 +777,15 @@ void CodeGen::generateMIR()
     }
     std::cout << ".section .text\nmain: \n";
 
-    // Shadow space 32 byte and 4 byte for each variable
-    unsigned int offset = 32 + vRegToOffset.size() * 4;
+    // Shadow space 32 byte and 8 byte for each variable
+    unsigned int offset = 32 + vRegToOffset.size() * 8;
+
+    // Offset for arrays
+    for (const auto& arrPair : arrVRegToSize)
+    {
+        offset += arrPair.second * 8;
+    }
+
     unsigned int aligned_offset = (offset + 15) & ~15; // 16-byte alignment
     std::cout << "    push rbp\n    mov rbp, rsp\n";
     std::cout << "    sub rsp, " << aligned_offset << std::endl;

@@ -466,8 +466,8 @@ ArrAccessInst::ArrAccessInst(std::shared_ptr<Inst> target,
     m_operands = std::vector<std::shared_ptr<Inst>>{m_source, m_index};
 }
 std::shared_ptr<Inst> ArrAccessInst::getTarget() { return m_target; }
-std::shared_ptr<Inst> ArrAccessInst::getSource() { return m_source; }
-std::shared_ptr<Inst> ArrAccessInst::getIndex() { return m_index; }
+std::shared_ptr<Inst> ArrAccessInst::getSource() { return m_operands[0]; }
+std::shared_ptr<Inst> ArrAccessInst::getIndex() { return m_operands[1]; }
 std::string ArrAccessInst::getString()
 {
     auto target = m_target->getTarget()->getString();
@@ -519,9 +519,9 @@ ArrUpdateInst::ArrUpdateInst(std::shared_ptr<Inst> target,
     m_operands = std::vector<std::shared_ptr<Inst>>{m_source, m_index, m_val};
 }
 std::shared_ptr<Inst> ArrUpdateInst::getTarget() { return m_target; }
-std::shared_ptr<Inst> ArrUpdateInst::getSource() { return m_source; }
-std::shared_ptr<Inst> ArrUpdateInst::getIndex() { return m_index; }
-std::shared_ptr<Inst> ArrUpdateInst::getVal() { return m_val; }
+std::shared_ptr<Inst> ArrUpdateInst::getSource() { return m_operands[0]; }
+std::shared_ptr<Inst> ArrUpdateInst::getIndex() { return m_operands[1]; }
+std::shared_ptr<Inst> ArrUpdateInst::getVal() { return m_operands[2]; }
 std::string ArrUpdateInst::getString()
 {
     auto target = m_target->getTarget()->getString();
