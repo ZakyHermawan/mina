@@ -1,13 +1,14 @@
 ﻿#pragma once
 
-#include <iostream>
-#include <stdexcept>
 #include <unordered_map>
-#include <cassert>
 #include <memory>
+#include <string>
+#include <utility>
 
 #include "Lexer.hpp"
 #include "vm.hpp"
+#include "Token.hpp"
+#include "Types.hpp"
 #include "Symbol.hpp"
 #include "arena_alloc.hpp"
 #include "Ast.hpp"
@@ -27,16 +28,10 @@ private:
     arena::vector<std::string> m_parameters;
     arena::vector<Type> m_parameterTypes;
     arena::vector<std::shared_ptr<ExprAST>> m_arguments;
-    unsigned int m_ip;  // instruction pointer
-    int m_sp;           // stack pointer, always point to the next valid address
-    int m_bp;           // base pointer for stack frame
-    // arena::unordered_map<std::string, Bucket> m_symTab; // symbol table
-    arena::vector<int>
-        m_globalDisplay;  // store base pointer address on each stack frame
+
     arena::vector<arena::unordered_map<std::string, Bucket>> m_symTab;
     arena::vector<arena::unordered_map<std::string, FunctionBucket>>
         m_functionTab;
-    arena::vector<int> m_instructions;
 
  public:
     Parser(std::string source);
@@ -46,7 +41,7 @@ private:
     Parser &operator=(Parser &&) = default;
     Parser &operator=(const Parser &) = default;
     ~Parser() = default;
-    
+
     // panic mode
     void exitParse(std::string msg);
     bool isFinished() const;
@@ -68,9 +63,7 @@ private:
     void symbolNotDefinedOnLexicalLevel(const std::string &identifier,
                                         int lexical_level);
     void symbolNotDefinedOnCurrentLexicalLevel(const std::string &identifier);
-
     Type getTypeFromSymTab(std::string &identifier);
-    void printInstructions();
     
     std::shared_ptr<ProgramAST> program();
     std::shared_ptr<ScopeAST> scope();

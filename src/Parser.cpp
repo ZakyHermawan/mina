@@ -1,5 +1,6 @@
 #include "Parser.hpp"
 #include "Ast.hpp"
+#include "Token.hpp"
 #include "Types.hpp"
 #include "IRVisitor.hpp"
 
@@ -15,9 +16,6 @@ Parser::Parser(std::string source)
     : m_lexer{std::move(source)},
       m_isError{false},
       m_lexical_level{-1},
-      m_ip{0},
-      m_sp{-1},
-      m_bp{-1},
       m_arrSize{0},
       m_parsing_function{0},
       m_local_numVar{0},
@@ -31,9 +29,6 @@ Parser::Parser()
       : m_lexer{},
       m_isError{false},
       m_lexical_level{-1},
-      m_ip{0},
-      m_sp{-1},
-      m_bp{-1},
       m_arrSize{0},
       m_parsing_function{0},
       m_local_numVar{0},
@@ -159,120 +154,6 @@ Type Parser::getTypeFromSymTab(std::string& identifier)
     auto type = symTab[identifier].getType();
     return type;
 }
-// for debugging purpose
-void Parser::printInstructions()
-{
-    int ip = 0;
-    while (ip < m_instructions.size())
-    {
-        printf("%04d:  ", ip);
-        switch (m_instructions[ip])
-        {
-            case NOOP:
-                std::cout << "noop\n";
-                break;
-            case IADD:
-                std::cout << "iadd\n";
-                break;
-            case ISUB:
-                std::cout << "isub\n";
-                break;
-            case IMUL:
-                std::cout << "imul\n";
-                break;
-            case IDIV:
-                std::cout << "idiv\n";
-                break;
-            case IOR:
-                std::cout << "ior\n";
-                break;
-            case IAND:
-                std::cout << "iand\n";
-                break;
-            case INOT:
-                std::cout << "inot\n";
-                break;
-            case ILT:
-                std::cout << "ilt\n";
-                break;
-            case IGT:
-                std::cout << "igt\n";
-                break;
-            case IEQ:
-                std::cout << "ieq\n";
-                break;
-            case BR:
-                std::cout << "br " << m_instructions[++ip] << std::endl;
-                break;
-            case BRT:
-                std::cout << "brt " << m_instructions[++ip] << std::endl;
-                break;
-            case BRF:
-                std::cout << "brf " << m_instructions[++ip] << std::endl;
-                break;
-            case ICONST:
-                std::cout << "iconst " << m_instructions[++ip] << std::endl;
-                break;
-            case LOAD:  // load local or arg
-                std::cout << "load " << m_instructions[++ip] << std::endl;
-                break;
-            case LLOAD:  // load local or arg
-                std::cout << "lload" << std::endl;
-                break;
-            case SLOAD:  // load local or arg
-                std::cout << "sload " << m_instructions[++ip] << std::endl;
-                break;
-            case GLOAD:  // load from global memory
-                std::cout << "gload " << m_instructions[++ip] << std::endl;
-                break;
-            case STORE:
-                std::cout << "store " << m_instructions[++ip] << std::endl;
-                break;
-            case LSTORE:
-                std::cout << "lstore" << std::endl;
-                break;
-            case SSTORE:
-                std::cout << "sstore " << m_instructions[++ip] << std::endl;
-                break;
-            case GSTORE:
-                std::cout << "gstore " << m_instructions[++ip] << std::endl;
-                break;
-            case ASTORE:
-                std::cout << "astore " << std::endl;
-                break;
-            case ALOAD:
-                std::cout << "aload " << std::endl;
-                break;
-            case PRINT:
-                std::cout << "print\n";
-                break;
-            case PRINTC:
-                std::cout << "printc\n";
-                break;
-            case READINT:
-                std::cout << "readint\n";
-                break;
-            case POP:
-                std::cout << "pop\n";
-                break;
-            case CALL:
-                printf("call %d %d %d\n", m_instructions[ip + 1],
-                m_instructions[ip + 2], m_instructions[ip + 3]);
-                ip += 3;
-                break;
-            case RET:
-                std::cout << "ret\n";
-                break;
-            case HALT:
-                std::cout << "halt\n";
-                break;
-            default:
-                printf("invalid opcode: %d at ip=%d\n", m_instructions[ip], (ip - 1));
-                exit(1);
-        }
-        ++ip;
-    }
-}
 
   /**
  * At the end of every parsing functions,
@@ -286,39 +167,12 @@ void Parser::printInstructions()
  * */
 std::shared_ptr<ProgramAST> Parser::program()
 {
-    ++m_sp;
-    m_bp = m_sp;
-
     m_symTab.push_back(arena::unordered_map<std::string, Bucket>());
     m_functionTab.push_back(
         arena::unordered_map<std::string, FunctionBucket>());
 
     auto scopeAST = scope();
     auto programAST = std::make_shared<ProgramAST>(std::move(scopeAST));
-
-    m_instructions.push_back(HALT);
-    
-    int *sc = (int *)malloc(sizeof(int) * m_instructions.size());
-    if (sc == nullptr)
-    {
-        std::cout << "FAILED\n";
-        exit(1);
-    }
-    for (unsigned int i = 0; i < m_instructions.size(); ++i)
-    {
-        sc[i] = m_instructions[i];
-    }
-
-    //VM *vm = vm_create(sc, m_instructions.size(), 1000);
-    //if (vm == nullptr)
-    //{
-    //    std::cout << "VM FAILED\n";
-    //}
-    
-    //printInstructions();
-
-    //vm_exec(vm, 0, false);
-    //vm_free(vm);
 
     IRVisitor dv;
     programAST->accept(dv);
@@ -335,11 +189,6 @@ std::shared_ptr<ProgramAST> Parser::program()
 std::shared_ptr<ScopeAST> Parser::scope()
 {
     ++m_lexical_level;
-    int prev_bp = m_bp;
-    m_bp = m_sp;
-    //++m_sp;
-    m_globalDisplay.push_back(m_bp);
-
     if (getCurrTokenType() != LEFT_BRACE)
     {
         exitParse("Expected '{'");
@@ -383,13 +232,6 @@ std::shared_ptr<ScopeAST> Parser::scope()
     advance();
 
     --m_lexical_level;
-    m_sp = m_bp;
-    m_bp = prev_bp;
-    // m_symTab = prevSymTab;
-    // m_functionTab = prevFuncTab;
-    m_globalDisplay.pop_back();
-    // m_symTab.pop_back();
-    // m_functionTab.pop_back();
     return std::make_shared<ScopeAST>(std::move(decls), std::move(statementsAST));
 }
 
@@ -429,7 +271,7 @@ std::shared_ptr<DeclAST> Parser::declaration()
         auto varName = currToken.getLexme();
 
         advance();
-        symbolNotDefinedOnCurrentLexicalLevel(varName);
+        // symbolNotDefinedOnCurrentLexicalLevel(varName);
         auto isArrDecl = optArrayBound(varName);
         
         if (getCurrTokenType() != COLON)
@@ -449,12 +291,8 @@ std::shared_ptr<DeclAST> Parser::declaration()
                 m_functionTab[m_lexical_level][m_procName].setSymTab(
                     varName, Bucket(arenaVectorInt(m_arrSize), m_local_numVar, m_type));
             }
-            else
-            {
-                m_symTab[m_lexical_level][varName] =
-                    Bucket(arenaVectorInt(m_arrSize), m_sp - m_bp, m_type);
-
-            }
+            m_symTab[m_lexical_level][varName] =
+                Bucket(arenaVectorInt(m_arrSize), 0, m_type);
             return std::make_shared<ArrDeclAST>(identifierAST, m_arrSize);
         }
 
@@ -467,11 +305,7 @@ std::shared_ptr<DeclAST> Parser::declaration()
 
             return decl;
         }
-        m_symTab[m_lexical_level][varName] = Bucket(0, m_sp - m_bp, m_type);
-        
-        m_instructions.push_back(ICONST);
-        m_instructions.push_back(0);
-        ++m_sp;
+        m_symTab[m_lexical_level][varName] = Bucket(0, 0, m_type);
         auto decl =
             std::make_shared<VarDeclAST>(
             VarDeclAST(identifierAST, Type::INTEGER));
@@ -490,16 +324,12 @@ std::shared_ptr<DeclAST> Parser::declaration()
         auto procName = currToken.getLexme();
         
         advance();
-        m_instructions.push_back(BR);
-        m_instructions.push_back(-1);
-        auto rewriteAddr = m_instructions.size() - 1;
         
         m_procName = procName;
         m_parsing_function = true;
         auto procDecl = procBody();
 
         auto& funcTab = m_functionTab[m_lexical_level][m_procName];
-        m_instructions[rewriteAddr] = funcTab.getEndAddr() + 1;
         m_procName = "";
         m_parsing_function = false;
 
@@ -524,17 +354,12 @@ std::shared_ptr<DeclAST> Parser::declaration()
         auto currToken = getCurrToken();
         auto funcName = currToken.getLexme();
 
-        advance();
-        m_instructions.push_back(BR);
-        m_instructions.push_back(-1);
-        auto rewriteAddr = m_instructions.size() - 1;
-        
+        advance();        
         m_funcName = funcName;
         m_parsing_function = true;
         auto funcDecl = funcBody();
         
         auto& funcTab = m_functionTab[m_lexical_level][m_funcName];
-        m_instructions[rewriteAddr] = funcTab.getEndAddr() + 1;
         m_funcName = "";
         m_parsing_function = false;
 
@@ -583,30 +408,24 @@ std::shared_ptr<FuncDeclAST> Parser::funcBody()
         
         advance();
 
-        m_functionTab[m_lexical_level + 1][m_funcName] = FunctionBucket(m_parameters);
-        m_functionTab[m_lexical_level + 1][m_funcName].setStartAddr(
-            m_instructions.size());
+        m_functionTab[(size_t)m_lexical_level + 1][m_funcName] =
+            FunctionBucket(m_parameters);
         
         for (int i = 0; i < m_parameters.size(); ++i)
         {
-            m_functionTab[m_lexical_level + 1][m_funcName].setSymTab(m_parameters[i], Bucket(0, i, m_parameterTypes[i]));
+            m_functionTab[(size_t)m_lexical_level + 1][m_funcName].setSymTab(
+                m_parameters[i], Bucket(0, i, m_parameterTypes[i]));
         }
         scopeAST = scope();
     }
     else
     {
-        m_functionTab[m_lexical_level + 1][m_funcName] =
-            FunctionBucket(arena::vector<std::string>());
-        m_functionTab[m_lexical_level + 1][m_funcName].setStartAddr(
-            m_instructions.size());
-        
+        m_functionTab[(size_t)m_lexical_level + 1][m_funcName] =
+            FunctionBucket(arena::vector<std::string>());        
         scopeAST = scope();
     }
 
-    m_instructions.push_back(RET);
-    m_functionTab[m_lexical_level + 1][m_funcName].setEndtAddr(
-        m_instructions.size() - 1);
-    m_functionTab[m_lexical_level + 1][m_funcName].setLocalNumVar(
+    m_functionTab[(size_t)m_lexical_level + 1][m_funcName].setLocalNumVar(
         m_local_numVar);
     auto funcDecl = std::make_shared<FuncDeclAST>(m_funcName, paramsAST,
                                                   std::move(scopeAST), m_type);
@@ -636,10 +455,10 @@ std::shared_ptr<ProcDeclAST> Parser::procBody()
     m_functionTab.push_back(
         arena::unordered_map<std::string, FunctionBucket>());
 
-    
+
     std::shared_ptr<ParametersAST> paramsAST = nullptr;
     std::shared_ptr<ScopeAST> scopeAST = nullptr;
-    
+
     if (getCurrTokenType() == LEFT_PAREN)
     {
         advance();
@@ -654,33 +473,25 @@ std::shared_ptr<ProcDeclAST> Parser::procBody()
         {
             exitParse("Expected ')'");
         }
-        advance();
-        
-        m_functionTab[m_lexical_level + 1][m_procName] = FunctionBucket(m_parameters);
-        m_functionTab[m_lexical_level + 1][m_procName].setStartAddr(
-            m_instructions.size());
+
+        advance();        
+        m_functionTab[(size_t)m_lexical_level + 1][m_procName] = FunctionBucket(m_parameters);
         
         for (int i = 0; i < m_parameters.size(); ++i)
         {
-            m_functionTab[m_lexical_level+ 1][m_procName].setSymTab(
+            m_functionTab[(size_t)m_lexical_level+ 1][m_procName].setSymTab(
                 m_parameters[i], Bucket(0, i, m_parameterTypes[i]));
         }
         scopeAST = scope();
     }
     else
     {
-        m_functionTab[m_lexical_level + 1][m_procName] =
-            FunctionBucket(arena::vector<std::string>());
-        m_functionTab[m_lexical_level + 1][m_procName].setStartAddr(
-            m_instructions.size());
-        
+        m_functionTab[(size_t)m_lexical_level + 1][m_procName] =
+            FunctionBucket(arena::vector<std::string>());        
         scopeAST = scope();
     }
-    
-    m_instructions.push_back(RET);
-    m_functionTab[m_lexical_level + 1][m_procName].setEndtAddr(m_instructions.size() -
-                                                           1);
-    m_functionTab[m_lexical_level + 1][m_procName].setLocalNumVar(
+
+    m_functionTab[(size_t)m_lexical_level + 1][m_procName].setLocalNumVar(
         m_local_numVar);
     
     auto procDecl = std::make_shared<ProcDeclAST>(
@@ -741,12 +552,6 @@ bool Parser::optArrayBound(std::string varName)
         // store the first stack address for the array
         auto& source = m_lexer.getSource();
         auto currIdx = m_lexer.getCurrIdx();
-        for (int i = 0; i < m_arrSize; ++i)
-        {
-            m_instructions.push_back(ICONST);
-            m_instructions.push_back(0);
-            ++m_sp;
-        }
 
         advance();
         return true;
@@ -805,21 +610,8 @@ std::shared_ptr<StatementAST> Parser::statement()
             exitParse("Expected 'then' after if expression");
         }
 
-        m_instructions.push_back(BRF);
-        m_instructions.push_back(-1);
-
-        auto rewriteAddr = m_instructions.size() - 1;
-
         advance();
         auto thenAST = statements(ELSE, END);
-
-        m_instructions.push_back(BR);
-        m_instructions.push_back(-1);
-
-        auto latestAddr = m_instructions.size() - 1;
-        m_instructions[rewriteAddr] = latestAddr + 1;
-
-        rewriteAddr = latestAddr;
         auto elseAST = optElse();
 
         if (getCurrTokenType() != END)
@@ -835,15 +627,11 @@ std::shared_ptr<StatementAST> Parser::statement()
         }
 
         advance();
-
-        latestAddr = m_instructions.size() - 1;
-        m_instructions[rewriteAddr] = latestAddr + 1;
         return std::make_shared<IfAST>(conditionAST, thenAST, elseAST);
     }
     else if (getCurrTokenType() == REPEAT)
     {
         advance();
-        auto repeatStartingInstAddr = m_instructions.size();
         auto statementsAST = statements(UNTIL);
 
         if (getCurrTokenType() != UNTIL)
@@ -853,9 +641,6 @@ std::shared_ptr<StatementAST> Parser::statement()
 
         advance();
         auto exitConditionAST = expression();
-
-        m_instructions.push_back(BRF);
-        m_instructions.push_back(repeatStartingInstAddr);
         return std::make_shared<RepeatUntilAST>(statementsAST,
                                                 exitConditionAST);
     }
@@ -931,12 +716,19 @@ std::shared_ptr<StatementAST> Parser::statement()
         }
         advance();
         auto exprAST = expression();
-        m_instructions.push_back(RET);
         return std::make_shared<ReturnAST>(exprAST);
     }
     else
     {
-        return scope();
+        m_symTab.push_back(arena::unordered_map<std::string, Bucket>());
+        m_functionTab.push_back(
+            arena::unordered_map<std::string, FunctionBucket>());
+
+        auto scopeAST = scope();
+        m_symTab.pop_back();
+        m_functionTab.pop_back();
+
+        return scopeAST;
     }
 }
 
@@ -992,17 +784,12 @@ std::shared_ptr<StatementAST> Parser::assignOrCall(std::string &identifier)
 
         if (startAddr != -1)
         {
-            auto base_pointer_addr = m_globalDisplay[lexical_level];
-            m_instructions.push_back(CALL);
-            m_instructions.push_back(base_pointer_addr + startAddr);
-            m_instructions.push_back(m_arguments.size());
-            m_instructions.push_back(0);
             return std::make_shared<CallAST>(identifier, argumentsAST);
         }
         else
         {
-            std::runtime_error("function or procedure " + identifier +
-                               " is not defined!");
+          throw std::runtime_error("function or procedure " + identifier +
+                                   " is not defined!");
         }
     }
     else if (getCurrTokenType() == COLON_EQUAL)
@@ -1014,41 +801,16 @@ std::shared_ptr<StatementAST> Parser::assignOrCall(std::string &identifier)
 
         if (m_parsing_function)
         {
-            m_instructions.push_back(STORE);
-            m_instructions.push_back(m_functionTab[m_lexical_level][m_procName]
-                                   .getSymTab(identifier)
-                                   .getStackAddr());
             return std::make_shared<AssignmentAST>(leftAST, exprAST);
         }
         else
         {
             auto [it, lexical_level] = variableDefined(identifier);
-            auto base_pointer_addr = m_globalDisplay[lexical_level];
-
-            // push result value
-            m_instructions.push_back(SSTORE);
-            m_instructions.push_back(base_pointer_addr + (it->second).getStackAddr());
             return std::make_shared<AssignmentAST>(leftAST, exprAST);
         }
     }
     else if (getCurrTokenType() == LEFT_SQUARE)
     {
-        if (m_parsing_function)
-        {
-            m_instructions.push_back(ICONST);
-            m_instructions.push_back(m_functionTab[m_lexical_level][m_procName]
-                .getSymTab(identifier)
-                .getStackAddr());
-        }
-        else
-        {
-            auto [it, lexical_level] = variableDefined(identifier);
-
-            auto base_pointer_addr = m_globalDisplay[lexical_level];
-
-            m_instructions.push_back(ICONST);
-            m_instructions.push_back(base_pointer_addr + (it->second).getStackAddr());
-        }
         advance();
         auto subscriptAST = subscript();
         auto x = getTypeFromSymTab(identifier);
@@ -1068,15 +830,6 @@ std::shared_ptr<StatementAST> Parser::assignOrCall(std::string &identifier)
 
         advance();
         auto rightAST = assignExpression();
-
-        if (m_parsing_function)
-        {
-            m_instructions.push_back(LSTORE);
-        }
-        else
-        {
-            m_instructions.push_back(ASTORE);
-        }
         return std::make_shared<AssignmentAST>(arrAccessAST, rightAST);
     }
     else
@@ -1097,18 +850,11 @@ std::shared_ptr<StatementAST> Parser::assignOrCall(std::string &identifier)
 
         if (startAddr != -1)
         {
-            auto base_pointer_addr = m_globalDisplay[lexical_level];
-
-            m_instructions.push_back(CALL);
-            m_instructions.push_back(base_pointer_addr + startAddr);
-            m_instructions.push_back(0);
-            m_instructions.push_back(0);
-
             return std::make_shared<CallAST>(identifier, nullptr);
         }
         else
         {
-            std::runtime_error("function or procedure " + identifier +
+            throw std::runtime_error("function or procedure " + identifier +
                                " is not defined!");
         }
     }
@@ -1145,6 +891,8 @@ std::shared_ptr<ExprAST> Parser::expression()
                  |   GREATER_EQUAL simpleExpression
                  |   LESS_EQUAL simpleExpression ;
  * */
+
+// EQUAL ('=') token is used to check for equality (same as "==" token in C++)
 std::shared_ptr<ExprAST> Parser::optRelation()
 {
     if (getCurrTokenType() == EQUAL)
@@ -1152,7 +900,6 @@ std::shared_ptr<ExprAST> Parser::optRelation()
         auto op = getCurrToken();
         advance();
         auto terms = simpleExpression();
-        m_instructions.push_back(IEQ);
         return std::make_shared<OptRelationAST>(op, terms);
     }
     else if (getCurrTokenType() == BANG_EQUAL)
@@ -1160,8 +907,6 @@ std::shared_ptr<ExprAST> Parser::optRelation()
         auto op = getCurrToken();
         advance();
         auto terms = simpleExpression();
-        m_instructions.push_back(IEQ);
-        m_instructions.push_back(INOT);
         return std::make_shared<OptRelationAST>(op, terms);
     }
     else if (getCurrTokenType() == LESS)
@@ -1169,7 +914,6 @@ std::shared_ptr<ExprAST> Parser::optRelation()
         auto op = getCurrToken();
         advance();
         auto terms = simpleExpression();
-        m_instructions.push_back(ILT);
         return std::make_shared<OptRelationAST>(op, terms);
     }
     else if (getCurrTokenType() == GREATER)
@@ -1177,7 +921,6 @@ std::shared_ptr<ExprAST> Parser::optRelation()
         auto op = getCurrToken();
         advance();
         auto terms = simpleExpression();
-        m_instructions.push_back(IGT);
         return std::make_shared<OptRelationAST>(op, terms);
     }
     else if (getCurrTokenType() == GREATER_EQUAL)
@@ -1185,8 +928,6 @@ std::shared_ptr<ExprAST> Parser::optRelation()
         auto op = getCurrToken();
         advance();
         auto terms = simpleExpression();
-        m_instructions.push_back(ILT);
-        m_instructions.push_back(INOT);
         return std::make_shared<OptRelationAST>(op, terms);
     }
     else if (getCurrTokenType() == LESS_EQUAL)
@@ -1194,8 +935,6 @@ std::shared_ptr<ExprAST> Parser::optRelation()
         auto op = getCurrToken();
         advance();
         auto terms = simpleExpression();
-        m_instructions.push_back(IGT);
-        m_instructions.push_back(INOT);
         return std::make_shared<OptRelationAST>(op, terms);
     }
     return nullptr;
@@ -1218,6 +957,7 @@ std::shared_ptr<ExprAST> Parser::simpleExpression()
                  |   MIN term terms
                  |   PIPE term terms
  * */
+// PIPE '|' token is used for logical or operation (same as "||" token in C++)
 std::shared_ptr<ExprAST> Parser::terms()
 {
     if (getCurrTokenType() == PLUS)
@@ -1225,7 +965,6 @@ std::shared_ptr<ExprAST> Parser::terms()
         auto op = getCurrToken();
         advance();
         auto termAST = term();
-        m_instructions.push_back(IADD);
         auto termsAST = terms();
         return std::make_shared<TermsAST>(op, termAST, termsAST);
     }
@@ -1234,7 +973,6 @@ std::shared_ptr<ExprAST> Parser::terms()
         auto op = getCurrToken();
         advance();
         auto termAST = term();
-        m_instructions.push_back(ISUB);
         auto termsAST = terms();
         return std::make_shared<TermsAST>(op, termAST, termsAST);
     }
@@ -1243,7 +981,6 @@ std::shared_ptr<ExprAST> Parser::terms()
         auto op = getCurrToken();
         advance();
         auto termAST = term();
-        m_instructions.push_back(IOR);
         auto termsAST = terms();
         return std::make_shared<TermsAST>(op, termAST, termsAST);
     }
@@ -1267,6 +1004,9 @@ std::shared_ptr<ExprAST> Parser::term()
                  |   SLASH factor factors
                  |   AMPERSAND factor factors ;
  * */
+// Slash '/' token is used for integer division
+// Ampersand '&' token is used for logical and operation (same as "&&" token in
+// C++)
 std::shared_ptr<ExprAST> Parser::factors()
 {
     if (getCurrTokenType() == STAR)
@@ -1274,7 +1014,6 @@ std::shared_ptr<ExprAST> Parser::factors()
         auto op = getCurrToken();
         advance();
         auto factorAST = factor();
-        m_instructions.push_back(IMUL);
         auto factorsAST = factors();
         return std::make_shared<FactorsAST>(op, factorAST, factorsAST);
     }
@@ -1283,7 +1022,6 @@ std::shared_ptr<ExprAST> Parser::factors()
         auto op = getCurrToken();
         advance();
         auto factorAST = factor();
-        m_instructions.push_back(IDIV);
         auto factorsAST = factors();
         return std::make_shared<FactorsAST>(op, factorAST, factorsAST);
     }
@@ -1292,7 +1030,6 @@ std::shared_ptr<ExprAST> Parser::factors()
         auto op = getCurrToken();
         advance();
         auto factorAST = factor();
-        m_instructions.push_back(IAND);
         auto factorsAST = factors();
         return std::make_shared<FactorsAST>(op, factorAST, factorsAST);
     }
@@ -1305,6 +1042,7 @@ std::shared_ptr<ExprAST> Parser::factors()
                  |   MIN factor
                  |   TILDE factor ;
  * */
+// TILDE '~' token is used for logical not operation (same as '!' token in C++)
 std::shared_ptr<ExprAST> Parser::factor()
 {
     if (getCurrTokenType() == PLUS)
@@ -1318,9 +1056,6 @@ std::shared_ptr<ExprAST> Parser::factor()
     {
         auto op = getCurrToken();
         advance();
-        m_instructions.push_back(ICONST);
-        m_instructions.push_back(-1);
-        m_instructions.push_back(IMUL);
         auto factorAST = factor();
         return std::make_shared<FactorAST>(op, factorAST);
     }
@@ -1328,7 +1063,6 @@ std::shared_ptr<ExprAST> Parser::factor()
     {
         auto op = getCurrToken();
         advance();
-        m_instructions.push_back(INOT);
         auto factorAST = factor();
         return std::make_shared<FactorAST>(op, factorAST);
     }
@@ -1351,8 +1085,6 @@ std::shared_ptr<ExprAST> Parser::primary()
     if (getCurrTokenType() == NUMBER)
     {
         int num = std::any_cast<int>(getCurrToken().getLiteral());
-        m_instructions.push_back(ICONST);
-        m_instructions.push_back(num);
         advance();
         return std::make_shared<NumberAST>(num);
     }
@@ -1360,16 +1092,11 @@ std::shared_ptr<ExprAST> Parser::primary()
     {
         if (std::any_cast<bool>(getCurrToken().getLiteral()) == true)
         {
-            m_instructions.push_back(ICONST);
-            m_instructions.push_back(1);
-
             advance();
             return std::make_shared<BoolAST>(true);
         }
         else
         {
-            m_instructions.push_back(ICONST);
-            m_instructions.push_back(0);
             advance();
             return std::make_shared<BoolAST>(false);
         }
@@ -1457,16 +1184,10 @@ std::shared_ptr<ExprAST> Parser::subsOrCall(std::string &identifier)
             auto addr = m_functionTab[m_lexical_level][m_procName]
                           .getSymTab(identifier)
                           .getStackAddr();
-            m_instructions.push_back(ICONST);
-            m_instructions.push_back(addr);
         }
         else
         {
             auto [it, lexical_level] = variableDefined(identifier);
-        
-            // base addr
-            m_instructions.push_back(ICONST);
-            m_instructions.push_back((it->second).getStackAddr());
         }
 
         auto subsExprAST = subscript();
@@ -1476,15 +1197,6 @@ std::shared_ptr<ExprAST> Parser::subsOrCall(std::string &identifier)
             exitParse("Expected ']'");
         }
         advance();
-
-        if (m_parsing_function)
-        {
-            m_instructions.push_back(LLOAD);
-        }
-        else
-        {
-            m_instructions.push_back(ALOAD);
-        }
         return std::make_shared<ArrAccessAST>(identifier, getTypeFromSymTab(identifier),
                                               IdentType::ARRAY, subsExprAST);
     }
@@ -1503,18 +1215,12 @@ std::shared_ptr<ExprAST> Parser::subsOrCall(std::string &identifier)
 
         if (startAddr != -1)
         {
-            m_instructions.push_back(CALL);
-            m_instructions.push_back(startAddr);
-            m_instructions.push_back(1);
-            m_instructions.push_back(0);
-
             return std::make_shared<CallAST>(identifier, nullptr);
         }
 
         // just an identifier
         if (m_parsing_function)
         {
-            m_instructions.push_back(LOAD);
             std::string theName;
             if (m_procName != "")
             {
@@ -1527,8 +1233,6 @@ std::shared_ptr<ExprAST> Parser::subsOrCall(std::string &identifier)
             auto addr = m_functionTab[m_lexical_level][theName]
                           .getSymTab(identifier)
                           .getStackAddr();
-            m_instructions.push_back(addr);
-
             auto& bucket =
                 m_functionTab[m_lexical_level][theName].getSymTab(
                     identifier);
@@ -1537,10 +1241,7 @@ std::shared_ptr<ExprAST> Parser::subsOrCall(std::string &identifier)
         }
         else
         {
-            auto [it, lexical_level] = variableDefined(identifier);
-            auto base_pointer_addr = m_globalDisplay[lexical_level];
-            m_instructions.push_back(SLOAD);
-            m_instructions.push_back(base_pointer_addr + (it->second).getStackAddr());
+            auto _ = variableDefined(identifier);
         }
         return std::make_shared<VariableAST>(identifier, getTypeFromSymTab(identifier),
                                              IdentType::VARIABLE);
@@ -1743,8 +1444,6 @@ std::shared_ptr<ParametersAST> Parser::parameters()
         m_functionTab[m_lexical_level][m_procName].setSymTab(
             identifier, Bucket(0, m_local_numVar++, m_type));
     }
-    m_symTab[m_lexical_level][identifier] = Bucket(0, m_sp - m_bp, m_type);
-
     advance();
     
     if (getCurrTokenType() != COLON)
@@ -1787,9 +1486,6 @@ std::shared_ptr<ExprAST> Parser::output()
             std::any_cast<std::string>(getCurrToken().getLiteral());
         for (unsigned int i = 0; i < stringLiteral.length(); ++i)
         {
-            m_instructions.push_back(ICONST);
-            m_instructions.push_back((int)stringLiteral[i]);
-            m_instructions.push_back(PRINTC);
         }
         
         advance();
@@ -1797,16 +1493,12 @@ std::shared_ptr<ExprAST> Parser::output()
     }
     else if (getCurrTokenType() == SKIP)
     {
-        m_instructions.push_back(ICONST);
-        m_instructions.push_back((int)'\n');
-        m_instructions.push_back(PRINTC);
         advance();
         return std::make_shared<StringAST>("\n");
     }
     else
     {
         auto exprAST = expression();
-        m_instructions.push_back(PRINT);
         return exprAST;
     }
 }
@@ -1866,14 +1558,7 @@ std::shared_ptr<InputAST> Parser::input()
     auto [it, lexical_level] = variableDefined(varName);
     auto identifierAST = std::make_shared<VariableAST>(
         varName, getTypeFromSymTab(varName), IdentType::VARIABLE);
-    
-    m_instructions.push_back(READINT);
-    
-    auto base_pointer_addr = m_globalDisplay[lexical_level];
-    
-    m_instructions.push_back(SSTORE);
-    m_instructions.push_back(base_pointer_addr + (it->second).getStackAddr());
-    
+
     advance();
     auto subsExpr = optSubscript();
     if (subsExpr)

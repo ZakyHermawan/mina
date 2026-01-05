@@ -309,7 +309,7 @@ void CodeGen::generateMIR()
                 else
                 {
                     auto op2MemMIR = memoryLocationForVReg(
-                        operand1->getTarget()->getString());
+                        operand2->getTarget()->getString());
 
                     // mov rbx, QWORD PTR [op2]
                     auto movMIR = std::make_shared<MovMIR>(

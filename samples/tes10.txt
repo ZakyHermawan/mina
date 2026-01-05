@@ -4,5 +4,6 @@
     B[3] := 42
     B[2] := 17
     a := B[2]
+    put(a, skip)
     put(B[3], skip)
 }
