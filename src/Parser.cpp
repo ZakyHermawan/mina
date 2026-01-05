@@ -51,8 +51,8 @@ TokenType Parser::getCurrTokenType() const { return getCurrToken().getTokenType(
 unsigned int Parser::getCurrLine() const { return m_lexer.getCurrLine(); }
 void Parser::advance() { m_lexer.advance(); }
 
-// return the iterator if a variable defined
-// throw error if the variable is defined
+// Return the iterator if a variable defined
+// Throw error if the variable is defined
 std::pair<std::unordered_map<std::string, Bucket>::iterator, int> Parser::variableDefined(const std::string &varName)
 {
     for (int i = m_lexical_level; i >= 0; --i)
@@ -63,11 +63,11 @@ std::pair<std::unordered_map<std::string, Bucket>::iterator, int> Parser::variab
     throw std::runtime_error("symbol '" + varName + "' does not exist!");
 }
 
-// return the iterator if a variable defined
-// throw error if the variable is defined
+// Return the iterator if a variable defined
+// Throw error if the variable is defined
 std::pair<std::unordered_map<std::string, Bucket>::iterator, int> Parser::variableDefinedOnLexicalLevel(const std::string &varName, int lexical_level)
 {
-    // iterator, no copy
+    // Iterator, no copy
     auto currSymTabIt = m_symTab.begin() + lexical_level;
     auto it = currSymTabIt->find(varName);
     if (it != currSymTabIt->end())
@@ -80,7 +80,7 @@ std::pair<std::unordered_map<std::string, Bucket>::iterator, int> Parser::variab
     return variableDefinedOnLexicalLevel(varName, m_lexical_level);
 }
 
-  // throw if symbol is defined
+  // Throw if symbol is defined
 void Parser::symbolNotDefined(const std::string &identifier)
 {
     for (int i = 0; i < m_symTab.size(); ++i)
@@ -104,7 +104,7 @@ void Parser::symbolNotDefined(const std::string &identifier)
     }
 }
 
-// throw if symbol on lexical level defined
+// Throw if symbol on lexical level defined
 void Parser::symbolNotDefinedOnLexicalLevel(const std::string &identifier,
                                     int lexical_level)
 {
@@ -805,7 +805,7 @@ std::shared_ptr<StatementAST> Parser::assignOrCall(std::string &identifier)
         }
         else
         {
-            auto [it, lexical_level] = variableDefined(identifier);
+            auto _ = variableDefined(identifier);
             return std::make_shared<AssignmentAST>(leftAST, exprAST);
         }
     }
@@ -1187,7 +1187,7 @@ std::shared_ptr<ExprAST> Parser::subsOrCall(std::string &identifier)
         }
         else
         {
-            auto [it, lexical_level] = variableDefined(identifier);
+            auto _ = variableDefined(identifier);
         }
 
         auto subsExprAST = subscript();
