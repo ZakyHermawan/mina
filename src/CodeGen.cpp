@@ -77,6 +77,8 @@ void CodeGen::generateMIR()
     std::shared_ptr<Register> rdx{
         new Register{5, "rdx", "edx", "dx", "dh", "dl"}};
     std::shared_ptr<Register> rip{new Register{6, "rip"}};
+    std::shared_ptr<Register> r8{new Register{7, "r8"}};
+    std::shared_ptr<Register> r9{new Register{8, "r9"}};
 
     std::map<std::string, unsigned int> vRegToOffset;
     std::map<std::string, unsigned int> arrVRegToSize;
@@ -133,10 +135,532 @@ void CodeGen::generateMIR()
             if (instType == InstType::FuncCall)
             {
                 auto currInst = std::dynamic_pointer_cast<FuncCallInst>(inst[j]);
-                auto target = currInst->getTarget();
-                auto targetStr = target->getTarget()->getString();
-                assignVRegToOffsetIfDoesNotExist(targetStr);
-                std::cout << "function call codegen is not being implemented yet!\n";
+                auto& arguments = currInst->getOperands();
+                for (int i = 0; i < arguments.size(); ++i)
+                {
+                    if (i == 0)
+                    {
+                        // mov first parameter to rcx
+                        auto& firstArg = arguments[i]->getTarget();
+                        if (firstArg->getInstType() == InstType::IntConst)
+                        {
+                            auto intConstInst =
+                                std::dynamic_pointer_cast<IntConstInst>(
+                                    firstArg);
+                            std::shared_ptr<MachineIR> mirSource{
+                                new ConstMIR{intConstInst->getVal()}};
+
+                            // mov rcx, constant
+                            auto movMIR = std::make_shared<MovMIR>(
+                                std::vector<std::shared_ptr<MachineIR>>{
+                                    rcx, mirSource});
+                            bbMIR->addInstruction(movMIR);
+                        }
+                        else if (firstArg->getInstType() == InstType::BoolConst)
+                        {
+                            auto boolConstInst =
+                                std::dynamic_pointer_cast<BoolConstInst>(
+                                    firstArg);
+                            int boolVal = boolConstInst->getVal() ? 1 : 0;
+                            std::shared_ptr<MachineIR> mirSource{
+                                new ConstMIR{boolVal}};
+
+                            // mov rcx, constant
+                            auto movMIR = std::make_shared<MovMIR>(
+                                std::vector<std::shared_ptr<MachineIR>>{
+                                    rcx, mirSource});
+                            bbMIR->addInstruction(movMIR);
+                        }
+                        else if (firstArg->getInstType() == InstType::Ident)
+                        {
+                            auto identInst =
+                                std::dynamic_pointer_cast<IdentInst>(
+                                    firstArg);
+                            std::shared_ptr<MachineIR> mirSource{
+                                memoryLocationForVReg(identInst->getString())};
+
+                            // Intermediate move to load from memory to register
+                            std::shared_ptr<MovMIR> intermediateMovMIR{
+                                new MovMIR{std::vector<std::shared_ptr<MachineIR>>{
+                                    rax, mirSource}}};
+                            bbMIR->addInstruction(intermediateMovMIR);
+
+                            // mov rcx, rax
+                            std::shared_ptr<MovMIR> finalMovMIR{
+                                new MovMIR{std::vector<std::shared_ptr<MachineIR>>{
+                                    rcx, rax}}};
+                            bbMIR->addInstruction(finalMovMIR);
+                        }
+                        else
+                        {
+                            throw std::runtime_error(
+                                "CodeGen Error: Unsupported argument type in "
+                                "function call.");
+                        }
+                    }
+                    else if (i == 1)
+                    {
+                        // mov second parameter to rdx
+                        auto& secondArg = arguments[i]->getTarget();
+                        if (secondArg->getInstType() == InstType::IntConst)
+                        {
+                            auto intConstInst =
+                                std::dynamic_pointer_cast<IntConstInst>(
+                                    secondArg);
+                            std::shared_ptr<MachineIR> mirSource{
+                                new ConstMIR{intConstInst->getVal()}};
+                            // mov rdx, constant
+                            auto movMIR = std::make_shared<MovMIR>(
+                                std::vector<std::shared_ptr<MachineIR>>{
+                                    rdx, mirSource});
+                            bbMIR->addInstruction(movMIR);
+                        }
+                        else if (secondArg->getInstType() ==
+                                 InstType::BoolConst)
+                        {
+                            auto boolConstInst =
+                                std::dynamic_pointer_cast<BoolConstInst>(
+                                    secondArg);
+                            int boolVal = boolConstInst->getVal() ? 1 : 0;
+                            std::shared_ptr<MachineIR> mirSource{
+                                new ConstMIR{boolVal}};
+
+                            // mov rdx, constant
+                            auto movMIR = std::make_shared<MovMIR>(
+                                std::vector<std::shared_ptr<MachineIR>>{
+                                    rdx, mirSource});
+                            bbMIR->addInstruction(movMIR);
+                        }
+                        else if (secondArg->getInstType() == InstType::Ident)
+                        {
+                            auto identInst =
+                                std::dynamic_pointer_cast<IdentInst>(secondArg);
+                            std::shared_ptr<MachineIR> mirSource{
+                                memoryLocationForVReg(identInst->getString())};
+
+                            // Intermediate move to load from memory to register
+                            std::shared_ptr<MovMIR> intermediateMovMIR{
+                                new MovMIR{std::vector<std::shared_ptr<MachineIR>>{
+                                    rax, mirSource}}};
+                            bbMIR->addInstruction(intermediateMovMIR);
+
+                            // mov rdx, rax
+                            std::shared_ptr<MovMIR> finalMovMIR{
+                                new MovMIR{std::vector<std::shared_ptr<MachineIR>>{
+                                    rdx, rax}}};
+                            bbMIR->addInstruction(finalMovMIR);
+                        }
+                        else
+                        {
+                            throw std::runtime_error(
+                                "CodeGen Error: Unsupported argument type in "
+                                "function call.");
+                        }
+
+                    }
+                    else if (i == 2)
+                    {
+                        // mov third parameter to r8
+                        auto& thirdArg = arguments[i]->getTarget();
+                        if (thirdArg->getInstType() == InstType::IntConst)
+                        {
+                            auto intConstInst =
+                                std::dynamic_pointer_cast<IntConstInst>(
+                                    thirdArg);
+                            std::shared_ptr<MachineIR> mirSource{
+                                new ConstMIR{intConstInst->getVal()}};
+
+                            // mov r8, constant
+                            auto movMIR = std::make_shared<MovMIR>(
+                                std::vector<std::shared_ptr<MachineIR>>{
+                                    r8, mirSource});
+                            bbMIR->addInstruction(movMIR);
+                        }
+                        else if (thirdArg->getInstType() ==
+                                 InstType::BoolConst)
+                        {
+                            auto boolConstInst =
+                                std::dynamic_pointer_cast<BoolConstInst>(
+                                    thirdArg);
+                            int boolVal = boolConstInst->getVal() ? 1 : 0;
+                            std::shared_ptr<MachineIR> mirSource{
+                                new ConstMIR{boolVal}};
+
+                            // mov r8, constant
+                            auto movMIR = std::make_shared<MovMIR>(
+                                std::vector<std::shared_ptr<MachineIR>>{
+                                    r8, mirSource});
+                            bbMIR->addInstruction(movMIR);
+                        }
+                        else if (thirdArg->getInstType() == InstType::Ident)
+                        {
+                            auto identInst =
+                                std::dynamic_pointer_cast<IdentInst>(thirdArg);
+                            std::shared_ptr<MachineIR> mirSource{
+                                memoryLocationForVReg(identInst->getString())};
+
+                            // Intermediate move to load from memory to register
+                            std::shared_ptr<MovMIR> intermediateMovMIR{
+                                new MovMIR{std::vector<std::shared_ptr<MachineIR>>{
+                                    rax, mirSource}}};
+                            bbMIR->addInstruction(intermediateMovMIR);
+
+                            // mov r8, rax
+                            std::shared_ptr<MovMIR> finalMovMIR{
+                                new MovMIR{std::vector<std::shared_ptr<MachineIR>>{
+                                    r8, rax}}};
+                            bbMIR->addInstruction(finalMovMIR);
+                        }
+                        else
+                        {
+                            throw std::runtime_error(
+                                "CodeGen Error: Unsupported argument type in "
+                                "function call.");
+                        }
+                    }
+                    else if (i == 3)
+                    {
+                        // mov fourth parameter to r9
+                        auto& fourthArg = arguments[i]->getTarget();
+                        if (fourthArg->getInstType() == InstType::IntConst)
+                        {
+                            auto intConstInst =
+                                std::dynamic_pointer_cast<IntConstInst>(
+                                    fourthArg);
+                            std::shared_ptr<MachineIR> mirSource{
+                                new ConstMIR{intConstInst->getVal()}};
+
+                            // mov r9, constant
+                            auto movMIR = std::make_shared<MovMIR>(
+                                std::vector<std::shared_ptr<MachineIR>>{
+                                    r9, mirSource});
+                            bbMIR->addInstruction(movMIR);
+                        }
+                        else if (fourthArg->getInstType() ==
+                                 InstType::BoolConst)
+                        {
+                            auto boolConstInst =
+                                std::dynamic_pointer_cast<BoolConstInst>(
+                                    fourthArg);
+                            int boolVal = boolConstInst->getVal() ? 1 : 0;
+                            std::shared_ptr<MachineIR> mirSource{
+                                new ConstMIR{boolVal}};
+
+                            // mov r9, constant
+                            auto movMIR = std::make_shared<MovMIR>(
+                                std::vector<std::shared_ptr<MachineIR>>{
+                                    r9, mirSource});
+                            bbMIR->addInstruction(movMIR);
+                        }
+                        else if (fourthArg->getInstType() == InstType::Ident)
+                        {
+                            auto identInst =
+                                std::dynamic_pointer_cast<IdentInst>(fourthArg);
+                            std::shared_ptr<MachineIR> mirSource{
+                                memoryLocationForVReg(identInst->getString())};
+
+                            // Intermediate move to load from memory to register
+                            std::shared_ptr<MovMIR> intermediateMovMIR{
+                                new MovMIR{std::vector<std::shared_ptr<MachineIR>>{
+                                    rax, mirSource}}};
+                            bbMIR->addInstruction(intermediateMovMIR);
+
+                            // mov r9, rax
+                            std::shared_ptr<MovMIR> finalMovMIR{
+                                new MovMIR{std::vector<std::shared_ptr<MachineIR>>{
+                                    r9, rax}}};
+                            bbMIR->addInstruction(finalMovMIR);
+                        }
+                        else
+                        {
+                            throw std::runtime_error(
+                                "CodeGen Error: Unsupported argument type in "
+                                "function call.");
+                        }
+                    }
+                    else
+                    {
+                        throw std::runtime_error(
+                            "CodeGen Error: More than 4 arguments in "
+                            "function call not supported.");
+                    }
+                }
+                auto& target = currInst->getTarget();
+                auto& tempTargetName = target->getString();
+                assignVRegToOffsetIfDoesNotExist(tempTargetName);
+
+                // After setting up parameters, call the function
+                auto callMIR = std::make_shared<CallMIR>(currInst->getCalleeStr());
+                bbMIR->addInstruction(callMIR);
+
+                // Move return value from rax to target variable's memory
+                // location
+                auto targetMemMIR = memoryLocationForVReg(tempTargetName);
+                auto movToTargetMIR = std::make_shared<MovMIR>(
+                    std::vector<std::shared_ptr<MachineIR>>{targetMemMIR, rax});
+                bbMIR->addInstruction(movToTargetMIR);
+            }
+            else if (instType == InstType::ProcCall)
+            {
+                auto currInst = std::dynamic_pointer_cast<ProcCallInst>(inst[j]);
+                auto& arguments = currInst->getOperands();
+                for (int i = 0; i < arguments.size(); ++i)
+                {
+                    if (i == 0)
+                    {
+                        // mov first parameter to rcx
+                        auto& firstArg = arguments[i]->getTarget();
+                        auto it = firstArg->getInstType();
+                        auto n = currInst->getString();
+                        if (firstArg->getInstType() == InstType::IntConst)
+                        {
+                            auto intConstInst =
+                                std::dynamic_pointer_cast<IntConstInst>(
+                                    firstArg);
+                            std::shared_ptr<MachineIR> mirSource{
+                                new ConstMIR{intConstInst->getVal()}};
+
+                            // mov rcx, constant
+                            auto movMIR = std::make_shared<MovMIR>(
+                                std::vector<std::shared_ptr<MachineIR>>{
+                                    rcx, mirSource});
+                            bbMIR->addInstruction(movMIR);
+                        }
+                        else if (firstArg->getInstType() == InstType::BoolConst)
+                        {
+                            auto boolConstInst =
+                                std::dynamic_pointer_cast<BoolConstInst>(
+                                    firstArg);
+                            int boolVal = boolConstInst->getVal() ? 1 : 0;
+                            std::shared_ptr<MachineIR> mirSource{
+                                new ConstMIR{boolVal}};
+
+                            // mov rcx, constant
+                            auto movMIR = std::make_shared<MovMIR>(
+                                std::vector<std::shared_ptr<MachineIR>>{
+                                    rcx, mirSource});
+                            bbMIR->addInstruction(movMIR);
+                        }
+                        else if (firstArg->getInstType() == InstType::Ident)
+                        {
+                            auto identInst =
+                                std::dynamic_pointer_cast<IdentInst>(
+                                    firstArg);
+                            std::shared_ptr<MachineIR> mirSource{
+                                memoryLocationForVReg(identInst->getString())};
+
+                            // Intermediate move to load from memory to register
+                            std::shared_ptr<MovMIR> intermediateMovMIR{
+                                new MovMIR{std::vector<std::shared_ptr<MachineIR>>{
+                                    rax, mirSource}}};
+                            bbMIR->addInstruction(intermediateMovMIR);
+
+                            // mov rcx, rax
+                            std::shared_ptr<MovMIR> finalMovMIR{
+                                new MovMIR{std::vector<std::shared_ptr<MachineIR>>{
+                                    rcx, rax}}};
+                            bbMIR->addInstruction(finalMovMIR);
+                        }
+                        else
+                        {
+                          std::cout << firstArg->getString() << std::endl;
+                            throw std::runtime_error(
+                                "CodeGen Error: Unsupported argument type in "
+                                "procedure call.");
+                        }
+                    }
+                    else if (i == 1)
+                    {
+                        // mov second parameter to rdx
+                        auto& secondArg = arguments[i]->getTarget();
+                        if (secondArg->getInstType() == InstType::IntConst)
+                        {
+                            auto intConstInst =
+                                std::dynamic_pointer_cast<IntConstInst>(
+                                    secondArg);
+                            std::shared_ptr<MachineIR> mirSource{
+                                new ConstMIR{intConstInst->getVal()}};
+
+                            // mov rdx, constant
+                            auto movMIR = std::make_shared<MovMIR>(
+                                std::vector<std::shared_ptr<MachineIR>>{
+                                    rdx, mirSource});
+                            bbMIR->addInstruction(movMIR);
+                        }
+                        else if (secondArg->getInstType() ==
+                                 InstType::BoolConst)
+                        {
+                            auto boolConstInst =
+                                std::dynamic_pointer_cast<BoolConstInst>(
+                                    secondArg);
+                            int boolVal = boolConstInst->getVal() ? 1 : 0;
+                            std::shared_ptr<MachineIR> mirSource{
+                                new ConstMIR{boolVal}};
+
+                            // mov rdx, constant
+                            auto movMIR = std::make_shared<MovMIR>(
+                                std::vector<std::shared_ptr<MachineIR>>{
+                                    rdx, mirSource});
+                            bbMIR->addInstruction(movMIR);
+                        }
+                        else if (secondArg->getInstType() == InstType::Ident)
+                        {
+                            auto identInst =
+                                std::dynamic_pointer_cast<IdentInst>(secondArg);
+                            std::shared_ptr<MachineIR> mirSource{
+                                memoryLocationForVReg(identInst->getString())};
+
+                            // Intermediate move to load from memory to register
+                            std::shared_ptr<MovMIR> intermediateMovMIR{
+                                new MovMIR{std::vector<std::shared_ptr<MachineIR>>{
+                                    rax, mirSource}}};
+                            bbMIR->addInstruction(intermediateMovMIR);
+
+                            // mov rdx, rax
+                            std::shared_ptr<MovMIR> finalMovMIR{
+                                new MovMIR{std::vector<std::shared_ptr<MachineIR>>{
+                                    rdx, rax}}};
+                            bbMIR->addInstruction(finalMovMIR);
+                        }
+                        else
+                        {
+                            throw std::runtime_error(
+                                "CodeGen Error: Unsupported argument type in "
+                                "procedure call.");
+                        }
+
+                    }
+                    else if (i == 2)
+                    {
+                        // mov third parameter to r8
+                        auto& thirdArg = arguments[i]->getTarget();
+                        if (thirdArg->getInstType() == InstType::IntConst)
+                        {
+                            auto intConstInst =
+                                std::dynamic_pointer_cast<IntConstInst>(
+                                    thirdArg);
+                            std::shared_ptr<MachineIR> mirSource{
+                                new ConstMIR{intConstInst->getVal()}};
+
+                            // mov r8, constant
+                            auto movMIR = std::make_shared<MovMIR>(
+                                std::vector<std::shared_ptr<MachineIR>>{
+                                    r8, mirSource});
+                            bbMIR->addInstruction(movMIR);
+                        }
+                        else if (thirdArg->getInstType() ==
+                                 InstType::BoolConst)
+                        {
+                            auto boolConstInst =
+                                std::dynamic_pointer_cast<BoolConstInst>(
+                                    thirdArg);
+                            int boolVal = boolConstInst->getVal() ? 1 : 0;
+                            std::shared_ptr<MachineIR> mirSource{
+                                new ConstMIR{boolVal}};
+
+                            // mov r8, constant
+                            auto movMIR = std::make_shared<MovMIR>(
+                                std::vector<std::shared_ptr<MachineIR>>{
+                                    r8, mirSource});
+                            bbMIR->addInstruction(movMIR);
+                        }
+                        else if (thirdArg->getInstType() == InstType::Ident)
+                        {
+                            auto identInst =
+                                std::dynamic_pointer_cast<IdentInst>(thirdArg);
+                            std::shared_ptr<MachineIR> mirSource{
+                                memoryLocationForVReg(identInst->getString())};
+
+                            // Intermediate move to load from memory to register
+                            std::shared_ptr<MovMIR> intermediateMovMIR{
+                                new MovMIR{std::vector<std::shared_ptr<MachineIR>>{
+                                    rax, mirSource}}};
+                            bbMIR->addInstruction(intermediateMovMIR);
+
+                            // mov r8, rax
+                            std::shared_ptr<MovMIR> finalMovMIR{
+                                new MovMIR{std::vector<std::shared_ptr<MachineIR>>{
+                                    r8, rax}}};
+                            bbMIR->addInstruction(finalMovMIR);
+                        }
+                        else
+                        {
+                            throw std::runtime_error(
+                                "CodeGen Error: Unsupported argument type in "
+                                "procedure call.");
+                        }
+                    }
+                    else if (i == 3)
+                    {
+                        // mov fourth parameter to r9
+                        auto& fourthArg = arguments[i]->getTarget();
+                        if (fourthArg->getInstType() == InstType::IntConst)
+                        {
+                            auto intConstInst =
+                                std::dynamic_pointer_cast<IntConstInst>(
+                                    fourthArg);
+                            std::shared_ptr<MachineIR> mirSource{
+                                new ConstMIR{intConstInst->getVal()}};
+
+                            // mov r9, constant
+                            auto movMIR = std::make_shared<MovMIR>(
+                                std::vector<std::shared_ptr<MachineIR>>{
+                                    r9, mirSource});
+                            bbMIR->addInstruction(movMIR);
+                        }
+                        else if (fourthArg->getInstType() ==
+                                 InstType::BoolConst)
+                        {
+                            auto boolConstInst =
+                                std::dynamic_pointer_cast<BoolConstInst>(
+                                    fourthArg);
+                            int boolVal = boolConstInst->getVal() ? 1 : 0;
+                            std::shared_ptr<MachineIR> mirSource{
+                                new ConstMIR{boolVal}};
+
+                            // mov r9, constant
+                            auto movMIR = std::make_shared<MovMIR>(
+                                std::vector<std::shared_ptr<MachineIR>>{
+                                    r9, mirSource});
+                            bbMIR->addInstruction(movMIR);
+                        }
+                        else if (fourthArg->getInstType() == InstType::Ident)
+                        {
+                            auto identInst =
+                                std::dynamic_pointer_cast<IdentInst>(fourthArg);
+                            std::shared_ptr<MachineIR> mirSource{
+                                memoryLocationForVReg(identInst->getString())};
+
+                            // Intermediate move to load from memory to register
+                            std::shared_ptr<MovMIR> intermediateMovMIR{
+                                new MovMIR{std::vector<std::shared_ptr<MachineIR>>{
+                                    rax, mirSource}}};
+                            bbMIR->addInstruction(intermediateMovMIR);
+
+                            // mov r9, rax
+                            std::shared_ptr<MovMIR> finalMovMIR{
+                                new MovMIR{std::vector<std::shared_ptr<MachineIR>>{
+                                    r9, rax}}};
+                            bbMIR->addInstruction(finalMovMIR);
+                        }
+                        else
+                        {
+                            throw std::runtime_error(
+                                "CodeGen Error: Unsupported argument type in "
+                                "procedure call.");
+                        }
+                    }
+                    else
+                    {
+                        throw std::runtime_error(
+                            "CodeGen Error: More than 4 arguments in "
+                            "procedure call not supported.");
+                    }
+                }
+                // After setting up parameters, call the function
+                auto callMIR =
+                    std::make_shared<CallMIR>(currInst->getCalleeStr());
+                bbMIR->addInstruction(callMIR);
             }
             else if (instType == InstType::Assign)
             {
@@ -211,6 +735,20 @@ void CodeGen::generateMIR()
                     auto constMIR =
                         std::make_shared<ConstMIR>(intConstInst->getVal());
 
+                    // mov rdx, constant
+                    auto movMIR = std::make_shared<MovMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rdx, constMIR});
+                    bbMIR->addInstruction(movMIR);
+                }
+                else if (outputType == InstType::BoolConst)
+                {
+                    bbMIR->addInstruction(leaToLabel("fmt_str"));
+                    auto boolConstInst =
+                        std::dynamic_pointer_cast<BoolConstInst>(
+                            operands[0]->getTarget());
+                    int boolVal = boolConstInst->getVal() ? 1 : 0;
+                    auto constMIR =
+                        std::make_shared<ConstMIR>(boolVal);
                     // mov rdx, constant
                     auto movMIR = std::make_shared<MovMIR>(
                         std::vector<std::shared_ptr<MachineIR>>{rdx, constMIR});

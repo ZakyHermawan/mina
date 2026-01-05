@@ -20,7 +20,7 @@
 	put(a, skip)
 	put(9123, skip)
 	put(true, skip)
-	a := someFunc(false, 10)
+	a := someFunc(false, 100)
 	empty()
 	something(a)
 	something(19)
