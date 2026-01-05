@@ -1,14 +1,13 @@
 #include "Parser.hpp"
 #include "Ast.hpp"
-#include "Visitors.hpp"
+#include "Types.hpp"
 #include "IRVisitor.hpp"
-#include "DebugVisitor.hpp"
 
 #include <memory>
 #include <iostream>
 #include <stdexcept>
 #include <unordered_map>
-#include <cassert>
+#include <cstdlib>
 #include <sstream>
 #include <stack>
 
@@ -289,10 +288,14 @@ std::shared_ptr<ProgramAST> Parser::program()
 {
     ++m_sp;
     m_bp = m_sp;
+
+    m_symTab.push_back(arena::unordered_map<std::string, Bucket>());
+    m_functionTab.push_back(
+        arena::unordered_map<std::string, FunctionBucket>());
+
     auto scopeAST = scope();
     auto programAST = std::make_shared<ProgramAST>(std::move(scopeAST));
 
-    m_functionTab.resize(1000);    
     m_instructions.push_back(HALT);
     
     int *sc = (int *)malloc(sizeof(int) * m_instructions.size());
@@ -316,8 +319,11 @@ std::shared_ptr<ProgramAST> Parser::program()
 
     //vm_exec(vm, 0, false);
     //vm_free(vm);
+
     IRVisitor dv;
     programAST->accept(dv);
+    m_symTab.pop_back();
+    m_functionTab.pop_back();
 
     return programAST;
 }
@@ -333,8 +339,6 @@ std::shared_ptr<ScopeAST> Parser::scope()
     m_bp = m_sp;
     //++m_sp;
     m_globalDisplay.push_back(m_bp);
-    m_symTab.push_back(arena::unordered_map<std::string, Bucket>());
-    m_functionTab.push_back(arena::unordered_map<std::string, FunctionBucket>());
 
     if (getCurrTokenType() != LEFT_BRACE)
     {
@@ -357,6 +361,7 @@ std::shared_ptr<ScopeAST> Parser::scope()
         }
 
         advance();
+        --m_lexical_level;
         return std::make_shared<ScopeAST>(nullptr, statementsAST);
     }
 
@@ -548,6 +553,13 @@ std::shared_ptr<FuncDeclAST> Parser::funcBody()
     m_parameters.clear();
     m_parameterTypes.clear();
     symbolNotDefinedOnCurrentLexicalLevel(m_funcName);
+
+    // New symbol table for procedure
+    // Later we use + 1 for declaration parameters, because we want to keep it
+    // inside procedure scope
+    m_symTab.push_back(arena::unordered_map<std::string, Bucket>());
+    m_functionTab.push_back(
+        arena::unordered_map<std::string, FunctionBucket>());
     
     std::shared_ptr<ParametersAST> paramsAST = nullptr;
     std::shared_ptr<ScopeAST> scopeAST = nullptr;
@@ -570,33 +582,38 @@ std::shared_ptr<FuncDeclAST> Parser::funcBody()
         }
         
         advance();
-        
-        m_functionTab[m_lexical_level][m_funcName] = FunctionBucket(m_parameters);
-        m_functionTab[m_lexical_level][m_funcName].setStartAddr(
+
+        m_functionTab[m_lexical_level + 1][m_funcName] = FunctionBucket(m_parameters);
+        m_functionTab[m_lexical_level + 1][m_funcName].setStartAddr(
             m_instructions.size());
         
         for (int i = 0; i < m_parameters.size(); ++i)
         {
-            m_functionTab[m_lexical_level][m_funcName].setSymTab(m_parameters[i], Bucket(0, i, m_parameterTypes[i]));
+            m_functionTab[m_lexical_level + 1][m_funcName].setSymTab(m_parameters[i], Bucket(0, i, m_parameterTypes[i]));
         }
         scopeAST = scope();
     }
     else
     {
-        m_functionTab[m_lexical_level][m_funcName] =
+        m_functionTab[m_lexical_level + 1][m_funcName] =
             FunctionBucket(arena::vector<std::string>());
-        m_functionTab[m_lexical_level][m_funcName].setStartAddr(
+        m_functionTab[m_lexical_level + 1][m_funcName].setStartAddr(
             m_instructions.size());
         
         scopeAST = scope();
     }
 
     m_instructions.push_back(RET);
-    m_functionTab[m_lexical_level][m_funcName].setEndtAddr(
+    m_functionTab[m_lexical_level + 1][m_funcName].setEndtAddr(
         m_instructions.size() - 1);
-    m_functionTab[m_lexical_level][m_funcName].setLocalNumVar(m_local_numVar);
+    m_functionTab[m_lexical_level + 1][m_funcName].setLocalNumVar(
+        m_local_numVar);
     auto funcDecl = std::make_shared<FuncDeclAST>(m_funcName, paramsAST,
                                                   std::move(scopeAST), m_type);
+
+    m_symTab.pop_back();
+    m_functionTab.pop_back();
+
     return funcDecl;
 }
 
@@ -611,6 +628,14 @@ std::shared_ptr<ProcDeclAST> Parser::procBody()
     m_parameters.clear();
     m_parameterTypes.clear();
     symbolNotDefinedOnCurrentLexicalLevel(m_procName);
+
+    // New symbol table for procedure
+    // Later we use + 1 for declaration parameters, because we want to keep it inside
+    // procedure scope
+    m_symTab.push_back(arena::unordered_map<std::string, Bucket>());
+    m_functionTab.push_back(
+        arena::unordered_map<std::string, FunctionBucket>());
+
     
     std::shared_ptr<ParametersAST> paramsAST = nullptr;
     std::shared_ptr<ScopeAST> scopeAST = nullptr;
@@ -631,34 +656,39 @@ std::shared_ptr<ProcDeclAST> Parser::procBody()
         }
         advance();
         
-        m_functionTab[m_lexical_level][m_procName] = FunctionBucket(m_parameters);
-        m_functionTab[m_lexical_level][m_procName].setStartAddr(
+        m_functionTab[m_lexical_level + 1][m_procName] = FunctionBucket(m_parameters);
+        m_functionTab[m_lexical_level + 1][m_procName].setStartAddr(
             m_instructions.size());
         
         for (int i = 0; i < m_parameters.size(); ++i)
         {
-            m_functionTab[m_lexical_level][m_procName].setSymTab(
+            m_functionTab[m_lexical_level+ 1][m_procName].setSymTab(
                 m_parameters[i], Bucket(0, i, m_parameterTypes[i]));
         }
         scopeAST = scope();
     }
     else
     {
-        m_functionTab[m_lexical_level][m_procName] =
+        m_functionTab[m_lexical_level + 1][m_procName] =
             FunctionBucket(arena::vector<std::string>());
-        m_functionTab[m_lexical_level][m_procName].setStartAddr(
+        m_functionTab[m_lexical_level + 1][m_procName].setStartAddr(
             m_instructions.size());
         
         scopeAST = scope();
     }
     
     m_instructions.push_back(RET);
-    m_functionTab[m_lexical_level][m_procName].setEndtAddr(m_instructions.size() -
+    m_functionTab[m_lexical_level + 1][m_procName].setEndtAddr(m_instructions.size() -
                                                            1);
-    m_functionTab[m_lexical_level][m_procName].setLocalNumVar(m_local_numVar);
+    m_functionTab[m_lexical_level + 1][m_procName].setLocalNumVar(
+        m_local_numVar);
     
     auto procDecl = std::make_shared<ProcDeclAST>(
         m_procName, paramsAST, scopeAST);
+
+    m_symTab.pop_back();
+    m_functionTab.pop_back();
+
     return procDecl;
 }
 
@@ -1398,6 +1428,7 @@ std::shared_ptr<ExprAST> Parser::primary()
                  |   LEFT_SQUARE subscript RIGHT_SQUARE ;
  * */
 // will emit / push smething to the stack, this is derived from primary
+// Expression (not a statement)
 std::shared_ptr<ExprAST> Parser::subsOrCall(std::string &identifier)
 {
     if (getCurrTokenType() == LEFT_PAREN)
@@ -1484,13 +1515,22 @@ std::shared_ptr<ExprAST> Parser::subsOrCall(std::string &identifier)
         if (m_parsing_function)
         {
             m_instructions.push_back(LOAD);
-            auto addr = m_functionTab[m_lexical_level - 1][m_procName]
+            std::string theName;
+            if (m_procName != "")
+            {
+                theName = m_procName;
+            }
+            else
+            {
+                theName = m_funcName;
+            }
+            auto addr = m_functionTab[m_lexical_level][theName]
                           .getSymTab(identifier)
                           .getStackAddr();
             m_instructions.push_back(addr);
 
             auto& bucket =
-                m_functionTab[m_lexical_level - 1][m_procName].getSymTab(
+                m_functionTab[m_lexical_level][theName].getSymTab(
                     identifier);
             return std::make_shared<VariableAST>(identifier, bucket.getType(),
                                                  IdentType::VARIABLE);
@@ -1697,6 +1737,14 @@ std::shared_ptr<ParametersAST> Parser::parameters()
     }
     auto identifier = m_lexer.getCurrToken().getLexme();
     m_parameters.push_back(identifier);
+
+    if (m_parsing_function)
+    {
+        m_functionTab[m_lexical_level][m_procName].setSymTab(
+            identifier, Bucket(0, m_local_numVar++, m_type));
+    }
+    m_symTab[m_lexical_level][identifier] = Bucket(0, m_sp - m_bp, m_type);
+
     advance();
     
     if (getCurrTokenType() != COLON)

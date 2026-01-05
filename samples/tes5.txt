@@ -4,11 +4,12 @@
 	;
 		put(13, skip)
 	}
-	integer func add(b: boolean, a: integer) {;return 1}
+	integer func add(b: boolean, a: integer) {; return a}
 	proc something(x: integer, y: boolean, z: integer) {
 	;
 		put(x, skip)
 	}
+
 ;
 	a := 5
 	if a = 5 then

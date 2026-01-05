@@ -453,7 +453,6 @@ void IRVisitor::visit(LoopAST& v)
 
     auto statements = v.getStatements();
     v.accept(*this);
-
 }
 
 void IRVisitor::visit(ExitAST& v) { }
@@ -976,8 +975,6 @@ void IRVisitor::visit(ProcDeclAST& v)
 
     scope->accept(*this);
     m_currentBB = oldBB;
-
-    return;
 }
 
 void IRVisitor::visit(FuncDeclAST& v)
@@ -987,7 +984,7 @@ void IRVisitor::visit(FuncDeclAST& v)
     
     auto basicBlock = std::make_shared<BasicBlock>(bbName);
     m_funcBB[bbName] = basicBlock;
-    auto& oldBB = m_currentBB;
+    std::shared_ptr<BasicBlock> oldBB = m_currentBB;
     m_currentBB = basicBlock;
     auto params = v.getParams();
     auto scope = v.getScope();

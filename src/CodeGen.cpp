@@ -47,21 +47,21 @@ void CodeGen::generateMIR()
 {
     linearizeCFG();
     std::cout << "Instructions in Reverse Post-Order:\n";
-    
+
     // Print instructions in linearized order
     for (unsigned int i = 0; i < m_linearizedBlocks.size(); ++i)
     {
-      std::cout << m_linearizedBlocks[i]->getName() << ":\n";
-      for (unsigned int j = 0;
-           j < m_linearizedBlocks[i]->getInstructions().size(); ++j)
-      {
-        std::cout << "    "
-                  << m_linearizedBlocks[i]->getInstructions()[j]->getString()
-                  << std::endl;
-      }
+        std::cout << m_linearizedBlocks[i]->getName() << ":\n";
+        for (unsigned int j = 0;
+            j < m_linearizedBlocks[i]->getInstructions().size(); ++j)
+        {
+            std::cout << "    "
+                      << m_linearizedBlocks[i]->getInstructions()[j]->getString()
+                      << std::endl;
+        }
     }
     std::cout << std::endl;
-    
+
     std::shared_ptr<Register> rbp{new Register{0, "rbp"}};
     std::shared_ptr<Register> rsp{new Register{1, "rsp"}};
     std::shared_ptr<Register> rax{
@@ -102,7 +102,7 @@ void CodeGen::generateMIR()
             std::vector<std::shared_ptr<MachineIR>>{rcx, memMIR});
         return leaMIR;
     };
-    
+
     auto memoryLocationForVReg = [&](std::string vReg)
     {
         if (vRegToOffset.find(vReg) == vRegToOffset.end())
