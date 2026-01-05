@@ -4,6 +4,7 @@
 #include "InstIR.hpp"
 #include "CodeGen.hpp"
 #include "IRVisitor.hpp"
+#include "BasicBlock.hpp"
 
 #include <memory>
 #include <cstdlib>

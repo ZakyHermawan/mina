@@ -1,4 +1,12 @@
 #include "Ast.hpp"
+#include "Types.hpp"
+#include "Token.hpp"
+#include "Visitors.hpp"
+
+#include <memory>
+#include <utility>
+#include <string>
+
 
 StatementsAST::StatementsAST(std::shared_ptr<StatementAST> statement,
                              std::shared_ptr<StatementsAST> statements)

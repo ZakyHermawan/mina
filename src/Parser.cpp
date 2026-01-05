@@ -1,16 +1,22 @@
-#include "Parser.hpp"
 #include "Ast.hpp"
 #include "Token.hpp"
 #include "Types.hpp"
+#include "Parser.hpp"
+#include "Symbol.hpp"
 #include "IRVisitor.hpp"
+#include "arena_alloc.hpp"
 
+#include <any>
+#include <stack>
+#include <cctype>
 #include <memory>
+#include <string>
+#include <cstdlib>
+#include <sstream>
+#include <utility>
 #include <iostream>
 #include <stdexcept>
 #include <unordered_map>
-#include <cstdlib>
-#include <sstream>
-#include <stack>
 
 Parser::Parser(std::string source)
     : m_lexer{std::move(source)},
@@ -38,7 +44,7 @@ Parser::Parser()
 {
 }
 
-void Parser::exitParse(std::string msg)
+void Parser::exitParse(std::string msg) const
 {
     std::cerr << "Error" << " : " << msg << ", got "
         << getCurrToken() << std::endl;
@@ -85,7 +91,7 @@ void Parser::symbolNotDefined(const std::string &identifier)
 {
     for (int i = 0; i < m_symTab.size(); ++i)
     {
-        auto currSymTab = m_symTab[i];
+        auto& currSymTab = m_symTab[i];
         auto it = currSymTab.find(identifier);
         if (it != currSymTab.end())
         {
@@ -95,7 +101,7 @@ void Parser::symbolNotDefined(const std::string &identifier)
 
     for (int i = 0; i < m_functionTab.size(); ++i)
     {
-        auto currFuncTab = m_functionTab[i];
+        auto& currFuncTab = m_functionTab[i];
         auto it = currFuncTab.find(identifier);
         if (it != currFuncTab.end())
         {
@@ -113,14 +119,14 @@ void Parser::symbolNotDefinedOnLexicalLevel(const std::string &identifier,
         return;
     }
 
-    auto currSymTab = m_symTab[lexical_level];
+    auto& currSymTab = m_symTab[lexical_level];
     auto it = currSymTab.find(identifier);
     if (it != currSymTab.end())
     {
         throw std::runtime_error("symbol " + identifier + " does exist!");
     }
 
-    auto currFuncTab = m_functionTab[lexical_level];
+    auto& currFuncTab = m_functionTab[lexical_level];
     auto it2 = currFuncTab.find(identifier);
     if (it2 != currFuncTab.end())
     {
@@ -155,7 +161,7 @@ Type Parser::getTypeFromSymTab(std::string& identifier)
     return type;
 }
 
-  /**
+/**
  * At the end of every parsing functions,
  * if there is no error,
  * always make sure the current token is pointing to the next token (use
@@ -194,8 +200,6 @@ std::shared_ptr<ScopeAST> Parser::scope()
         exitParse("Expected '{'");
     }
 
-    // auto prevSymTab = m_symTab;
-    // auto prevFuncTab = m_functionTab;
     advance();
 
     // Parse: LEFT_BRACE SEMI statements RIGHT_BRACE
@@ -271,7 +275,6 @@ std::shared_ptr<DeclAST> Parser::declaration()
         auto varName = currToken.getLexme();
 
         advance();
-        // symbolNotDefinedOnCurrentLexicalLevel(varName);
         auto isArrDecl = optArrayBound(varName);
         
         if (getCurrTokenType() != COLON)
@@ -773,7 +776,7 @@ std::shared_ptr<StatementAST> Parser::assignOrCall(std::string &identifier)
         int lexical_level;
         for (int i = m_lexical_level; i >= 0; --i)
         {
-          auto currFuncTab = m_functionTab[i];
+          auto& currFuncTab = m_functionTab[i];
           auto it = currFuncTab.find(identifier);
             if (it != currFuncTab.end())
             {
@@ -839,7 +842,7 @@ std::shared_ptr<StatementAST> Parser::assignOrCall(std::string &identifier)
         int lexical_level;
         for (int i = m_lexical_level; i >= 0; --i)
         {
-            auto currFuncTab = m_functionTab[i];
+            auto& currFuncTab = m_functionTab[i];
             auto it = currFuncTab.find(identifier);
             if (it != currFuncTab.end())
             {
@@ -1205,7 +1208,7 @@ std::shared_ptr<ExprAST> Parser::subsOrCall(std::string &identifier)
         int startAddr = -1;
         for (int i = m_lexical_level; i >= 0; --i)
         {
-            auto currFuncTab = m_functionTab[i];
+            auto& currFuncTab = m_functionTab[i];
             auto it = currFuncTab.find(identifier);
             if (it != currFuncTab.end())
             {

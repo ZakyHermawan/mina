@@ -43,7 +43,7 @@ private:
     ~Parser() = default;
 
     // panic mode
-    void exitParse(std::string msg);
+    void exitParse(std::string msg) const;
     bool isFinished() const;
     Token getCurrToken() const;
     TokenType getCurrTokenType() const;
