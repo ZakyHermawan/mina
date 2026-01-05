@@ -461,10 +461,7 @@ void IRVisitor::visit(ReturnAST& v)
     auto retExpr = v.getRetExpr();
     retExpr->accept(*this);
     auto inst = popInst();
-    auto pushInst = std::make_shared<PushInst>(inst, m_currentBB);
-    pushInst->setup_def_use();
-    m_currentBB->pushInst(pushInst);
-    auto retInst = std::make_shared<ReturnInst>(m_currentBB);
+    auto retInst = std::make_shared<ReturnInst>(inst, m_currentBB);
     retInst->setup_def_use();
     m_currentBB->pushInst(retInst);
 }

@@ -1025,61 +1025,14 @@ void GetInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
 std::shared_ptr<BasicBlock> GetInst::getBlock() { return m_block; };
 InstType GetInst::getInstType() const { return InstType::Get; }
 
-PushInst::PushInst(std::shared_ptr<Inst> operand,
-                   std::shared_ptr<BasicBlock> block)
+ReturnInst::ReturnInst(std::shared_ptr<Inst> returnExpr, std::shared_ptr<BasicBlock> block)
     : m_block(std::move(block))
 {
-    m_operands = std::vector<std::shared_ptr<Inst>>{operand};
-}
-std::shared_ptr<Inst> PushInst::getOperand() { return m_operands[0]; }
-std::string PushInst::getString()
-{
-    auto operand = m_operands[0]->getTarget()->getString();
-    return "Push(" + operand + ")";
-}
-void PushInst::push_user(std::shared_ptr<Inst> user)
-{
-    m_users.push_back(user);
-}
-void PushInst::setup_def_use() { m_operands[0]->push_user(shared_from_this()); }
-std::vector<std::shared_ptr<Inst>>& PushInst::getOperands()
-{
-    return m_operands;
-}
-std::shared_ptr<BasicBlock> PushInst::getBlock() { return m_block; };
-InstType PushInst::getInstType() const { return InstType::Push; }
-
-PopInst::PopInst(std::shared_ptr<Inst> target,
-                 std::shared_ptr<BasicBlock> block)
-    : m_target(std::move(target)), m_block(std::move(block))
-{
-}
-std::shared_ptr<Inst> PopInst::getTarget() { return m_target; }
-std::string PopInst::getString()
-{
-    auto target = m_target->getTarget()->getString();
-    return target + " <- Pop()";
-}
-void PopInst::push_user(std::shared_ptr<Inst> user)
-{
-    m_users.push_back(user);
-}
-void PopInst::setup_def_use() {}
-std::vector<std::shared_ptr<Inst>>& PopInst::getOperands()
-{
-    return m_operands;
-}
-void PopInst::setTarget(std::shared_ptr<Inst> target) { m_target = target; }
-std::shared_ptr<BasicBlock> PopInst::getBlock() { return m_block; };
-InstType PopInst::getInstType() const { return InstType::Pop; }
-
-ReturnInst::ReturnInst(std::shared_ptr<BasicBlock> block)
-    : m_block(std::move(block))
-{
+    m_operands.push_back(returnExpr);
 }
 std::string ReturnInst::getString()
 {
-    return "Return";
+    return "Return " + m_operands[0]->getTarget()->getString();
 }
 void ReturnInst::push_user(std::shared_ptr<Inst> user)
 {

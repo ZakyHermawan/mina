@@ -38,8 +38,6 @@ enum class InstType
     BRF,
     Put,
     Get,
-    Push,
-    Pop,
     Return,
     FuncSignature,
     LowerFunc,
@@ -827,58 +825,6 @@ public:
     virtual InstType getInstType() const override;
 };
 
-class PushInst : public Inst
-{
-private:
-    std::vector<std::shared_ptr<Inst>> m_users, m_operands;
-    std::shared_ptr<BasicBlock> m_block;
-
-public:
-    PushInst(std::shared_ptr<Inst> operand, std::shared_ptr<BasicBlock> block);
-
-    virtual ~PushInst() = default;
-    PushInst(const PushInst&) = delete;
-    PushInst(PushInst&&) noexcept = default;
-    PushInst& operator=(const PushInst&) = delete;
-    PushInst& operator=(PushInst&&) noexcept = default;
-  
-    std::shared_ptr<Inst> getOperand();
-  
-    virtual std::string getString() override;
-    virtual void push_user(std::shared_ptr<Inst> user) override;
-    virtual void setup_def_use();
-    virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
-    virtual std::shared_ptr<BasicBlock> getBlock() override;
-    virtual InstType getInstType() const override;
-};
-
-class PopInst : public Inst
-{
-private:
-    std::shared_ptr<Inst> m_target;
-    std::vector<std::shared_ptr<Inst>> m_users, m_operands;
-    std::shared_ptr<BasicBlock> m_block;
-
-public:
-    PopInst(std::shared_ptr<Inst> target, std::shared_ptr<BasicBlock> block);
-  
-    virtual ~PopInst() = default;
-    PopInst(const PopInst&) = delete;
-    PopInst(PopInst&&) noexcept = default;
-    PopInst& operator=(const PopInst&) = delete;
-    PopInst& operator=(PopInst&&) noexcept = default;
-  
-    virtual std::shared_ptr<Inst> getTarget() override;
-  
-    virtual std::string getString() override;
-    virtual void push_user(std::shared_ptr<Inst> user) override;
-    virtual void setup_def_use();
-    virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
-    virtual void setTarget(std::shared_ptr<Inst> target);
-    virtual std::shared_ptr<BasicBlock> getBlock() override;
-    virtual InstType getInstType() const override;
-};
-
 class ReturnInst : public Inst
 {
 private:
@@ -886,13 +832,13 @@ private:
     std::shared_ptr<BasicBlock> m_block;
 
 public:
-    ReturnInst(std::shared_ptr<BasicBlock> block);
+    ReturnInst(std::shared_ptr<Inst> returnExpr, std::shared_ptr<BasicBlock> block);
     virtual ~ReturnInst() = default;
     ReturnInst(const ReturnInst&) = delete;
     ReturnInst(ReturnInst&&) noexcept = default;
     ReturnInst& operator=(const ReturnInst&) = delete;
     ReturnInst& operator=(ReturnInst&&) noexcept = default;
-  
+
     virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
@@ -975,9 +921,9 @@ public:
     CallInst(CallInst&&) noexcept = default;
     CallInst& operator=(const CallInst&) = delete;
     CallInst& operator=(CallInst&&) noexcept = default;
-  
+
     std::string getCalleeStr();
-  
+
     virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
@@ -1003,7 +949,7 @@ public:
     PhiInst& operator=(PhiInst&&) noexcept = default;
 
     void appendOperand(std::shared_ptr<Inst> operand);
-    
+
     virtual std::shared_ptr<Inst> getTarget() override;
     virtual std::shared_ptr<BasicBlock> getBlock();
     virtual std::string getString() override;
@@ -1028,9 +974,9 @@ public:
     HaltInst(HaltInst&&) noexcept = default;
     HaltInst& operator=(const HaltInst&) = delete;
     HaltInst& operator=(HaltInst&&) noexcept = default;
-  
+
     virtual bool hasTarget() override { return false; }
-  
+
     virtual std::string getString() override;
     virtual std::shared_ptr<BasicBlock> getBlock() override;
     virtual InstType getInstType() const override;
