@@ -1,11 +1,16 @@
 #include "Ast.hpp"
+#include "SSA.hpp"
+#include "Types.hpp"
 #include "InstIR.hpp"
 #include "CodeGen.hpp"
 #include "IRVisitor.hpp"
-#include "SSA.hpp"
 
 #include <memory>
+#include <cstdlib>
+#include <string>
+#include <utility>
 #include <stdexcept>
+#include <iostream>
 
 IRVisitor::IRVisitor()
     : m_tempCounter(0),
@@ -93,7 +98,8 @@ void IRVisitor::visit(ProgramAST& v)
     for (auto const& [key, func]: m_funcBB)
     {
         SSA newSSA;
-        newSSA.setCFG(func);
+        newSSA.setCFG(func->getBlock());
+        std::cout << func->getString() << std::endl;
 
         // todo: correctly implement rename for function signature,
         // one of the solution:
@@ -102,8 +108,6 @@ void IRVisitor::visit(ProgramAST& v)
         // then just do phiweb
         newSSA.renameSSA();
         newSSA.printCFG();
-        //CodeGen funcCG(newSSA);
-        //funcCG.generateMIR();
     }
 
     auto haltInst = std::make_shared<HaltInst>(m_currentBB);
@@ -240,7 +244,6 @@ void IRVisitor::visit(OutputsAST& v)
     {
         size_t pos = temp.find('[');
         if (pos != std::string::npos){
-            //auto inst = popInst();
             std::string baseName = temp.substr(0, pos);
             auto targetInstName = inst->getString();
             auto targetInst = std::make_shared<IdentInst>(
@@ -526,9 +529,27 @@ void IRVisitor::visit(CallAST& v)
        args->accept(*this);
     }
 
-    auto callInst = std::make_shared<CallInst>(funcName, m_arguments, m_currentBB);
-    callInst->setup_def_use();
-    m_currentBB->pushInst(callInst);
+    auto& func = m_funcBB[funcName];
+
+    if (func->getFType() == FType::FUNC)
+    {
+        // Create temporary variable to store the result of function call
+        pushCurrentTemp();
+        auto temp = getCurrentTemp();
+        auto callInst =
+            std::make_shared<FuncCallInst>(funcName, temp, m_arguments, m_currentBB);
+        callInst->setup_def_use();
+        m_currentBB->pushInst(callInst);
+        m_ssa.writeVariable(temp, m_currentBB, callInst);
+        m_instStack.push(callInst->getTarget());
+    }
+    else
+    {
+        auto callInst =
+            std::make_shared<ProcCallInst>(funcName, m_arguments, m_currentBB);
+        callInst->setup_def_use();
+        m_currentBB->pushInst(callInst);
+    }
 }
 
 void IRVisitor::visit(FactorAST& v)
@@ -543,9 +564,7 @@ void IRVisitor::visit(FactorAST& v)
         std::make_shared<IdentInst>(std::move(currentTempStr), m_currentBB);
     currentTempInst->setup_def_use();
     m_instStack.push(currentTempInst);
-
     pushCurrentTemp();
-
 
     if (op == "-")
     {
@@ -584,7 +603,6 @@ void IRVisitor::visit(FactorsAST& v)
 
     if (op == "*")
     {
-
         auto inst =
             std::make_shared<MulInst>(std::move(currentTempInst),
                                             std::move(leftInst),
@@ -687,7 +705,6 @@ void IRVisitor::visit(TermsAST& v)
     {
         terms->accept(*this);
     }
-
 }
 
 void IRVisitor::visit(SimpleExprAST& v)
@@ -793,8 +810,7 @@ void IRVisitor::visit(ExpressionAST& v)
 
 void IRVisitor::visit(VarDeclAST& v)
 {
-    auto baseName = v.getIdentifier()->getName();
-    
+    auto& baseName = v.getIdentifier()->getName();
     auto ssaName = m_ssa.baseNameToSSA(baseName);
     auto targetIdentInst = std::make_shared<IdentInst>(ssaName, m_currentBB);
     targetIdentInst->setup_def_use();
@@ -951,18 +967,18 @@ void IRVisitor::visit(ProcDeclAST& v)
     std::string bbName = procName;
 
     auto basicBlock = std::make_shared<BasicBlock>(bbName);
-    m_funcBB[bbName] = basicBlock;
     std::shared_ptr<BasicBlock> oldBB = m_currentBB;
     m_currentBB = basicBlock;
 
     auto params = v.getParams();
     auto scope = v.getScope();
 
-    // This function signature instruction will not be lowered,
-    // It's purpose only for readibility of the SSA CFG
-    auto funcSignature = std::make_shared<FuncSignature>(
+    // This function signature instruction will not be lowered
+    // It's purpose just to bring information
+    auto funcSignature = std::make_shared<Func>(
         procName, FType::PROC, Type::UNDEFINED, m_parameters, m_currentBB);
     m_currentBB->pushInst(funcSignature);
+    m_funcBB[bbName] = funcSignature;
 
     m_parameters = {};
     if (params)
@@ -980,18 +996,18 @@ void IRVisitor::visit(FuncDeclAST& v)
     std::string bbName = funcName;
     
     auto basicBlock = std::make_shared<BasicBlock>(bbName);
-    m_funcBB[bbName] = basicBlock;
     std::shared_ptr<BasicBlock> oldBB = m_currentBB;
     m_currentBB = basicBlock;
     auto params = v.getParams();
     auto scope = v.getScope();
     auto type = v.getType();
 
-    // This function signature instruction will not be lowered,
-    // It's purpose only for readibility of the SSA CFG
-    auto funcSignature = std::make_shared<FuncSignature>(
+    // This function signature instruction will not be lowered
+    // It's purpose just to bring information
+    auto funcSignature = std::make_shared<Func>(
         funcName, FType::FUNC, type, m_parameters, m_currentBB);
     m_currentBB->pushInst(funcSignature);
+    m_funcBB[bbName] = funcSignature;
 
     m_parameters = {};
     if (params)
@@ -1003,9 +1019,9 @@ void IRVisitor::visit(FuncDeclAST& v)
     m_currentBB = oldBB;
 }
 
-std::string IRVisitor::getCurrentTemp()
+std::string IRVisitor::getCurrentTemp() const
 {
-  return "t" + std::to_string(m_tempCounter);
+    return "t" + std::to_string(m_tempCounter);
 }
 
 void IRVisitor::pushCurrentTemp()
@@ -1027,9 +1043,9 @@ std::string IRVisitor::popTemp()
     return val;
 }
 
-std::string IRVisitor::getLastTemp()
+std::string IRVisitor::getLastTemp() const
 {
-  return "t" + std::to_string(m_tempCounter - 1);
+    return "t" + std::to_string(m_tempCounter - 1);
 }
 
 std::shared_ptr<Inst> IRVisitor::popInst()

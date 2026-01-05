@@ -1,3 +1,4 @@
+#include "SSA.hpp"
 #include "CodeGen.hpp"
 #include "BasicBlock.hpp"
 #include "MachineIR.hpp"
@@ -13,8 +14,6 @@
 #include <algorithm>
 #include <stdexcept>
 #include <functional>
-
-typedef int (*Func)(void);
 
 CodeGen::CodeGen(SSA ssa) : m_ssa{ssa}
 {
@@ -107,7 +106,6 @@ void CodeGen::generateMIR()
     {
         if (vRegToOffset.find(vReg) == vRegToOffset.end())
         {
-            std::cout << vReg << std::endl;
             throw std::runtime_error("CodeGen Error: Variable '" + vReg + "' not found in stack map.");
         }
         unsigned int offset = vRegToOffset[vReg];
@@ -127,7 +125,15 @@ void CodeGen::generateMIR()
         for (int j = 0; j < inst.size(); ++j)
         {
             auto instType = inst[j]->getInstType();
-            if (instType == InstType::Assign)
+            if (instType == InstType::FuncCall)
+            {
+                auto currInst = std::dynamic_pointer_cast<FuncCallInst>(inst[j]);
+                auto target = currInst->getTarget();
+                auto targetStr = target->getTarget()->getString();
+                assignVRegToOffsetIfDoesNotExist(targetStr);
+                std::cout << "function call codegen is not being implemented yet!\n";
+            }
+            else if (instType == InstType::Assign)
             {
                 auto assignInst = std::dynamic_pointer_cast<AssignInst>(inst[j]);
                 auto& operands = assignInst->getOperands();

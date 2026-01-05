@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Ast.hpp"
 #include "SSA.hpp"
 #include "CodeGen.hpp"
 #include "Visitors.hpp"
@@ -27,7 +28,7 @@ private:
     CodeGen m_cg;
 
     std::shared_ptr<BasicBlock> m_currentBB; // current basic block
-    std::unordered_map<std::string, std::shared_ptr<BasicBlock>> m_funcBB;
+    std::unordered_map<std::string, std::shared_ptr<Func>> m_funcBB;
 
 public:
     IRVisitor();
@@ -67,10 +68,10 @@ public:
     void visit(ProcDeclAST& v) override;
     void visit(FuncDeclAST& v) override;
 
-    std::string getCurrentTemp();
+    std::string getCurrentTemp() const;
     void pushCurrentTemp();
     std::string popTemp();
-    std::string getLastTemp();
+    std::string getLastTemp() const;
 
     std::shared_ptr<Inst> popInst();
 };

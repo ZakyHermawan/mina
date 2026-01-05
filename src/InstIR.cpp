@@ -1046,7 +1046,7 @@ std::vector<std::shared_ptr<Inst>>& ReturnInst::getOperands()
 std::shared_ptr<BasicBlock> ReturnInst::getBlock() { return m_block; };
 InstType ReturnInst::getInstType() const { return InstType::Return; }
 
-FuncSignature::FuncSignature(std::string funcName, FType fType, Type retType,
+Func::Func(std::string funcName, FType fType, Type retType,
     std::vector<std::shared_ptr<IdentifierAST>> parameters,
     std::shared_ptr<BasicBlock> block)
     :   m_funcName(std::move(funcName)),
@@ -1056,8 +1056,9 @@ FuncSignature::FuncSignature(std::string funcName, FType fType, Type retType,
         m_block(std::move(block))
 {
 }
-std::string FuncSignature::getFuncName() { return m_funcName; }
-std::string FuncSignature::getString()
+std::string Func::getFuncName() { return m_funcName; }
+FType Func::getFType() { return m_fType; }
+std::string Func::getString()
 {
     std::string res;
     if (m_fType == FType::PROC)
@@ -1108,16 +1109,16 @@ std::string FuncSignature::getString()
     res += ")";
     return res;
 }
-void FuncSignature::push_user(std::shared_ptr<Inst> user)
+void Func::push_user(std::shared_ptr<Inst> user)
 {
     throw std::runtime_error("function signature should not use anything!\n");
 }
-void FuncSignature::setup_def_use()
+void Func::setup_def_use()
 {
     // do nothing, since function signature did not use anything
 }
-std::shared_ptr<BasicBlock> FuncSignature::getBlock() { return m_block; }
-InstType FuncSignature::getInstType() const { return InstType::FuncSignature; }
+std::shared_ptr<BasicBlock> Func::getBlock() { return m_block; }
+InstType Func::getInstType() const { return InstType::Func; }
 
 LowerFunc::LowerFunc(std::string funcName, FType fType, Type retType,
     std::vector<std::shared_ptr<IdentifierAST>> parameters,
@@ -1184,14 +1185,16 @@ void LowerFunc::setup_def_use()
 std::shared_ptr<BasicBlock> LowerFunc::getBlock() { return m_block; }
 InstType LowerFunc::getInstType() const { return InstType::LowerFunc; }
 
-CallInst::CallInst(std::string calleeStr,
+ProcCallInst::ProcCallInst(std::string calleeStr,
                    std::vector<std::shared_ptr<Inst>> operands,
                    std::shared_ptr<BasicBlock> block)
-    : m_calleeStr(std::move(calleeStr)), m_operands(std::move(operands)), m_block(std::move(block))
+    : m_calleeStr(std::move(calleeStr)),
+      m_operands(std::move(operands)),
+      m_block(std::move(block))
 {
 }
-std::string CallInst::getCalleeStr() { return m_calleeStr; }
-std::string CallInst::getString()
+std::string ProcCallInst::getCalleeStr() { return m_calleeStr; }
+std::string ProcCallInst::getString()
 {
 
     std::string res = m_calleeStr + "(";
@@ -1206,17 +1209,59 @@ std::string CallInst::getString()
     res += ")";
     return res;
 }
-void CallInst::push_user(std::shared_ptr<Inst> user)
+void ProcCallInst::push_user(std::shared_ptr<Inst> user)
 {
     m_users.push_back(user);
 }
-void CallInst::setup_def_use() {}
-std::vector<std::shared_ptr<Inst>>& CallInst::getOperands()
+void ProcCallInst::setup_def_use() {}
+std::vector<std::shared_ptr<Inst>>& ProcCallInst::getOperands()
 {
     return m_operands;
 }
-std::shared_ptr<BasicBlock> CallInst::getBlock() { return m_block; };
-InstType CallInst::getInstType() const { return InstType::Call; }
+std::shared_ptr<BasicBlock> ProcCallInst::getBlock() { return m_block; };
+InstType ProcCallInst::getInstType() const { return InstType::ProcCall; }
+
+
+FuncCallInst::FuncCallInst(std::string calleeStr, std::string targetName,
+                   std::vector<std::shared_ptr<Inst>> operands,
+                   std::shared_ptr<BasicBlock> block)
+    : m_calleeStr(std::move(calleeStr)),
+      m_operands(std::move(operands)),
+      m_block(std::move(block))
+{
+    m_target = std::make_shared<IdentInst>(targetName, block);
+}
+std::string FuncCallInst::getCalleeStr() { return m_calleeStr; }
+std::string FuncCallInst::getString()
+{
+    std::string res =
+        m_target->getTarget()->getString() + " = " + m_calleeStr + "(";
+    for (int i = 0; i < m_operands.size(); ++i)
+    {
+        if (i)
+        {
+            res += ", ";
+        }
+        res += m_operands[i]->getTarget()->getString();
+    }
+    res += ")";
+    return res;
+}
+std::shared_ptr<Inst> FuncCallInst::getTarget()
+{
+    return m_target;
+}
+void FuncCallInst::push_user(std::shared_ptr<Inst> user)
+{
+    m_users.push_back(user);
+}
+void FuncCallInst::setup_def_use() {}
+std::vector<std::shared_ptr<Inst>>& FuncCallInst::getOperands()
+{
+    return m_operands;
+}
+std::shared_ptr<BasicBlock> FuncCallInst::getBlock() { return m_block; };
+InstType FuncCallInst::getInstType() const { return InstType::FuncCall; }
 
 PhiInst::PhiInst(std::string name, std::shared_ptr<BasicBlock> block)
     : m_target(std::make_shared<IdentInst>(name, block)), m_block(std::move(block))

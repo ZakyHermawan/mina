@@ -4,7 +4,7 @@
 	;
 		put(13, skip)
 	}
-	integer func add(b: boolean, a: integer) {; return a}
+	integer func someFunc(b: boolean, a: integer) {; return a}
 	proc something(x: integer, y: boolean, z: integer) {
 	;
 		put(x, skip)
@@ -20,6 +20,7 @@
 	put(a, skip)
 	put(9123, skip)
 	put(true, skip)
+	a := someFunc(false, 10)
 	empty()
 	something(a)
 	something(19)

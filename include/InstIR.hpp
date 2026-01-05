@@ -39,9 +39,10 @@ enum class InstType
     Put,
     Get,
     Return,
-    FuncSignature,
+    Func,
     LowerFunc,
-    Call,
+    ProcCall,
+    FuncCall,
     Phi,
     Halt,
     Undef,
@@ -848,7 +849,7 @@ public:
 };
 
 // object of this class does not execute
-class FuncSignature : public Inst
+class Func : public Inst
 {
 private:
     std::string m_funcName;
@@ -859,16 +860,17 @@ private:
     std::shared_ptr<BasicBlock> m_block;
 
 public:
-    FuncSignature(std::string funcName, FType fType, Type retType,
+    Func(std::string funcName, FType fType, Type retType,
                   std::vector<std::shared_ptr<IdentifierAST>> parameters,
                   std::shared_ptr<BasicBlock> block);
-    virtual ~FuncSignature() = default;
-    FuncSignature(const FuncSignature&) = delete;
-    FuncSignature(FuncSignature&&) noexcept = default;
-    FuncSignature& operator=(const FuncSignature&) = delete;
-    FuncSignature& operator=(FuncSignature&&) noexcept = default;
+    virtual ~Func() = default;
+    Func(const Func&) = delete;
+    Func(Func&&) noexcept = default;
+    Func& operator=(const Func&) = delete;
+    Func& operator=(Func&&) noexcept = default;
 
     std::string getFuncName();
+    FType getFType();
 
     virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
@@ -907,7 +909,7 @@ public:
     virtual InstType getInstType() const override;
 };
 
-class CallInst : public Inst
+class ProcCallInst : public Inst
 {
 private:
     std::string m_calleeStr;
@@ -915,16 +917,47 @@ private:
     std::shared_ptr<BasicBlock> m_block;
 
 public:
-    CallInst(std::string calleeStr, std::vector<std::shared_ptr<Inst>> operands, std::shared_ptr<BasicBlock> block);
-    virtual ~CallInst() = default;
-    CallInst(const CallInst&) = delete;
-    CallInst(CallInst&&) noexcept = default;
-    CallInst& operator=(const CallInst&) = delete;
-    CallInst& operator=(CallInst&&) noexcept = default;
+    ProcCallInst(std::string calleeStr,
+                 std::vector<std::shared_ptr<Inst>> operands,
+                 std::shared_ptr<BasicBlock> block);
+    virtual ~ProcCallInst() = default;
+    ProcCallInst(const ProcCallInst&) = delete;
+    ProcCallInst(ProcCallInst&&) noexcept = default;
+    ProcCallInst& operator=(const ProcCallInst&) = delete;
+    ProcCallInst& operator=(ProcCallInst&&) noexcept = default;
 
     std::string getCalleeStr();
 
     virtual std::string getString() override;
+    virtual void push_user(std::shared_ptr<Inst> user) override;
+    virtual void setup_def_use();
+    virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;
+    virtual std::shared_ptr<BasicBlock> getBlock() override;
+    virtual InstType getInstType() const override;
+};
+
+class FuncCallInst : public Inst
+{
+private:
+    std::string m_calleeStr;
+    std::vector<std::shared_ptr<Inst>> m_users, m_operands;
+    std::shared_ptr<BasicBlock> m_block;
+    std::shared_ptr<IdentInst> m_target;
+
+public:
+    FuncCallInst(std::string calleeStr, std::string targetName,
+                 std::vector<std::shared_ptr<Inst>> operands,
+                 std::shared_ptr<BasicBlock> block);
+    virtual ~FuncCallInst() = default;
+    FuncCallInst(const FuncCallInst&) = delete;
+    FuncCallInst(FuncCallInst&&) noexcept = default;
+    FuncCallInst& operator=(const FuncCallInst&) = delete;
+    FuncCallInst& operator=(FuncCallInst&&) noexcept = default;
+
+    std::string getCalleeStr();
+
+    virtual std::string getString() override;
+    virtual std::shared_ptr<Inst> getTarget() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
     virtual std::vector<std::shared_ptr<Inst>>& getOperands() override;

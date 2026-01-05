@@ -1,14 +1,18 @@
 #include "SSA.hpp"
 #include "InstIR.hpp"
+#include "BasicBlock.hpp"
 #include "DisjointSetUnion.hpp"
 
 #include <set>
 #include <queue>
 #include <memory>
+#include <string>
 #include <vector>
 #include <iostream>
 #include <algorithm>
+#include <stdexcept>
 #include <functional>
+#include <unordered_map>
 
 SSA::SSA()
     : m_cfg{std::make_shared<BasicBlock>("Entry_0")},
@@ -81,6 +85,8 @@ void SSA::printCFG()
         auto& inst = currBlock->getInstructions();
         for (int j = 0; j < inst.size(); ++j)
         {
+            // Don't print function signature
+            if (inst[j]->getInstType() == InstType::Func) continue;
             std::cout << inst[j]->getString() << std::endl;
         }
     }
@@ -393,7 +399,7 @@ void SSA::renameSSA()
                 instructions.erase(instructions.begin() + instruction_idx);
                 continue;
             }
-            else if (currInst->getInstType() == InstType::Call)
+            else if (currInst->getInstType() == InstType::ProcCall)
             {
                 auto& operands = currInst->getOperands();
                 for (int i = 0; i < operands.size(); ++i)

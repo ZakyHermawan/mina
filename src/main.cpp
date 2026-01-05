@@ -1,12 +1,13 @@
+#include <string>
+#include <fstream>
 #include <sstream>
+#include <utility>
+#include <iostream>
 
-#include "Lexer.hpp"
 #include "Token.hpp"
 #include "Parser.hpp"
 
 #include "tests/test_lexer.hpp"
-
-#include <fstream>
 
 static void repl()
 {
@@ -47,6 +48,6 @@ int main(int argc, char* argv[])
     tests_token();
     tests_lexer();
 
-    runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes.txt");
+    runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes5.txt");
     return 0;
 }
