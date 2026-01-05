@@ -1,9 +1,11 @@
 #include "Ast.hpp"
+#include "Types.hpp"
 #include "InstIR.hpp"
 #include "BasicBlock.hpp"
 
 #include <string>
 #include <vector>
+#include <utility>
 #include <stdexcept>
 
 IntConstInst::IntConstInst(int val, std::shared_ptr<BasicBlock> block)
@@ -1111,6 +1113,18 @@ std::string FuncSignature::getString()
     }
     else
     {
+      if (m_retType == Type::INTEGER)
+        {
+            res += "int ";
+        }
+        else if (m_retType == Type::BOOLEAN)
+        {
+            res += "bool ";
+        }
+        else
+        {
+            throw std::runtime_error("function return undefined function type!");
+        }
         res += "func ";
     }
     res += m_funcName + "(";

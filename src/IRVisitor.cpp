@@ -88,22 +88,8 @@ void IRVisitor::visit(VariableAST& v)
 void IRVisitor::visit(ProgramAST& v)
 {
     v.getScope()->accept(*this);
-    auto haltInst = std::make_shared<HaltInst>(m_currentBB);
-    m_currentBB->pushInst(haltInst);
-    
-    m_ssa.sealBlock(m_currentBB);
 
-    //std::cout << "Before renaming: \n";
-    m_ssa.renameSSA();
-
-    //std::cout << "\n\nAfter renaming: \n";
-    //m_ssa.printCFG();
-
-    SSA old = m_ssa;
-    m_cg.setSSA(old);
-    //m_cg.linearizeCFG();
-    m_cg.generateMIR();
-
+    // Generate non-main functions first
     for (auto const& [key, func]: m_funcBB)
     {
         SSA newSSA;
@@ -116,7 +102,24 @@ void IRVisitor::visit(ProgramAST& v)
         // then just do phiweb
         newSSA.renameSSA();
         newSSA.printCFG();
+        //CodeGen funcCG(newSSA);
+        //funcCG.generateMIR();
     }
+
+    auto haltInst = std::make_shared<HaltInst>(m_currentBB);
+    m_currentBB->pushInst(haltInst);
+
+    m_ssa.sealBlock(m_currentBB);
+
+    //std::cout << "Before renaming: \n";
+    m_ssa.renameSSA();
+
+    //std::cout << "\n\nAfter renaming: \n";
+    //m_ssa.printCFG();
+
+    SSA old = m_ssa;
+    m_cg.setSSA(old);
+    m_cg.generateMIR();
 }
 
 void IRVisitor::visit(ScopeAST& v)
@@ -912,11 +915,27 @@ void IRVisitor::visit(ParameterAST& v)
 
     // curerntBB here is the basic block for the function declaration
     std::string& identName = ident->getName();
-    auto identInst = std::make_shared<IdentInst>(m_ssa.baseNameToSSA(identName),
-                                                 m_currentBB);
-    // Each parameter is a definition.
+    std::shared_ptr<Inst> assignmentValue;
+    if (ident->getType() == Type::INTEGER)
+    {
+        assignmentValue = std::make_shared<IntConstInst>(0, m_currentBB);
+    }
+    else if (ident->getType() == Type::BOOLEAN)
+    {
+        assignmentValue = std::make_shared<BoolConstInst>(false, m_currentBB);
+    }
+    else
+    {
+        throw std::runtime_error("Only integer and boolean types are supported as parameter!");
+    }
+
+    auto assignInst = std::make_shared<AssignInst>(
+    std::make_shared<IdentInst>(m_ssa.baseNameToSSA(identName),
+                                m_currentBB), assignmentValue, m_currentBB);
+    assignInst->setup_def_use();
     m_ssa.writeVariable(m_ssa.baseNameToSSA(identName), m_currentBB,
-                        identInst);
+                        assignmentValue);
+    m_currentBB->pushInst(assignInst);
 }
 
 void IRVisitor::visit(ParametersAST& v)
@@ -940,9 +959,14 @@ void IRVisitor::visit(ProcDeclAST& v)
     std::shared_ptr<BasicBlock> oldBB = m_currentBB;
     m_currentBB = basicBlock;
 
-
     auto params = v.getParams();
     auto scope = v.getScope();
+
+    // This function signature instruction will not be lowered,
+    // It's purpose only for readibility of the SSA CFG
+    auto funcSignature = std::make_shared<FuncSignature>(
+        procName, FType::PROC, Type::UNDEFINED, m_parameters, m_currentBB);
+    m_currentBB->pushInst(funcSignature);
 
     m_parameters = {};
     if (params)
@@ -950,33 +974,9 @@ void IRVisitor::visit(ProcDeclAST& v)
         params->accept(*this);
     }
 
-    auto lowerFunc = std::make_shared<LowerFunc>(
-        procName, FType::PROC, Type::UNDEFINED, m_parameters, m_currentBB);
-    lowerFunc->setup_def_use();
-    m_currentBB->pushInst(lowerFunc);
-
-    // lower param
-    for (int i=0; i < m_parameters.size(); ++i)
-    {
-        auto& param = m_parameters[i];
-        auto identType = param->getIdentType();
-        if (identType == IdentType::VARIABLE)
-        {
-            auto variable = std::dynamic_pointer_cast<VariableAST>(param);
-        }
-        else
-        {
-            throw std::runtime_error("array parameter is not implemented yet!\n");
-        }
-    }
-
     scope->accept(*this);
     m_currentBB = oldBB;
 
-    auto funcSignature = std::make_shared<FuncSignature>(
-        procName, FType::PROC, Type::UNDEFINED, m_parameters, m_currentBB);
-    m_currentBB->pushInst(funcSignature);
-    //m_cg.generateFuncNode(procName, false, m_parameters.size());
     return;
 }
 
@@ -987,14 +987,24 @@ void IRVisitor::visit(FuncDeclAST& v)
     
     auto basicBlock = std::make_shared<BasicBlock>(bbName);
     m_funcBB[bbName] = basicBlock;
-    auto oldBB = m_currentBB;
+    auto& oldBB = m_currentBB;
     m_currentBB = basicBlock;
     auto params = v.getParams();
     auto scope = v.getScope();
+    auto type = v.getType();
+
+    // This function signature instruction will not be lowered,
+    // It's purpose only for readibility of the SSA CFG
+    auto funcSignature = std::make_shared<FuncSignature>(
+        funcName, FType::FUNC, type, m_parameters, m_currentBB);
+    m_currentBB->pushInst(funcSignature);
+
+    m_parameters = {};
     if (params)
     {
         params->accept(*this);
     }
+
     scope->accept(*this);
     m_currentBB = oldBB;
 }

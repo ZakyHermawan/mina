@@ -748,5 +748,6 @@ public:
     std::string getFuncName() const;
     std::shared_ptr<ParametersAST> getParams();
     std::shared_ptr<ScopeAST> getScope();
+    Type getType() const;
     void accept(Visitor& v) override;
 };

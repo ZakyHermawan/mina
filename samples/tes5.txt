@@ -4,7 +4,8 @@
 	;
 		put(13, skip)
 	}
-	proc something(x: integer) {
+	integer func add(b: boolean, a: integer) {;return 1}
+	proc something(x: integer, y: boolean, z: integer) {
 	;
 		put(x, skip)
 	}

@@ -135,7 +135,7 @@ void CodeGen::generateMIR()
                 auto source = assignInst->getSource();
 
                 assignVRegToOffsetIfDoesNotExist(targetStr);
-              
+
                 auto mirTarget = memoryLocationForVReg(targetStr);              
                 auto sourceType = source->getInstType();
 

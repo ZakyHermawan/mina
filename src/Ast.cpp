@@ -411,5 +411,5 @@ void FuncDeclAST::accept(Visitor& v)
 {
     v.visit(*this);
 }
-std::string FuncDeclAST::getFuncName() const
-{ return m_funcName; }
+std::string FuncDeclAST::getFuncName() const { return m_funcName; }
+Type FuncDeclAST::getType() const { return m_type; }

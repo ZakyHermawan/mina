@@ -1,14 +1,12 @@
 {
-  var A: integer
   var fibo[100]: integer
   var i	  : integer
   var N   : integer;
   
-  A := 3 + 2 / 1 + 5 * 4
   get(N)
   fibo[0] := 1
   fibo[1] := 1
-  
+
   i := 2
   repeat
     fibo[i] := fibo[i-1] + fibo[i-2]

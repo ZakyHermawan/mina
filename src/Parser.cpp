@@ -492,8 +492,8 @@ std::shared_ptr<DeclAST> Parser::declaration()
         m_procName = procName;
         m_parsing_function = true;
         auto procDecl = procBody();
-        
-        auto funcTab = m_functionTab[m_lexical_level][m_procName];
+
+        auto& funcTab = m_functionTab[m_lexical_level][m_procName];
         m_instructions[rewriteAddr] = funcTab.getEndAddr() + 1;
         m_procName = "";
         m_parsing_function = false;
@@ -503,7 +503,7 @@ std::shared_ptr<DeclAST> Parser::declaration()
     else
     {
         type();
-        
+
         if (getCurrTokenType() != FUNC)
         {
             exitParse("Expected 'func'");
@@ -515,10 +515,10 @@ std::shared_ptr<DeclAST> Parser::declaration()
         {
             exitParse("Expected identifier");
         }
-        
+
         auto currToken = getCurrToken();
         auto funcName = currToken.getLexme();
-        
+
         advance();
         m_instructions.push_back(BR);
         m_instructions.push_back(-1);
@@ -528,7 +528,7 @@ std::shared_ptr<DeclAST> Parser::declaration()
         m_parsing_function = true;
         auto funcDecl = funcBody();
         
-        auto funcTab = m_functionTab[m_lexical_level][m_funcName];
+        auto& funcTab = m_functionTab[m_lexical_level][m_funcName];
         m_instructions[rewriteAddr] = funcTab.getEndAddr() + 1;
         m_funcName = "";
         m_parsing_function = false;
@@ -549,15 +549,21 @@ std::shared_ptr<FuncDeclAST> Parser::funcBody()
     m_parameterTypes.clear();
     symbolNotDefinedOnCurrentLexicalLevel(m_funcName);
     
-    std::shared_ptr<ParameterAST> paramsAST = nullptr;
+    std::shared_ptr<ParametersAST> paramsAST = nullptr;
     std::shared_ptr<ScopeAST> scopeAST = nullptr;
     
     if (getCurrTokenType() == LEFT_PAREN)
     {
         advance();
-        parameters();
+
+        if (getCurrTokenType() == COMMA)
+        {
+            exitParse("Parameters should not started with','");
+        }
+
+        paramsAST = parameters();
         m_local_numVar = m_parameters.size();
-        
+
         if (getCurrTokenType() != RIGHT_PAREN)
         {
             exitParse("Expected ')'");
@@ -571,7 +577,7 @@ std::shared_ptr<FuncDeclAST> Parser::funcBody()
         
         for (int i = 0; i < m_parameters.size(); ++i)
         {
-            m_functionTab[m_lexical_level + 1][m_funcName].setSymTab(m_parameters[i], Bucket(0, i, m_parameterTypes[i]));
+            m_functionTab[m_lexical_level][m_funcName].setSymTab(m_parameters[i], Bucket(0, i, m_parameterTypes[i]));
         }
         scopeAST = scope();
     }
@@ -589,7 +595,7 @@ std::shared_ptr<FuncDeclAST> Parser::funcBody()
     m_functionTab[m_lexical_level][m_funcName].setEndtAddr(
         m_instructions.size() - 1);
     m_functionTab[m_lexical_level][m_funcName].setLocalNumVar(m_local_numVar);
-    auto funcDecl = std::make_shared<FuncDeclAST>(m_funcName, nullptr,
+    auto funcDecl = std::make_shared<FuncDeclAST>(m_funcName, paramsAST,
                                                   std::move(scopeAST), m_type);
     return funcDecl;
 }

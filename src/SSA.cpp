@@ -5,7 +5,9 @@
 #include <set>
 #include <queue>
 #include <memory>
+#include <vector>
 #include <iostream>
+#include <algorithm>
 #include <functional>
 
 SSA::SSA()
@@ -71,7 +73,7 @@ void SSA::printCFG()
     };
     dfs(m_cfg);
     std::reverse(linearizedBlocks.begin(), linearizedBlocks.end());
-    std::cout << "Print CFG in Reverse Post-Order:\n";
+
     for (int i = 0; i < linearizedBlocks.size(); ++i)
     {
         auto& currBlock = linearizedBlocks[i];
