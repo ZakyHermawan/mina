@@ -662,6 +662,52 @@ void CodeGen::generateMIR()
                     std::make_shared<CallMIR>(currInst->getCalleeStr());
                 bbMIR->addInstruction(callMIR);
             }
+            else if (instType == InstType::Return)
+            {
+                auto returnInst = std::dynamic_pointer_cast<ReturnInst>(inst[j]);
+                auto& expr = returnInst->getOperands()[0]->getTarget();
+                if (expr->getInstType() == InstType::IntConst)
+                {
+                    auto intConstInst =
+                        std::dynamic_pointer_cast<IntConstInst>(expr);
+                    auto constMIR =
+                        std::make_shared<ConstMIR>(intConstInst->getVal());
+
+                    // mov rax, constant
+                    auto movMIR = std::make_shared<MovMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rax, constMIR});
+                    bbMIR->addInstruction(movMIR);
+                }
+                else if (expr->getInstType() == InstType::BoolConst)
+                {
+                    auto boolConstInst =
+                        std::dynamic_pointer_cast<BoolConstInst>(expr);
+                    int boolVal = boolConstInst->getVal() ? 1 : 0;
+                    auto constMIR =
+                        std::make_shared<ConstMIR>(boolVal);
+
+                    // mov rax, constant
+                    auto movMIR = std::make_shared<MovMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rax, constMIR});
+                    bbMIR->addInstruction(movMIR);
+                }
+                else if (expr->getInstType() == InstType::Ident)
+                {
+                    // Load return variable from its memory location
+                    auto memoryMIR = memoryLocationForVReg(
+                    std::dynamic_pointer_cast<IdentInst>(expr)->getString());
+
+                    // mov rax, QWORD PTR [return variable]
+                    auto movMIR = std::make_shared<MovMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{rax, memoryMIR});
+                    bbMIR->addInstruction(movMIR);
+                }
+                else
+                {
+                    throw std::runtime_error(
+                        "CodeGen Error: Unsupported return expression type.");
+                }
+            }
             else if (instType == InstType::Assign)
             {
                 auto assignInst = std::dynamic_pointer_cast<AssignInst>(inst[j]);

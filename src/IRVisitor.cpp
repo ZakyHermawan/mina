@@ -109,6 +109,8 @@ void IRVisitor::visit(ProgramAST& v)
         // then just do phiweb
         newSSA.renameSSA();
         newSSA.printCFG();
+        CodeGen cg(newSSA);
+        cg.generateMIR();
     }
 
     auto haltInst = std::make_shared<HaltInst>(m_currentBB);
