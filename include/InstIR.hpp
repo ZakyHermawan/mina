@@ -88,7 +88,7 @@ public:
     IntConstInst& operator=(const IntConstInst&) = delete;
     IntConstInst& operator=(IntConstInst&&) noexcept = default;
 
-    int getVal();
+    int getVal() const;
     virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
@@ -114,7 +114,7 @@ public:
     BoolConstInst& operator=(const BoolConstInst&) = delete;
     BoolConstInst& operator=(BoolConstInst&&) noexcept = default;
 
-    bool getVal();
+    bool getVal() const;
     virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
@@ -402,8 +402,8 @@ public:
     AllocaInst& operator=(AllocaInst&&) noexcept = default;
     
     std::shared_ptr<Inst> getTarget() override;
-    Type getType();
-    unsigned int getSize();
+    Type getType() const;
+    unsigned int getSize() const;
     
     virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;

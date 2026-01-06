@@ -3,6 +3,7 @@
 #include "InstIR.hpp"
 #include "BasicBlock.hpp"
 
+#include <memory>
 #include <string>
 #include <vector>
 #include <utility>
@@ -12,7 +13,7 @@ IntConstInst::IntConstInst(int val, std::shared_ptr<BasicBlock> block)
     : m_val(val), m_block(std::move(block))
 {
 }
-int IntConstInst::getVal() { return m_val; }
+int IntConstInst::getVal() const { return m_val; }
 std::string IntConstInst::getString()
 {
     return std::to_string(m_val);
@@ -36,7 +37,7 @@ BoolConstInst::BoolConstInst(bool val, std::shared_ptr<BasicBlock> block)
     : m_val(val), m_block(std::move(block))
 {
 }
-bool BoolConstInst::getVal() { return m_val; }
+bool BoolConstInst::getVal() const { return m_val; }
 std::string BoolConstInst::getString()
 {
     if (m_val)
@@ -427,8 +428,8 @@ AllocaInst::AllocaInst(std::shared_ptr<Inst> target, Type type,
     }
 }
 std::shared_ptr<Inst> AllocaInst::getTarget() { return m_target; }
-Type AllocaInst::getType() { return m_type; }
-unsigned int AllocaInst::getSize() { return m_size; }
+Type AllocaInst::getType() const { return m_type; }
+unsigned int AllocaInst::getSize() const { return m_size; }
 std::string AllocaInst::getString()
 {
     auto target = m_target->getTarget()->getString();

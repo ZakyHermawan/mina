@@ -1,6 +1,8 @@
 #include "BasicBlock.hpp"
 #include "InstIR.hpp"
 
+#include <utility>
+
 BasicBlock::BasicBlock(std::string name) : m_name(std::move(name)) {}
 
 void BasicBlock::setInstructions(

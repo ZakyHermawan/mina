@@ -1,10 +1,8 @@
 #pragma once
 
-#include <cctype>
-#include <memory>
-#include <stdexcept>
-
 #include "Token.hpp"
+
+#include <string>
 
 class Lexer
 {

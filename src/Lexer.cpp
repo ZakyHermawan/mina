@@ -2,7 +2,9 @@
 #include "Lexer.hpp"
 
 #include <cctype>
+#include <string>
 #include <utility>
+#include <stdexcept>
 
 Lexer::Lexer(std::string source)
     : m_source{std::move(source)},

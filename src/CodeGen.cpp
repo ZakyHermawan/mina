@@ -52,24 +52,6 @@ void CodeGen::generateMIR()
 {
     linearizeCFG();
 
-    /*
-    std::cout << "Instructions in Reverse Post-Order:\n";
-
-    // Print instructions in linearized order
-    for (unsigned int i = 0; i < m_linearizedBlocks.size(); ++i)
-    {
-        std::cout << m_linearizedBlocks[i]->getName() << ":\n";
-        for (unsigned int j = 0;
-            j < m_linearizedBlocks[i]->getInstructions().size(); ++j)
-        {
-            std::cout << "    "
-                      << m_linearizedBlocks[i]->getInstructions()[j]->getString()
-                      << std::endl;
-        }
-    }
-    std::cout << std::endl;
-    */
-
     std::shared_ptr<Register> rbp{new Register{0, "rbp"}};
     std::shared_ptr<Register> rsp{new Register{1, "rsp"}};
     std::shared_ptr<Register> rax{
@@ -1433,7 +1415,6 @@ void CodeGen::generateMIR()
         m_mirBlocks.push_back(std::move(bbMIR));
     }
 
-    //std::cout << ".intel_syntax noprefix\n.globl main\nfmt_str: .string \"%d\"\n";
     for (unsigned int i = 0; i < strLiterals.size(); ++i)
     {
         auto& literalLabel = strLiterals[i];
@@ -1443,10 +1424,7 @@ void CodeGen::generateMIR()
             std::cout << "literal" << std::to_string(i) << ": .string ";
             std::cout << literalLabel << std::endl;
         }
-        //std::cout << "literal" << std::to_string(i) << ": .string ";
-        //std::cout << strLiterals[i] << std::endl;
     }
-    //std::cout << ".section .text\nmain: \n";
 
     // Shadow space 32 byte and 8 byte for each variable
     unsigned int offset = 32 + vRegToOffset.size() * 8;
@@ -1471,9 +1449,6 @@ void CodeGen::generateMIR()
 
     std::cout << "    add rsp, " << aligned_offset << std::endl;
     std::cout << "    mov rsp, rbp\n    pop rbp\n    ret\n";
-
-    //std::cout << "\nnewline_str: .string \"\\n\"\n";
-    //std::cout << "\n";
 }
 
 void CodeGen::addSSA(std::string funcName, SSA& ssa)
@@ -1512,9 +1487,6 @@ void CodeGen::generateAllFunctionsMIR()
         //m_ssa.printCFG();
         std::cout << "\n" << funcName << ": \n";
         generateMIR();
-        //ssa.renameSSA();
-        //CodeGen funcCodeGen(ssa);
-        //funcCodeGen.generateMIR();
     }
 
     // Global epilogue

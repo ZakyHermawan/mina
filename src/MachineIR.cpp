@@ -5,6 +5,7 @@
 #include <iostream>
 #include <vector>
 #include <sstream>
+#include <memory>
 
 std::string BasicBlockMIR::getName() const { return m_name; }
 
