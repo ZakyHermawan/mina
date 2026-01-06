@@ -976,18 +976,17 @@ void IRVisitor::visit(ProcDeclAST& v)
     auto params = v.getParams();
     auto scope = v.getScope();
 
-    // This function signature instruction will not be lowered
-    // It's purpose just to bring information
-    auto funcSignature = std::make_shared<Func>(
-        procName, FType::PROC, Type::UNDEFINED, m_parameters, m_currentBB);
-    m_currentBB->pushInst(funcSignature);
-    m_funcBB[bbName] = funcSignature;
-
     m_parameters = {};
     if (params)
     {
         params->accept(*this);
     }
+
+    // To lower parameters correctly, we create a function signature instruction
+    auto funcSignature = std::make_shared<Func>(
+        procName, FType::PROC, Type::UNDEFINED, m_parameters, m_currentBB);
+    m_currentBB->pushInst(funcSignature);
+    m_funcBB[bbName] = funcSignature;
 
     scope->accept(*this);
     m_currentBB = oldBB;
@@ -1005,18 +1004,17 @@ void IRVisitor::visit(FuncDeclAST& v)
     auto scope = v.getScope();
     auto type = v.getType();
 
-    // This function signature instruction will not be lowered
-    // It's purpose just to bring information
-    auto funcSignature = std::make_shared<Func>(
-        funcName, FType::FUNC, type, m_parameters, m_currentBB);
-    m_currentBB->pushInst(funcSignature);
-    m_funcBB[bbName] = funcSignature;
-
     m_parameters = {};
     if (params)
     {
         params->accept(*this);
     }
+
+    // To lower parameters correctly, we create a function signature instruction
+    auto funcSignature = std::make_shared<Func>(funcName, FType::FUNC, type,
+                                                m_parameters, m_currentBB);
+    m_currentBB->pushInst(funcSignature);
+    m_funcBB[bbName] = funcSignature;
 
     scope->accept(*this);
     m_currentBB = oldBB;

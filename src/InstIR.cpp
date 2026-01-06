@@ -1052,9 +1052,14 @@ Func::Func(std::string funcName, FType fType, Type retType,
     :   m_funcName(std::move(funcName)),
         m_fType(fType),
         m_retType(retType),
-        m_parameters(std::move(parameters)),
+        m_parameters(parameters), // Copy, because this vector will get resetted
         m_block(std::move(block))
 {
+    //for (int i = 0; i < parameters.size(); ++i)
+    //{
+    //    m_parameters.push_back(parameters[i]);
+    //}
+    //std::cout << "size from inst IR: " << m_parameters.size() << std::endl;
 }
 std::string Func::getFuncName() { return m_funcName; }
 FType Func::getFType() { return m_fType; }
@@ -1119,6 +1124,10 @@ void Func::setup_def_use()
 }
 std::shared_ptr<BasicBlock> Func::getBlock() { return m_block; }
 InstType Func::getInstType() const { return InstType::Func; }
+std::vector<std::shared_ptr<IdentifierAST>>& Func::getParameters()
+{
+    return m_parameters;
+}
 
 LowerFunc::LowerFunc(std::string funcName, FType fType, Type retType,
     std::vector<std::shared_ptr<IdentifierAST>> parameters,

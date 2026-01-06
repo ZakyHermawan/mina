@@ -877,6 +877,7 @@ public:
     virtual void setup_def_use();
     virtual std::shared_ptr<BasicBlock> getBlock() override;
     virtual InstType getInstType() const override;
+    std::vector<std::shared_ptr<IdentifierAST>>& getParameters();
 };
 
 class LowerFunc : public Inst

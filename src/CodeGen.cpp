@@ -662,6 +662,70 @@ void CodeGen::generateMIR()
                     std::make_shared<CallMIR>(currInst->getCalleeStr());
                 bbMIR->addInstruction(callMIR);
             }
+            else if (instType == InstType::Func)
+            {
+                auto currInst = std::dynamic_pointer_cast<Func>(inst[j]);
+                auto& arguments = currInst->getParameters();
+                for (int i = 0; i < arguments.size(); ++i)
+                {
+                    if (i == 0)
+                    {
+                        auto& firstArg = arguments[i];
+
+                        // mov QWORD PTR [firstArg], rcx
+                        auto firstArgMemMIR =
+                            memoryLocationForVReg(firstArg->getName());
+                        auto movFromRcxMIR = std::make_shared<MovMIR>(
+                            std::vector<std::shared_ptr<MachineIR>>{
+                                firstArgMemMIR, rcx});
+                        bbMIR->addInstruction(movFromRcxMIR);
+                    }
+                    else if (i == 1)
+                    {
+                        auto& secondArg = arguments[i];
+
+                        // mov QWORD PTR [secondArg], rdx
+                        auto secondArgMemMIR =
+                            memoryLocationForVReg(secondArg->getName());
+                        auto movFromRdxMIR = std::make_shared<MovMIR>(
+                            std::vector<std::shared_ptr<MachineIR>>{
+                                secondArgMemMIR, rdx});
+                        bbMIR->addInstruction(movFromRdxMIR);
+                    }
+                    else if (i == 2)
+                    {
+                        // mov third parameter to r8
+                        auto& thirdArg = arguments[i];
+
+                        // mov QWORD PTR [thirdArg], r8
+                        auto thirdArgMemMIR =
+                            memoryLocationForVReg(thirdArg->getName());
+                        auto movFromR8MIR = std::make_shared<MovMIR>(
+                            std::vector<std::shared_ptr<MachineIR>>{
+                                thirdArgMemMIR, r8});
+                        bbMIR->addInstruction(movFromR8MIR);
+                    }
+                    else if (i == 3)
+                    {
+                        // mov fourth parameter to r9
+                        auto& fourthArg = arguments[i];
+
+                        // mov QWORD PTR [fourthArg], r9
+                        auto fourthArgMemMIR =
+                            memoryLocationForVReg(fourthArg->getName());
+                        auto movFromR9MIR = std::make_shared<MovMIR>(
+                            std::vector<std::shared_ptr<MachineIR>>{
+                                fourthArgMemMIR, r9});
+                        bbMIR->addInstruction(movFromR9MIR);
+                    }
+                    else
+                    {
+                        throw std::runtime_error(
+                            "CodeGen Error: Function/procedure with more than 4 "
+                            "parameter is not supported.");
+                    }
+                }
+            }
             else if (instType == InstType::Return)
             {
                 auto returnInst = std::dynamic_pointer_cast<ReturnInst>(inst[j]);
