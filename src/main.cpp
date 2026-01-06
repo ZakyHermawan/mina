@@ -48,6 +48,6 @@ int main(int argc, char* argv[])
     tests_token();
     tests_lexer();
 
-    runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes3.txt");
+    runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes2.txt");
     return 0;
 }

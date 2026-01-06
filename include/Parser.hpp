@@ -6,7 +6,6 @@
 #include <utility>
 
 #include "Lexer.hpp"
-#include "vm.hpp"
 #include "Token.hpp"
 #include "Types.hpp"
 #include "Symbol.hpp"

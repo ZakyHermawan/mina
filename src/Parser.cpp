@@ -1383,7 +1383,7 @@ int Parser::calculateConstantExpr(std::string &expr)
     return evalRPN(postfixExpr);
 }
 
-  /*
+/*
  * constantsExpression is just arithmethics expressions while all of the
  * operands are constants
  * */
