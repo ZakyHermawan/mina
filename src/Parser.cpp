@@ -1227,7 +1227,8 @@ std::shared_ptr<ExprAST> Parser::subsOrCall(std::string &identifier)
 
         if (startAddr != -1)
         {
-            return std::make_shared<CallAST>(identifier, nullptr);
+            throw std::runtime_error("Calling function or procedure "
+                                     " without parentheses is not allowed!");
         }
 
         // just an identifier

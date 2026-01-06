@@ -36,9 +36,9 @@
   A := Arr[2] + 3
   
   put(A, skip)
-  A := satu
+  A := satu()
   put(A, skip)
-  something
+  something()
   haha(4)
   two(2, 3)
 }
