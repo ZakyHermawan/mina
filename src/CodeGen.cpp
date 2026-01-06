@@ -24,6 +24,7 @@ void CodeGen::setSSA(SSA& ssa) { m_ssa = ssa; }
 void CodeGen::linearizeCFG()
 {
     // Implement Reverse Post-Order Traversal to linearize the CFG
+    m_linearizedBlocks.clear();
     std::set<std::shared_ptr<BasicBlock>> visited;
     std::function<void(std::shared_ptr<BasicBlock>)> dfs =
         [&](std::shared_ptr<BasicBlock> bb)
@@ -50,6 +51,8 @@ void CodeGen::linearizeCFG()
 void CodeGen::generateMIR()
 {
     linearizeCFG();
+
+    /*
     std::cout << "Instructions in Reverse Post-Order:\n";
 
     // Print instructions in linearized order
@@ -65,6 +68,7 @@ void CodeGen::generateMIR()
         }
     }
     std::cout << std::endl;
+    */
 
     std::shared_ptr<Register> rbp{new Register{0, "rbp"}};
     std::shared_ptr<Register> rsp{new Register{1, "rsp"}};
@@ -121,6 +125,7 @@ void CodeGen::generateMIR()
         return memoryMIR;
     };
 
+    m_mirBlocks.clear();
     for (int i = 0; i < m_linearizedBlocks.size(); ++i)
     {
         auto& currBlock = m_linearizedBlocks[i];
@@ -852,17 +857,17 @@ void CodeGen::generateMIR()
                 }
                 else if (outputType == InstType::BoolConst)
                 {
-                    bbMIR->addInstruction(leaToLabel("fmt_str"));
                     auto boolConstInst =
                         std::dynamic_pointer_cast<BoolConstInst>(
                             operands[0]->getTarget());
-                    int boolVal = boolConstInst->getVal() ? 1 : 0;
-                    auto constMIR =
-                        std::make_shared<ConstMIR>(boolVal);
-                    // mov rdx, constant
-                    auto movMIR = std::make_shared<MovMIR>(
-                        std::vector<std::shared_ptr<MachineIR>>{rdx, constMIR});
-                    bbMIR->addInstruction(movMIR);
+                    if (boolConstInst->getVal() == true)
+                    {
+                        bbMIR->addInstruction(leaToLabel("true_str"));
+                    }
+                    else
+                    {
+                        bbMIR->addInstruction(leaToLabel("false_str"));
+                    }
                 }
                 else if (outputType == InstType::StrConst)
                 {
@@ -1428,13 +1433,20 @@ void CodeGen::generateMIR()
         m_mirBlocks.push_back(std::move(bbMIR));
     }
 
-    std::cout << ".intel_syntax noprefix\n.globl main\nfmt_str: .string \"%d\"\n";
+    //std::cout << ".intel_syntax noprefix\n.globl main\nfmt_str: .string \"%d\"\n";
     for (unsigned int i = 0; i < strLiterals.size(); ++i)
     {
-        std::cout << "literal" << std::to_string(i) << ": .string ";
-        std::cout << strLiterals[i] << std::endl;
+        auto& literalLabel = strLiterals[i];
+        if (m_stringLiterals.count(literalLabel) == 0)
+        {
+            m_stringLiterals.insert(literalLabel);
+            std::cout << "literal" << std::to_string(i) << ": .string ";
+            std::cout << literalLabel << std::endl;
+        }
+        //std::cout << "literal" << std::to_string(i) << ": .string ";
+        //std::cout << strLiterals[i] << std::endl;
     }
-    std::cout << ".section .text\nmain: \n";
+    //std::cout << ".section .text\nmain: \n";
 
     // Shadow space 32 byte and 8 byte for each variable
     unsigned int offset = 32 + vRegToOffset.size() * 8;
@@ -1449,15 +1461,63 @@ void CodeGen::generateMIR()
     std::cout << "    push rbp\n    mov rbp, rsp\n";
     std::cout << "    sub rsp, " << aligned_offset << std::endl;
 
+    int ctr = 0;
     for (const auto& mirBlock : m_mirBlocks)
     {
-        std::cout << mirBlock->getName() << ": \n";
+        if(ctr++)
+            std::cout << mirBlock->getName() << ": \n";
         mirBlock->printInstructions();
     }
 
     std::cout << "    add rsp, " << aligned_offset << std::endl;
     std::cout << "    mov rsp, rbp\n    pop rbp\n    ret\n";
 
+    //std::cout << "\nnewline_str: .string \"\\n\"\n";
+    //std::cout << "\n";
+}
+
+void CodeGen::addSSA(std::string funcName, SSA& ssa)
+{
+    if (m_functionSSAMap.find(funcName) != m_functionSSAMap.end())
+    {
+        throw std::runtime_error("SSA for function '" + funcName + "' already exists in CodeGen.");
+    }
+    m_functionSSAMap[funcName] = ssa;
+}
+
+void CodeGen::generateAllFunctionsMIR()
+{
+    // Global prologue
+    std::cout << std::endl << std::endl;
+    std::cout << ".intel_syntax noprefix\n.globl main\n";
+    std::cout << ".section .text\n";
+    std::cout << "fmt_str: .string \"%d\"\n";
+    std::cout << "true_str: .string \"true\"\n";
+    std::cout << "false_str: .string \"false\"\n";
+
+    std::cout << "main: \n";
+    m_stringLiterals.insert("fmt_str");
+    m_stringLiterals.insert("true_str");
+    m_stringLiterals.insert("false_str");
+    m_stringLiterals.insert("newline_str");
+
+    // generate MIR for main function first
+    m_ssa.renameSSA();
+    generateMIR();
+
+    for (auto& [funcName, ssa] : m_functionSSAMap)
+    {
+        m_ssa = ssa;
+        m_ssa.renameSSA();
+        //m_ssa.printCFG();
+        std::cout << "\n" << funcName << ": \n";
+        generateMIR();
+        //ssa.renameSSA();
+        //CodeGen funcCodeGen(ssa);
+        //funcCodeGen.generateMIR();
+    }
+
+    // Global epilogue
     std::cout << "\nnewline_str: .string \"\\n\"\n";
     std::cout << "\n";
 }

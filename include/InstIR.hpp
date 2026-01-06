@@ -870,7 +870,7 @@ public:
     Func& operator=(Func&&) noexcept = default;
 
     std::string getFuncName();
-    FType getFType();
+    FType getFType() const;
 
     virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;

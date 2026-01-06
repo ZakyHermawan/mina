@@ -25,10 +25,11 @@
   {
 	;
 	a := a + b
+	put(a, skip)
   }
   ;
 
-  put("Ok!")
+  put("Ok!", skip)
   Arr[0] := 0
   Arr[1] := 1
   Arr[2] := 2

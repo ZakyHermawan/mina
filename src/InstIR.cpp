@@ -1055,14 +1055,9 @@ Func::Func(std::string funcName, FType fType, Type retType,
         m_parameters(parameters), // Copy, because this vector will get resetted
         m_block(std::move(block))
 {
-    //for (int i = 0; i < parameters.size(); ++i)
-    //{
-    //    m_parameters.push_back(parameters[i]);
-    //}
-    //std::cout << "size from inst IR: " << m_parameters.size() << std::endl;
 }
 std::string Func::getFuncName() { return m_funcName; }
-FType Func::getFType() { return m_fType; }
+FType Func::getFType() const { return m_fType; }
 std::string Func::getString()
 {
     std::string res;

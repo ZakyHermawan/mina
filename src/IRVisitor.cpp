@@ -100,33 +100,36 @@ void IRVisitor::visit(ProgramAST& v)
     {
         SSA newSSA;
         newSSA.setCFG(func->getBlock());
-        std::cout << func->getString() << std::endl;
+        //std::cout << func->getString() << std::endl;
 
         // todo: correctly implement rename for function signature,
         // one of the solution:
         // make special case for parameters in function signature,
         // make every parameter declaration as definition a new variable
         // then just do phiweb
-        newSSA.renameSSA();
-        newSSA.printCFG();
-        CodeGen cg(newSSA);
-        cg.generateMIR();
+        //newSSA.renameSSA();
+        //newSSA.printCFG();
+        //CodeGen cg(newSSA);
+        //cg.generateMIR();
+        m_cg.addSSA(key, newSSA);
     }
 
     auto haltInst = std::make_shared<HaltInst>(m_currentBB);
     m_currentBB->pushInst(haltInst);
 
-    m_ssa.sealBlock(m_currentBB);
+    //m_ssa.sealBlock(m_currentBB);
 
     //std::cout << "Before renaming: \n";
-    m_ssa.renameSSA();
+    //m_ssa.renameSSA();
 
     //std::cout << "\n\nAfter renaming: \n";
     //m_ssa.printCFG();
 
-    SSA old = m_ssa;
-    m_cg.setSSA(old);
-    m_cg.generateMIR();
+    //SSA old = m_ssa;
+    //m_cg.setSSA(old);
+    //m_cg.generateMIR();
+    m_cg.setSSA(m_ssa);
+    m_cg.generateAllFunctionsMIR();
 }
 
 void IRVisitor::visit(ScopeAST& v)

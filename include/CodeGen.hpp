@@ -4,6 +4,12 @@
 #include "BasicBlock.hpp"
 #include "MachineIR.hpp"
 
+#include <map>
+#include <set>
+#include <memory>
+#include <string>
+#include <vector>
+
 class CodeGen
 {
 	SSA m_ssa;
@@ -11,10 +17,15 @@ class CodeGen
 	std::vector<std::shared_ptr<BasicBlock>> m_linearizedBlocks;
 	std::vector<std::shared_ptr<BasicBlockMIR>> m_mirBlocks;
 
+	std::set<std::string> m_stringLiterals;
+	std::map<std::string, SSA> m_functionSSAMap;
+
 public:
 	CodeGen(SSA ssa);
 	void setSSA(SSA& SSA);
 
 	void linearizeCFG();
 	void generateMIR();
+	void addSSA(std::string funcName, SSA& ssa);
+	void generateAllFunctionsMIR();
 };

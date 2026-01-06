@@ -2,7 +2,7 @@
   var fibo[100]: integer
   var i	  : integer
   var N   : integer;
-  
+
   get(N)
   fibo[0] := 1
   fibo[1] := 1

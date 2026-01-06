@@ -287,11 +287,21 @@ std::shared_ptr<DeclAST> Parser::declaration()
         auto identifierAST =
             std::make_shared<VariableAST>(varName, m_type, IdentType::VARIABLE);
 
+        std::string theName;
+        if (m_procName != "")
+        {
+            theName = m_procName;
+        }
+        else
+        {
+            theName = m_funcName;
+        }
+
         if (isArrDecl)
         {
             if (m_parsing_function)
             {
-                m_functionTab[m_lexical_level][m_procName].setSymTab(
+                m_functionTab[m_lexical_level][theName].setSymTab(
                     varName, Bucket(arenaVectorInt(m_arrSize), m_local_numVar, m_type));
             }
             m_symTab[m_lexical_level][varName] =
@@ -299,19 +309,18 @@ std::shared_ptr<DeclAST> Parser::declaration()
             return std::make_shared<ArrDeclAST>(identifierAST, m_arrSize);
         }
 
+        m_symTab[m_lexical_level][varName] = Bucket(0, 0, m_type);
         if (m_parsing_function)
         {
-            m_functionTab[m_lexical_level][m_procName].setSymTab(
+            m_functionTab[m_lexical_level][theName].setSymTab(
                 varName, Bucket(0, m_local_numVar++, m_type));
-            auto decl = std::make_shared<VarDeclAST>(
-                VarDeclAST(identifierAST, Type::INTEGER));
+            auto decl = std::make_shared<VarDeclAST>(identifierAST, m_type);
 
             return decl;
         }
-        m_symTab[m_lexical_level][varName] = Bucket(0, 0, m_type);
+
         auto decl =
-            std::make_shared<VarDeclAST>(
-            VarDeclAST(identifierAST, Type::INTEGER));
+            std::make_shared<VarDeclAST>(identifierAST, m_type);
         return decl;
     }
     else if (getCurrTokenType() == PROC)
@@ -1442,10 +1451,20 @@ std::shared_ptr<ParametersAST> Parser::parameters()
     auto identifier = m_lexer.getCurrToken().getLexme();
     m_parameters.push_back(identifier);
 
+    std::string theName;
+    if (m_procName != "")
+    {
+        theName = m_procName;
+    }
+    else
+    {
+        theName = m_funcName;
+    }
     if (m_parsing_function)
     {
-        m_functionTab[m_lexical_level][m_procName].setSymTab(
+        m_functionTab[m_lexical_level][theName].setSymTab(
             identifier, Bucket(0, m_local_numVar++, m_type));
+        m_symTab[m_lexical_level][identifier] = Bucket(0, 0, m_type);
     }
     advance();
     
