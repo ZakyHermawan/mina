@@ -49,9 +49,9 @@ private:
     FType m_ftype;
     std::unordered_map<std::string, Bucket> m_symTab;
     
-    unsigned int m_start_addr;
-    unsigned int m_end_addr;
-    unsigned int m_localNumVar;
+    unsigned int m_start_addr = 0;
+    unsigned int m_end_addr = 0;
+    unsigned int m_localNumVar = 0;
 
 public:
     FunctionBucket(

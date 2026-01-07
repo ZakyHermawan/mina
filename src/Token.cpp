@@ -1,5 +1,11 @@
 #include "Token.hpp"
 
+#include <any>
+#include <string>
+#include <utility>
+#include <iostream>
+#include <stdexcept>
+
 std::string tokenTypeToString(TokenType type)
 {
     switch (type)

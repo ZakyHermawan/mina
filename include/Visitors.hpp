@@ -1,9 +1,5 @@
 #pragma once
 
-#include <memory>
-#include <vector>
-#include <iostream>
-
 class StatementsAST;
 class NumberAST;
 class BoolAST;

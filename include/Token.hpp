@@ -2,7 +2,6 @@
 
 #include <any>
 #include <iostream>
-#include <stdexcept>
 #include <string>
 
 enum TokenType
