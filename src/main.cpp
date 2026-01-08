@@ -43,10 +43,26 @@ static void runFile(const char* fileName)
     parser.program();
 }
 
+static void runAllSamples()
+{
+    runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes.txt");
+    runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes2.txt");
+    runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes3.txt");
+    runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes4.txt");
+    runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes5.txt");
+    runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes6.txt");
+    runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes7.txt");
+    runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes8.txt");
+    runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes9.txt");
+    runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes10.txt");
+}
+
 int main(int argc, char* argv[])
 {
     tests_token();
     tests_lexer();
+
+    //runAllSamples();
 
     runFile("C:\\Users\\zakyh\\source\\repos\\mina\\samples\\tes2.txt");
     return 0;
