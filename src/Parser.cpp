@@ -432,8 +432,9 @@ std::shared_ptr<FuncDeclAST> Parser::funcBody()
     }
     else
     {
+        arena::vector<std::string> tmp;
         m_functionTab[(size_t)m_lexical_level + 1][m_funcName] =
-            FunctionBucket(arena::vector<std::string>());        
+            FunctionBucket(tmp);        
         scopeAST = scope();
     }
 
@@ -498,8 +499,9 @@ std::shared_ptr<ProcDeclAST> Parser::procBody()
     }
     else
     {
+        arena::vector<std::string> tmp;
         m_functionTab[(size_t)m_lexical_level + 1][m_procName] =
-            FunctionBucket(arena::vector<std::string>());        
+            FunctionBucket(tmp);        
         scopeAST = scope();
     }
 

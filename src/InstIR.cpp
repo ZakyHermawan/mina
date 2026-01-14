@@ -987,7 +987,7 @@ PutInst::PutInst(std::shared_ptr<Inst> operand,
 std::shared_ptr<Inst> PutInst::getOperand() { return m_operands[0]; }
 std::string PutInst::getString()
 {
-    auto& operand = m_operands[0]->getTarget()->getString();
+    const auto& operand = m_operands[0]->getTarget()->getString();
     return "Put(" + operand + ")";
 }
 void PutInst::push_user(std::shared_ptr<Inst> user)

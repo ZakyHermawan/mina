@@ -61,7 +61,7 @@ void SSA::printCFG()
         [&](std::shared_ptr<BasicBlock> bb)
         {
           visited.insert(bb);
-          auto& successors = bb->getSuccessors();
+          const auto& successors = bb->getSuccessors();
           // Traverse successors in reverse order so the first element that is being inserted 
           // into the successors vector is in front of successors that is added later,
           // since we will reverse the linearizedBlocks at the end.
@@ -214,7 +214,7 @@ std::shared_ptr<Inst> SSA::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> phi)
     // replace all uses of phi with same
     for (auto& user : users_without_phi)
     {
-        auto& block = user->getBlock();
+        const auto& block = user->getBlock();
         auto& instructions = block->getInstructions();
         for (int i = 0; i < instructions.size(); ++i)
         {
@@ -237,7 +237,7 @@ std::shared_ptr<Inst> SSA::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> phi)
     }
 
     // remove phi from the hash table
-    auto& block = phi->getBlock();
+    const auto& block = phi->getBlock();
     for (auto& [varName, value] : m_currDef[block])
     {
         if (value == phi)
@@ -307,8 +307,8 @@ void SSA::renameSSA()
         for (unsigned int i = 0; i < instructions.size(); ++i)
         {
             auto& currInst = instructions[i];
-            auto& target = currInst->getTarget();
-            auto& targetStr = target->getString();
+            const auto& target = currInst->getTarget();
+            const auto& targetStr = target->getString();
             dsu.make_set(targetStr);
 
             if (currInst->isPhi())
@@ -316,7 +316,7 @@ void SSA::renameSSA()
                 auto& operands = currInst->getOperands();
                 for (int i = 0; i < operands.size(); ++i)
                 {
-                    auto& opStr = operands[i]->getString();
+                    const auto& opStr = operands[i]->getString();
 
                     // Merges two sets that targetStr and opStr belong to.
                     // Create phiweb.
@@ -325,7 +325,7 @@ void SSA::renameSSA()
             }
             else if (currInst->getInstType() == InstType::Put)
             {
-                auto& operandStr = currInst->getOperands()[0]->getTarget()->getString();
+                const auto& operandStr = currInst->getOperands()[0]->getTarget()->getString();
                 variables.push_back(operandStr);
                 dsu.make_set(operandStr);
             }
@@ -390,9 +390,9 @@ void SSA::renameSSA()
             }
 
             auto& currInst = instructions[instruction_idx];
-            auto& target = currInst->getTarget();
-            auto& operands = currInst->getOperands();
-            auto& targetStr = target->getString();
+            const auto& target = currInst->getTarget();
+            const auto& operands = currInst->getOperands();
+            const auto& targetStr = target->getString();
 
             if (currInst->isPhi())
             {
@@ -408,8 +408,8 @@ void SSA::renameSSA()
                     {
                         continue;
                     }
-                    auto& operandTarget = operands[i]->getTarget();
-                    auto& operandTargetStr = operandTarget->getString();
+                    const auto& operandTarget = operands[i]->getTarget();
+                    const auto& operandTargetStr = operandTarget->getString();
                     if (root_to_new_name.find(operandTargetStr) ==
                         root_to_new_name.end())
                     {
@@ -440,8 +440,8 @@ void SSA::renameSSA()
                     {
                         continue;
                     }
-                    auto& operandTarget = operands[i]->getTarget();
-                    auto& operandTargetStr = operandTarget->getString();
+                    const auto& operandTarget = operands[i]->getTarget();
+                    const auto& operandTargetStr = operandTarget->getString();
                     if (root_to_new_name.find(operandTargetStr) ==
                         root_to_new_name.end())
                     {

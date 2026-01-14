@@ -25,7 +25,7 @@ public:
     ~Bucket() = default;
     
     Bucket(int val, int stackAddr, Type type);
-    Bucket(arenaVectorInt &arr, int stackAddr, Type type);
+    Bucket(const arenaVectorInt &arr, int stackAddr, Type type);
     Bucket(arenaVectorInt &&arr, int stackAddr, Type type);
     
     void setArrSize(unsigned int size);
@@ -65,7 +65,7 @@ public:
 
     FunctionBucket() = default;
 
-    void setSymTab(std::string &identifier, Bucket &bucket);
+    void setSymTab(std::string &identifier, Bucket bucket);
     Bucket &getSymTab(std::string &identifier);
 
     void setStartAddr(unsigned int startAddr);

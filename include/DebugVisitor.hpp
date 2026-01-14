@@ -36,6 +36,4 @@ public:
     void visit(VarDeclAST& v) override;
     void visit(ArrDeclAST&) override;
     void visit(DeclarationsAST&) override;
-    void DebugVisitor::visit(ProcDeclAST&) override;
-    void DebugVisitor::visit(FuncDeclAST&) override;
 };

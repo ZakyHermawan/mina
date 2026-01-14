@@ -396,7 +396,11 @@ DivMIR::DivMIR(std::shared_ptr<MemoryMIR> divisor)
 
 std::vector<std::shared_ptr<MachineIR>>& DivMIR::getOperands()
 { 
-    return std::vector<std::shared_ptr<MachineIR>>{m_divisor};
+    // Store the operand in a member variable to return a reference
+    static std::vector<std::shared_ptr<MachineIR>> operands;
+    operands.clear();
+    operands.push_back(m_divisor);
+    return operands;
 }
 
 MIRType DivMIR::getMIRType() const 
@@ -439,7 +443,10 @@ NotMIR::NotMIR(std::shared_ptr<Register> operand)
 
 std::vector<std::shared_ptr<MachineIR>>& NotMIR::getOperands()
 {
-    return std::vector<std::shared_ptr<MachineIR>>{m_operand};
+    static std::vector<std::shared_ptr<MachineIR>> operands;
+    operands.clear();
+    operands.push_back(m_operand);
+    return operands;
 }
 
 MIRType NotMIR::getMIRType() const 
@@ -560,7 +567,10 @@ std::string SeteMIR::getString() const
 
 std::vector<std::shared_ptr<MachineIR>>& SeteMIR::getOperands()
 {
-    return std::vector<std::shared_ptr<MachineIR>>{m_reg};
+    static std::vector<std::shared_ptr<MachineIR>> operands;
+    operands.clear();
+    operands.push_back(m_reg);
+    return operands;
 }
 
 // ==========================================
@@ -584,7 +594,10 @@ std::string SetneMIR::getString() const
 
 std::vector<std::shared_ptr<MachineIR>>& SetneMIR::getOperands()
 {
-    return std::vector<std::shared_ptr<MachineIR>>{m_reg};
+    static std::vector<std::shared_ptr<MachineIR>> operands;
+    operands.clear();
+    operands.push_back(m_reg);
+    return operands;
 }
 
 // ==========================================
@@ -608,7 +621,10 @@ std::string SetlMIR::getString() const
 
 std::vector<std::shared_ptr<MachineIR>>& SetlMIR::getOperands()
 {
-    return std::vector<std::shared_ptr<MachineIR>>{m_reg};
+    static std::vector<std::shared_ptr<MachineIR>> operands;
+    operands.clear();
+    operands.push_back(m_reg);
+    return operands;
 }
 
 // ==========================================
@@ -632,7 +648,10 @@ std::string SetleMIR::getString() const
 
 std::vector<std::shared_ptr<MachineIR>>& SetleMIR::getOperands()
 {
-    return std::vector<std::shared_ptr<MachineIR>>{m_reg};
+    static std::vector<std::shared_ptr<MachineIR>> operands;
+    operands.clear();
+    operands.push_back(m_reg);
+    return operands;
 }
 
 // ==========================================
@@ -656,7 +675,10 @@ std::string SetgMIR::getString() const
 
 std::vector<std::shared_ptr<MachineIR>>& SetgMIR::getOperands()
 {
-    return std::vector<std::shared_ptr<MachineIR>>{m_reg};
+    static std::vector<std::shared_ptr<MachineIR>> operands;
+    operands.clear();
+    operands.push_back(m_reg);
+    return operands;
 }
 
 // ==========================================
@@ -680,7 +702,10 @@ std::string SetgeMIR::getString() const
 
 std::vector<std::shared_ptr<MachineIR>>& SetgeMIR::getOperands()
 {
-    return std::vector<std::shared_ptr<MachineIR>>{m_reg};
+    static std::vector<std::shared_ptr<MachineIR>> operands;
+    operands.clear();
+    operands.push_back(m_reg);
+    return operands;
 }
 
 // ==========================================
@@ -760,7 +785,10 @@ std::string MovzxMIR::getString() const
 
 std::vector<std::shared_ptr<MachineIR>>& MovzxMIR::getOperands()
 {
-    return std::vector<std::shared_ptr<MachineIR>>{m_reg};
+    static std::vector<std::shared_ptr<MachineIR>> operands;
+    operands.clear();
+    operands.push_back(m_reg);
+    return operands;
 }
 
 // ==========================================
@@ -784,7 +812,11 @@ std::string TestMIR::getString() const
 
 std::vector<std::shared_ptr<MachineIR>>& TestMIR::getOperands()
 {
-    return std::vector<std::shared_ptr<MachineIR>>{m_reg1, m_reg2};
+    static std::vector<std::shared_ptr<MachineIR>> operands;
+    operands.clear();
+    operands.push_back(m_reg1);
+    operands.push_back(m_reg2);
+    return operands;
 }
 
 // ==========================================

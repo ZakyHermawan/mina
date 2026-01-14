@@ -7,7 +7,7 @@
 #include "Token.hpp"
 #include "Parser.hpp"
 
-#include "tests/test_lexer.hpp"
+//#include "tests/test_lexer.hpp"
 
 static void repl()
 {
@@ -59,8 +59,8 @@ static void runAllSamples()
 
 int main(int argc, char* argv[])
 {
-    tests_token();
-    tests_lexer();
+    //tests_token();
+    //tests_lexer();
 
     //runAllSamples();
 

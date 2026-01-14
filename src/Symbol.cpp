@@ -17,7 +17,7 @@ Bucket::Bucket(int val, int stackAddr, Type type)
       m_stackAddr{stackAddr}, m_type{type}
 {
 }
-Bucket::Bucket(arenaVectorInt &arr, int stackAddr, Type type)
+Bucket::Bucket(const arenaVectorInt &arr, int stackAddr, Type type)
     : m_arr{arr},
       m_intVal{0},
       m_stackAddr{stackAddr}, m_type{type}
@@ -83,7 +83,7 @@ FunctionBucket::FunctionBucket(
     m_ftype = FType::FUNC;
 }
 
-void FunctionBucket::setSymTab(std::string &identifier, Bucket &bucket)
+void FunctionBucket::setSymTab(std::string &identifier, Bucket bucket)
 {
     auto it = m_symTab.find(identifier);
     if (it != m_symTab.end())

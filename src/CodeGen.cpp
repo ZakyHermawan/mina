@@ -30,7 +30,7 @@ void CodeGen::linearizeCFG()
         [&](std::shared_ptr<BasicBlock> bb)
         {
           visited.insert(bb);
-          auto& successors = bb->getSuccessors();
+          const auto& successors = bb->getSuccessors();
           // Traverse successors in reverse order so the first element that is being inserted 
           // into the successors vector is in front of successors that is added later,
           // since we will reverse the linearizedBlocks at the end.
@@ -66,7 +66,7 @@ void CodeGen::generateMIR()
     std::shared_ptr<Register> r8{new Register{7, "r8"}};
     std::shared_ptr<Register> r9{new Register{8, "r9"}};
 
-    std::map<std::string, unsigned int> vRegToOffset;
+    std::map<std::string, size_t> vRegToOffset;
     std::map<std::string, unsigned int> arrVRegToSize;
     std::vector<std::string> strLiterals;
     unsigned int strConstCtr = 0;
@@ -128,7 +128,7 @@ void CodeGen::generateMIR()
                     if (i == 0)
                     {
                         // mov first parameter to rcx
-                        auto& firstArg = arguments[i]->getTarget();
+                        const auto& firstArg = arguments[i]->getTarget();
                         if (firstArg->getInstType() == InstType::IntConst)
                         {
                             auto intConstInst =
@@ -188,7 +188,7 @@ void CodeGen::generateMIR()
                     else if (i == 1)
                     {
                         // mov second parameter to rdx
-                        auto& secondArg = arguments[i]->getTarget();
+                        const auto& secondArg = arguments[i]->getTarget();
                         if (secondArg->getInstType() == InstType::IntConst)
                         {
                             auto intConstInst =
@@ -248,7 +248,7 @@ void CodeGen::generateMIR()
                     else if (i == 2)
                     {
                         // mov third parameter to r8
-                        auto& thirdArg = arguments[i]->getTarget();
+                        const auto& thirdArg = arguments[i]->getTarget();
                         if (thirdArg->getInstType() == InstType::IntConst)
                         {
                             auto intConstInst =
@@ -308,7 +308,7 @@ void CodeGen::generateMIR()
                     else if (i == 3)
                     {
                         // mov fourth parameter to r9
-                        auto& fourthArg = arguments[i]->getTarget();
+                        const auto& fourthArg = arguments[i]->getTarget();
                         if (fourthArg->getInstType() == InstType::IntConst)
                         {
                             auto intConstInst =
@@ -372,8 +372,8 @@ void CodeGen::generateMIR()
                             "function call not supported.");
                     }
                 }
-                auto& target = currInst->getTarget();
-                auto& tempTargetName = target->getString();
+                const auto& target = currInst->getTarget();
+                const auto& tempTargetName = target->getString();
                 assignVRegToOffsetIfDoesNotExist(tempTargetName);
 
                 // After setting up parameters, call the function
@@ -396,7 +396,7 @@ void CodeGen::generateMIR()
                     if (i == 0)
                     {
                         // mov first parameter to rcx
-                        auto& firstArg = arguments[i]->getTarget();
+                        const auto& firstArg = arguments[i]->getTarget();
                         auto it = firstArg->getInstType();
                         auto n = currInst->getString();
                         if (firstArg->getInstType() == InstType::IntConst)
@@ -459,7 +459,7 @@ void CodeGen::generateMIR()
                     else if (i == 1)
                     {
                         // mov second parameter to rdx
-                        auto& secondArg = arguments[i]->getTarget();
+                        const auto& secondArg = arguments[i]->getTarget();
                         if (secondArg->getInstType() == InstType::IntConst)
                         {
                             auto intConstInst =
@@ -520,7 +520,7 @@ void CodeGen::generateMIR()
                     else if (i == 2)
                     {
                         // mov third parameter to r8
-                        auto& thirdArg = arguments[i]->getTarget();
+                        const auto& thirdArg = arguments[i]->getTarget();
                         if (thirdArg->getInstType() == InstType::IntConst)
                         {
                             auto intConstInst =
@@ -580,7 +580,7 @@ void CodeGen::generateMIR()
                     else if (i == 3)
                     {
                         // mov fourth parameter to r9
-                        auto& fourthArg = arguments[i]->getTarget();
+                        const auto& fourthArg = arguments[i]->getTarget();
                         if (fourthArg->getInstType() == InstType::IntConst)
                         {
                             auto intConstInst =
@@ -716,7 +716,7 @@ void CodeGen::generateMIR()
             else if (instType == InstType::Return)
             {
                 auto returnInst = std::dynamic_pointer_cast<ReturnInst>(inst[j]);
-                auto& expr = returnInst->getOperands()[0]->getTarget();
+                const auto& expr = returnInst->getOperands()[0]->getTarget();
                 if (expr->getInstType() == InstType::IntConst)
                 {
                     auto intConstInst =
@@ -763,7 +763,7 @@ void CodeGen::generateMIR()
             {
                 auto assignInst = std::dynamic_pointer_cast<AssignInst>(inst[j]);
                 auto& operands = assignInst->getOperands();
-                auto& targetStr = assignInst->getTarget()->getString();
+                const auto& targetStr = assignInst->getTarget()->getString();
                 auto source = assignInst->getSource();
 
                 assignVRegToOffsetIfDoesNotExist(targetStr);
@@ -891,7 +891,7 @@ void CodeGen::generateMIR()
             {
                 std::vector<std::shared_ptr<MachineIR>> mirOperands;
                 auto getInst = std::dynamic_pointer_cast<GetInst>(inst[j]);
-                auto& target = getInst->getTarget();
+                const auto& target = getInst->getTarget();
 
                 bbMIR->addInstruction(leaToLabel("fmt_str"));
 
@@ -911,8 +911,8 @@ void CodeGen::generateMIR()
                 auto targetStr = currInst->getTarget()->getString(); // Temporary variable
 
                 auto& operands = currInst->getOperands();
-                auto& operand1 = operands[0]->getTarget();
-                auto& operand2 = operands[1]->getTarget();
+                const auto& operand1 = operands[0]->getTarget();
+                const auto& operand2 = operands[1]->getTarget();
 
                 assignVRegToOffsetIfDoesNotExist(targetStr);
 
@@ -998,8 +998,8 @@ void CodeGen::generateMIR()
                 auto targetStr = divInst->getTarget()->getString(); // Temporary variable
 
                 auto& operands = divInst->getOperands();
-                auto& operand1 = operands[0]->getTarget();
-                auto& operand2 = operands[1]->getTarget();
+                const auto& operand1 = operands[0]->getTarget();
+                const auto& operand2 = operands[1]->getTarget();
 
                 assignVRegToOffsetIfDoesNotExist(targetStr);
 
@@ -1082,10 +1082,10 @@ void CodeGen::generateMIR()
             else if (instType == InstType::Or || instType == InstType::And)
             {
                 auto& currInst = inst[j];
-                auto& targetStr = currInst->getTarget()->getString(); // Temporary variable
-                auto& operands = currInst->getOperands();
-                auto& operand1 = operands[0]->getTarget();
-                auto& operand2 = operands[1]->getTarget();
+                const auto& targetStr = currInst->getTarget()->getString(); // Temporary variable
+                const auto& operands = currInst->getOperands();
+                const auto& operand1 = operands[0]->getTarget();
+                const auto& operand2 = operands[1]->getTarget();
                 assignVRegToOffsetIfDoesNotExist(targetStr);
 
                 if (operand1->getInstType() == InstType::BoolConst)
@@ -1161,8 +1161,8 @@ void CodeGen::generateMIR()
                 auto target = currInst->getTarget();
                 auto targetStr = target->getString();
                 auto& operands = currInst->getOperands();
-                auto& operand1 = operands[0]->getTarget();
-                auto& operand2 = operands[1]->getTarget();
+                const auto& operand1 = operands[0]->getTarget();
+                const auto& operand2 = operands[1]->getTarget();
 
                 assignVRegToOffsetIfDoesNotExist(targetStr);
 
@@ -1301,10 +1301,10 @@ void CodeGen::generateMIR()
             else if (instType == InstType::ArrUpdate)
             {
                 auto arrUpdateInst = std::dynamic_pointer_cast<ArrUpdateInst>(inst[j]);
-                auto& source = arrUpdateInst->getTarget();
-                auto& sourceName = source->getString();
-                auto& index = arrUpdateInst->getIndex()->getTarget();
-                auto& value = arrUpdateInst->getVal()->getTarget();
+                const auto& source = arrUpdateInst->getTarget();
+                const auto& sourceName = source->getString();
+                const auto& index = arrUpdateInst->getIndex()->getTarget();
+                const auto& value = arrUpdateInst->getVal()->getTarget();
 
                 // Array Base Address Check
                 if (vRegToOffset.find(sourceName) == vRegToOffset.end())
@@ -1363,9 +1363,9 @@ void CodeGen::generateMIR()
             else if (instType == InstType::ArrAccess)
             {
                 auto arrAccessInst = std::dynamic_pointer_cast<ArrAccessInst>(inst[j]);
-                auto& target = arrAccessInst->getTarget();
-                auto& source = arrAccessInst->getSource()->getTarget();
-                auto& index = arrAccessInst->getIndex()->getTarget();
+                const auto& target = arrAccessInst->getTarget();
+                const auto& source = arrAccessInst->getSource()->getTarget();
+                const auto& index = arrAccessInst->getIndex()->getTarget();
 
                 if (vRegToOffset.find(source->getString()) == vRegToOffset.end())
                 {
@@ -1427,7 +1427,7 @@ void CodeGen::generateMIR()
     }
 
     // Shadow space 32 byte and 8 byte for each variable
-    unsigned int offset = 32 + vRegToOffset.size() * 8;
+    size_t offset = 32 + vRegToOffset.size() * 8;
 
     // Offset for arrays
     for (const auto& arrPair : arrVRegToSize)

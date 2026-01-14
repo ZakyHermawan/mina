@@ -61,5 +61,3 @@ void DebugVisitor::visit(ArrDeclAST& v)
 
 void DebugVisitor::visit(DeclarationsAST&) { std::cout << "Declarations node\n"; }
 void DebugVisitor::visit(ParametersAST&) { std::cout << "Parameters node\n"; }
-void DebugVisitor::visit(ProcDeclAST&) { std::cout << "Procedure Declaration\n"; }
-void DebugVisitor::visit(FuncDeclAST&) { std::cout << "Function Declaration\n"; }

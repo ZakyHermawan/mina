@@ -18,7 +18,7 @@ private:
     Lexer m_lexer;
     bool m_isError;
     int m_lexical_level;
-    int m_local_numVar;
+    size_t m_local_numVar;
     bool m_parsing_function;
     std::string m_procName;
     std::string m_funcName;
