@@ -25,7 +25,7 @@ bool IGNode::isNeighborWith(const std::shared_ptr<IGNode>& other) const
     if (!other) return false;
     
     // Get the actual register we are looking for
-    const auto& targetReg = other->getInst();
+    const auto& targetReg = other->getReg();
 
     // Check if that register exists in our neighbor list
     return std::any_of(m_neighbors.begin(), m_neighbors.end(),
@@ -34,7 +34,7 @@ bool IGNode::isNeighborWith(const std::shared_ptr<IGNode>& other) const
         });
 }
 
-std::shared_ptr<Register> IGNode::getInst()
+std::shared_ptr<Register> IGNode::getReg()
 {
 	return m_inst;
 }
@@ -53,12 +53,12 @@ void InferenceGraph::printAdjMatrix() const
 {
     std::cout << "\t";
     for (const auto& colNode : m_nodes) {
-        std::cout << colNode->getInst()->get64BitName() << "\t";
+        std::cout << colNode->getReg()->get64BitName() << "\t";
     }
     std::cout << "\n";
 
     for (const auto& rowNode : m_nodes) {
-        std::cout << rowNode->getInst()->get64BitName() << "\t";
+        std::cout << rowNode->getReg()->get64BitName() << "\t";
 
 		for (const auto& colNode : m_nodes) {
             if (rowNode == colNode) {
@@ -77,7 +77,7 @@ void InferenceGraph::printAdjList() const
 {
 	for(const auto& node : m_nodes)
 	{
-		std::cout << node->getInst()->get64BitName() << ": ";
+		std::cout << node->getReg()->get64BitName() << ": ";
 		for (const auto& neighbor : node->getNeighbors())
 		{
 			std::cout << neighbor->get64BitName() << " ";
@@ -86,12 +86,20 @@ void InferenceGraph::printAdjList() const
 	}
 }
 
+bool InferenceGraph::isNodePresent(const std::shared_ptr<IGNode>& node) const
+{
+	return std::any_of(m_nodes.begin(), m_nodes.end(),
+		[&node](const std::shared_ptr<IGNode>& currentNode)
+		{
+			return currentNode->getReg()->getID() == node->getReg()->getID();
+		});
+}
 
 RegisterAllocator::RegisterAllocator(
     std::vector<std::shared_ptr<BasicBlockMIR>>&& MIRBlocks)
     : m_MIRBlocks(std::move(MIRBlocks))
 {
-	constructBaseGraph();
+	allocateRegisters();
 }
 
 void RegisterAllocator::allocateRegisters()
@@ -107,7 +115,11 @@ void RegisterAllocator::allocateRegisters()
 std::shared_ptr<InferenceGraph> RegisterAllocator::buildGraph()
 {
 	// Build the interference graph from m_MIRBlocks
-    //auto& inferenceGraph = constructBaseGraph();
+    auto inferenceGraph = constructBaseGraph();
+	inferenceGraph.printAdjList();
+	inferenceGraph.printAdjMatrix();
+	addAllRegistersAsNodes(inferenceGraph);
+
 	return nullptr;
 }
 
@@ -133,7 +145,7 @@ std::vector<std::shared_ptr<BasicBlockMIR>> RegisterAllocator::replaceVirtualReg
     return {};
 }
 
-void RegisterAllocator::constructBaseGraph()
+InferenceGraph RegisterAllocator::constructBaseGraph()
 {
 	// Construct the base interference graph without spill costs or coloring	
 	auto rax = std::make_shared<Register>(0, "rax", "eax", "ax", "ah", "al");
@@ -212,6 +224,37 @@ void RegisterAllocator::constructBaseGraph()
 	nodes.push_back(r13Node);
 	
 	InferenceGraph ig(std::move(nodes));
-	ig.printAdjList();
-	ig.printAdjMatrix();
+	return ig;
+}
+
+void RegisterAllocator::addAllRegistersAsNodes(InferenceGraph& graph)
+{
+	// Iterate through m_MIRBlocks and add all virtual registers as nodes in the graph
+	for(const auto& block : m_MIRBlocks)
+	{
+		for(const auto& inst : block->getInstructions())
+		{
+			auto& operands = inst->getOperands();
+			for(const auto& operand : operands)
+			{
+				auto operandType = operand->getMIRType();
+				if(operandType != MIRType::Reg)
+				{
+					continue; // Only interested in registers
+				}
+
+				auto regOperand = std::dynamic_pointer_cast<Register>(operand);
+				std::shared_ptr<IGNode> igNode(std::make_shared<IGNode>(regOperand,
+					std::vector<std::shared_ptr<Register>>{},
+					0.0, -1, false));
+
+				if(graph.isNodePresent(igNode))
+				{
+					std::cout << "Skipping: " << operand->getString() << std::endl;
+					continue;
+				}
+				std::cout << operand->getString() << std::endl;
+			}
+		}
+	}
 }

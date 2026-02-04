@@ -1496,5 +1496,17 @@ void CodeGen::generateAllFunctionsMIR()
     std::cout << "\n";
 
     std::vector<std::shared_ptr<BasicBlockMIR>> bbMIR;
+    std::shared_ptr<BasicBlockMIR> mainBB{new BasicBlockMIR{"testBlock"}};
+    std::cout << "block name: " << mainBB->getName() << std::endl;
+
+    // Test Code
+    auto rax = std::make_shared<Register>(0, "rax", "eax", "ax", "ah", "al");
+    auto rbx = std::make_shared<Register>(1, "rbx", "ebx", "bx", "bh", "bl");
+    auto vreg = std::make_shared<Register>(100, "vreg1");
+
+    mainBB->addInstruction(std::make_shared<MovMIR>(
+        std::vector<std::shared_ptr<MachineIR>>{vreg, vreg}));
+
+    bbMIR.push_back(mainBB);
     RegisterAllocator ra(std::move(bbMIR));
 }

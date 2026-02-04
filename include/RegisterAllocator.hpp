@@ -17,7 +17,7 @@ public:
         std::vector<std::shared_ptr<Register>> neighbors, double spill_cost,
         int color, bool pruned);
 	virtual ~IGNode() = default;
-    std::shared_ptr<Register> getInst();
+    std::shared_ptr<Register> getReg();
     std::vector<std::shared_ptr<Register>>& getNeighbors();
     bool isNeighborWith(const std::shared_ptr<IGNode>& other) const;
 
@@ -42,6 +42,7 @@ public:
 
     void printAdjMatrix() const;
     void printAdjList() const;
+    bool isNodePresent(const std::shared_ptr<IGNode>& node) const;
 
 private:
     std::vector<std::shared_ptr<IGNode>> m_nodes;
@@ -70,5 +71,6 @@ private:
     std::vector<std::shared_ptr<BasicBlockMIR>> replaceVirtualRegisters(
         std::map<int, std::shared_ptr<Register>> registerMap);
 
-    void constructBaseGraph();
+    InferenceGraph constructBaseGraph();
+    void addAllRegistersAsNodes(InferenceGraph& graph);
 };

@@ -23,6 +23,12 @@ std::string MachineIR::getString() const
     return "";
 }
 
+std::vector<std::shared_ptr<MachineIR>>& MachineIR::getOperands()
+{
+    static std::vector<std::shared_ptr<MachineIR>> emptyOperands;
+    return emptyOperands;
+}
+
 // ==========================================
 // BasicBlockMIR (Basic Block)
 // ==========================================

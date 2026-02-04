@@ -37,6 +37,8 @@ enum class MIRType
     Jnz
 };
 
+class Register;
+
 // Base Class
 class MachineIR
 {
@@ -45,6 +47,7 @@ public:
 
     virtual MIRType getMIRType() const;
     virtual std::string getString() const;
+    virtual std::vector<std::shared_ptr<MachineIR>>& getOperands();
 };
 
 class BasicBlockMIR
@@ -136,8 +139,8 @@ public:
 
     MIRType getMIRType() const override;
     std::string getString() const override; 
-    
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
 };
 
 class LeaMIR : public MachineIR
@@ -152,7 +155,7 @@ public:
     MIRType getMIRType() const override;
     std::string getString() const override;
 
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
     
     // Virtual destructor (good practice for inheritance)
     ~LeaMIR() override = default;
@@ -176,7 +179,7 @@ public:
     AddMIR(std::vector<std::shared_ptr<MachineIR>> operands);
     MIRType getMIRType() const override;
     std::string getString() const override;
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
 };
 
 class SubMIR : public MachineIR
@@ -187,7 +190,7 @@ public:
     SubMIR(std::vector<std::shared_ptr<MachineIR>> operands);
     MIRType getMIRType() const override;
     std::string getString() const override;
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
 };
 
 class MulMIR : public MachineIR
@@ -198,7 +201,7 @@ public:
     MulMIR(std::vector<std::shared_ptr<MachineIR>> operands);
     MIRType getMIRType() const override;
     std::string getString() const override;
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
 };
 
 class DivMIR : public MachineIR
@@ -209,7 +212,7 @@ public:
     DivMIR(std::shared_ptr<MemoryMIR> divisor);
     MIRType getMIRType() const override;
     std::string getString() const override;
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
 };
 
 class CqoMIR : public MachineIR
@@ -229,7 +232,7 @@ public:
     NotMIR(std::shared_ptr<Register> operand);
     MIRType getMIRType() const override;
     std::string getString() const override;
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
 };
 
 class AndMIR : public MachineIR
@@ -240,7 +243,7 @@ public:
     AndMIR(std::vector<std::shared_ptr<MachineIR>> operands);
     MIRType getMIRType() const override;
     std::string getString() const override;
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
 };
 
 
@@ -252,7 +255,7 @@ public:
     OrMIR(std::vector<std::shared_ptr<MachineIR>> operands);
     MIRType getMIRType() const override;
     std::string getString() const override;
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
 };
 
 class CmpMIR : public MachineIR
@@ -263,7 +266,7 @@ class CmpMIR : public MachineIR
     CmpMIR(std::vector<std::shared_ptr<MachineIR>> operands);
     MIRType getMIRType() const override;
     std::string getString() const override;
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
 };
 
 class SeteMIR : public MachineIR
@@ -274,7 +277,7 @@ public:
     SeteMIR(std::shared_ptr<Register> reg);
     MIRType getMIRType() const override;
     std::string getString() const override;
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
 };
 
 class SetneMIR : public MachineIR
@@ -285,7 +288,7 @@ public:
     SetneMIR(std::shared_ptr<Register> reg);
     MIRType getMIRType() const override;
     std::string getString() const override;
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
 };
 
 class SetlMIR : public MachineIR
@@ -296,7 +299,7 @@ public:
     SetlMIR(std::shared_ptr<Register> reg);
     MIRType getMIRType() const override;
     std::string getString() const override;
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
 };
 
 class SetleMIR : public MachineIR
@@ -307,7 +310,7 @@ public:
     SetleMIR(std::shared_ptr<Register> reg);
     MIRType getMIRType() const override;
     std::string getString() const override;
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
 };
 
 class SetgMIR : public MachineIR
@@ -318,7 +321,7 @@ public:
     SetgMIR(std::shared_ptr<Register> reg);
     MIRType getMIRType() const override;
     std::string getString() const override;
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
 };
 
 class SetgeMIR : public MachineIR
@@ -329,7 +332,7 @@ public:
     SetgeMIR(std::shared_ptr<Register> reg);
     MIRType getMIRType() const override;
     std::string getString() const override;
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
 };
 
 class MovzxMIR : public MachineIR
@@ -343,7 +346,7 @@ public:
     MovzxMIR(std::shared_ptr<Register> reg, unsigned int toRegSize, unsigned int fromRegSize, bool isFromRegLow);
     MIRType getMIRType() const override;
     std::string getString() const override;
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
 };
 
 class TestMIR: public MachineIR
@@ -355,7 +358,7 @@ public:
     TestMIR(std::shared_ptr<Register> reg1, std::shared_ptr<Register> reg2);
     MIRType getMIRType() const override;
     std::string getString() const override;
-    std::vector<std::shared_ptr<MachineIR>>& getOperands();
+    std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
 };
 
 class JmpMIR : public MachineIR

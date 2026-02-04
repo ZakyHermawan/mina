@@ -501,7 +501,7 @@ std::shared_ptr<ProcDeclAST> Parser::procBody()
     {
         arena::vector<std::string> tmp;
         m_functionTab[(size_t)m_lexical_level + 1][m_procName] =
-            FunctionBucket(tmp);        
+            FunctionBucket(tmp);
         scopeAST = scope();
     }
 
