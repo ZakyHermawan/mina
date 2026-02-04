@@ -91,6 +91,12 @@ unsigned int Register::getID() const
     return m_id; 
 }
 
+std::string Register::get64BitName() const
+{
+    return getString();
+}
+
+
 std::string Register::get32BitName() const
 {
     return m_32BitName;
@@ -307,7 +313,7 @@ AddMIR::AddMIR(std::vector<std::shared_ptr<MachineIR>> operands)
 {
     if (m_operands.size() != 2)
     {
-        throw std::runtime_error("MovMIR should have exactly 2 operands!");
+        throw std::runtime_error("AddMIR should have exactly 2 operands!");
     }
 }
 
@@ -336,7 +342,7 @@ SubMIR::SubMIR(std::vector<std::shared_ptr<MachineIR>> operands)
 {
     if (m_operands.size() != 2)
     {
-        throw std::runtime_error("MovMIR should have exactly 2 operands!");
+        throw std::runtime_error("SubMIR should have exactly 2 operands!");
     }
 }
 
@@ -365,7 +371,7 @@ MulMIR::MulMIR(std::vector<std::shared_ptr<MachineIR>> operands)
 {
     if (m_operands.size() != 2)
     {
-        throw std::runtime_error("MovMIR should have exactly 2 operands!");
+        throw std::runtime_error("MulMIR should have exactly 2 operands!");
     }
 }
 
@@ -468,7 +474,7 @@ AndMIR::AndMIR(std::vector<std::shared_ptr<MachineIR>> operands)
 {
     if (m_operands.size() != 2)
     {
-        throw std::runtime_error("MovMIR should have exactly 2 operands!");
+        throw std::runtime_error("AndMIR should have exactly 2 operands!");
     }
 }
 
@@ -497,7 +503,7 @@ OrMIR::OrMIR(std::vector<std::shared_ptr<MachineIR>> operands)
 {
     if (m_operands.size() != 2)
     {
-        throw std::runtime_error("MovMIR should have exactly 2 operands!");
+        throw std::runtime_error("OrMIR should have exactly 2 operands!");
     }
 }
 
@@ -526,7 +532,7 @@ CmpMIR::CmpMIR(std::vector<std::shared_ptr<MachineIR>> operands)
 {
     if (m_operands.size() != 2)
     {
-        throw std::runtime_error("MovMIR should have exactly 2 operands!");
+        throw std::runtime_error("CmpMIR should have exactly 2 operands!");
     }
 }
 

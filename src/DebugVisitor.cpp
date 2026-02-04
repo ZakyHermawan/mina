@@ -1,4 +1,5 @@
 #include "DebugVisitor.hpp"
+#include "Types.hpp"
 #include "Ast.hpp"
 
 void DebugVisitor::visit(StatementsAST& v) { std::cout << "Statements AST\n"; }

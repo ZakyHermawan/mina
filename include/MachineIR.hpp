@@ -42,7 +42,7 @@ class MachineIR
 {
 public:
     virtual ~MachineIR() = default;
-    
+
     virtual MIRType getMIRType() const;
     virtual std::string getString() const;
 };
@@ -81,6 +81,7 @@ public:
     std::string getString() const override;
     unsigned int getID() const;
 
+    std::string get64BitName() const;
     std::string get32BitName() const;
     std::string get16BitName() const;
     std::string get8BitHighName() const;

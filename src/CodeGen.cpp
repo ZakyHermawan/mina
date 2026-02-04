@@ -3,6 +3,7 @@
 #include "BasicBlock.hpp"
 #include "MachineIR.hpp"
 #include "InstIR.hpp"
+#include "RegisterAllocator.hpp"
 
 #include <map>
 #include <set>
@@ -1478,6 +1479,7 @@ void CodeGen::generateAllFunctionsMIR()
 
     // generate MIR for main function first
     m_ssa.renameSSA();
+    //m_ssa.printCFG();
     generateMIR();
 
     for (auto& [funcName, ssa] : m_functionSSAMap)
@@ -1492,4 +1494,7 @@ void CodeGen::generateAllFunctionsMIR()
     // Global epilogue
     std::cout << "\nnewline_str: .string \"\\n\"\n";
     std::cout << "\n";
+
+    std::vector<std::shared_ptr<BasicBlockMIR>> bbMIR;
+    RegisterAllocator ra(std::move(bbMIR));
 }
