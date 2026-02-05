@@ -8,6 +8,9 @@
 #include "Types.hpp"
 #include "BasicBlock.hpp"
 
+namespace mina
+{
+
 class BasicBlock;
 
 enum class InstType
@@ -1040,3 +1043,6 @@ public:
     virtual std::shared_ptr<BasicBlock> getBlock() override;
     virtual InstType getInstType() const override;
 };
+
+
+}  // namespace mina

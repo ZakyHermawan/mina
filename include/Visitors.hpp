@@ -1,5 +1,8 @@
 #pragma once
 
+namespace mina
+{
+
 class StatementsAST;
 class NumberAST;
 class BoolAST;
@@ -76,3 +79,5 @@ public:
     virtual void visit(ProcDeclAST&) = 0;
     virtual void visit(FuncDeclAST&) = 0;
 };
+
+}  // namespace mina

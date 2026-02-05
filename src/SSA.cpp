@@ -14,6 +14,9 @@
 #include <functional>
 #include <unordered_map>
 
+namespace mina
+{
+
 SSA::SSA()
     : m_cfg{std::make_shared<BasicBlock>("Entry_0")},
       m_currBBNameWithoutCtr {"Entry"},
@@ -469,3 +472,5 @@ void SSA::renameSSA()
         }
     }
 }
+
+}  // namespace mina

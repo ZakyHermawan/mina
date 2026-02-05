@@ -4,6 +4,9 @@
 #include <vector>
 #include <string>
 
+namespace mina
+{
+
 Bucket::Bucket()
     : m_intVal{0},
       m_arr{arenaVectorInt()},
@@ -110,3 +113,5 @@ void FunctionBucket::setLocalNumVar(unsigned int numVar) { m_localNumVar = numVa
 unsigned int FunctionBucket::getStartAddr() const { return m_start_addr; }
 unsigned int FunctionBucket::getEndAddr() const { return m_end_addr; }
 unsigned int FunctionBucket::getLocalNumVar() const { return m_localNumVar; }
+
+}  // namespace mina

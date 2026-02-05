@@ -1,8 +1,16 @@
 #pragma once
 
+#include <set>
 #include <string>
 #include <vector>
 #include <memory>
+#include <array>
+
+#include <type_traits>
+#include <concepts>
+
+namespace mina
+{
 
 // Enum declaration remains in the header
 enum class MIRType
@@ -34,10 +42,9 @@ enum class MIRType
     Movzx,
     Test,
     Jz,
-    Jnz
+    Jnz,
+    Ret
 };
-
-class Register;
 
 // Base Class
 class MachineIR
@@ -55,6 +62,13 @@ class BasicBlockMIR
 private:
     std::string m_name;
     std::vector<std::shared_ptr<MachineIR>> m_instructions;
+    std::vector<std::shared_ptr<BasicBlockMIR>> m_predecessors,
+        m_successors;  // predecessors and successors
+
+    std::set<int> m_def;
+    std::set<int> m_use;
+    std::set<int> m_liveIn;
+    std::set<int> m_liveOut;
 
 public:
     BasicBlockMIR(std::string name);
@@ -62,6 +76,28 @@ public:
     std::vector<std::shared_ptr<MachineIR>>& getInstructions();
     void addInstruction(std::shared_ptr<MachineIR> inst);
     void printInstructions() const;
+
+    void setSuccessorFromNames(
+        const std::vector<std::string>& successorNames);
+    void setPredecessorFromNames(
+        const std::vector<std::string>& predecessorNames);
+
+    std::vector<std::shared_ptr<BasicBlockMIR>>& getPredecessors();
+    std::vector<std::shared_ptr<BasicBlockMIR>>& getSuccessors();
+
+    void addDef(int regID);
+    void addUse(int regID);
+    void insertDef(int regID);
+    void insertLiveIn(int regID);
+    void insertLiveOut(int regID);
+
+    std::set<int>& getDef();
+    std::set<int>& getUse();
+    std::set<int>& getLiveIn();
+    std::set<int>& getLiveOut();
+
+    void generateDefUse();
+    void printLivenessSets() const;
 };
 
 class Register : public MachineIR
@@ -262,7 +298,7 @@ class CmpMIR : public MachineIR
 {
     std::vector<std::shared_ptr<MachineIR>> m_operands;
 
- public:
+public:
     CmpMIR(std::vector<std::shared_ptr<MachineIR>> operands);
     MIRType getMIRType() const override;
     std::string getString() const override;
@@ -365,7 +401,7 @@ class JmpMIR : public MachineIR
 {
     std::string m_targetLabel;
 
- public:
+public:
     JmpMIR(std::string targetLabel);
     MIRType getMIRType() const override;
     std::string getString() const override;
@@ -387,9 +423,37 @@ class JnzMIR : public MachineIR
 {
     std::string m_targetLabel;
 
- public:
+public:
     JnzMIR(std::string targetLabel);
     MIRType getMIRType() const override;
     std::string getString() const override;
     std::string getTargetLabel() const;
 };
+
+class RetMIR : public MachineIR
+{
+public:
+    RetMIR();
+    MIRType getMIRType() const override;
+    std::string getString() const override;
+};
+
+enum class RegID : int
+{
+    RAX, RBX, RCX, RDX, RDI, RSI, R8, R9, R12, R13, R14,
+    COUNT 
+};
+
+template<typename T>
+concept IsEnum = std::is_enum_v<T>;
+
+template<IsEnum T>
+constexpr auto to_int(T e) noexcept
+{
+    return static_cast<std::underlying_type_t<T>>(e);
+}
+
+const std::array<std::shared_ptr<Register>, to_int(RegID::COUNT)>& getAllRegisters();
+const std::shared_ptr<Register>& getReg(RegID id);
+
+}; // namespace mina

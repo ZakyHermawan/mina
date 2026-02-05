@@ -6,6 +6,9 @@
 #include <iostream>
 #include <stdexcept>
 
+namespace mina
+{
+
 std::string tokenTypeToString(TokenType type)
 {
     switch (type)
@@ -146,3 +149,5 @@ std::ostream &operator<<(std::ostream &out, const Token &token)
 
     return out;
 }
+
+}  // namespace mina

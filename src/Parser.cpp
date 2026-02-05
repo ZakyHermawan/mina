@@ -18,6 +18,9 @@
 #include <stdexcept>
 #include <unordered_map>
 
+namespace mina
+{
+
 Parser::Parser(std::string source)
     : m_lexer{std::move(source)},
       m_isError{false},
@@ -1617,3 +1620,5 @@ std::shared_ptr<ExprAST> Parser::optSubscript()
     }
     return nullptr;
 }
+
+}  // namespace mina

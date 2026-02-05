@@ -8,6 +8,9 @@
 #include <unordered_map>
 #include <unordered_set>
 
+namespace mina
+{
+
 using subMap = std::unordered_map<std::string, std::shared_ptr<Inst>>;
 using subPhi = std::unordered_map<std::string, std::shared_ptr<PhiInst>>;
 
@@ -54,3 +57,5 @@ private:
     std::unordered_map<std::shared_ptr<BasicBlock>, subMap> m_currDef;
     std::unordered_map<std::shared_ptr<BasicBlock>, subPhi> m_incompletePhis;
 };
+
+}  // namespace mina

@@ -6,6 +6,9 @@
 #include <memory>
 #include <vector>
 
+namespace mina
+{
+
 // Interference Graph Node
 class IGNode
 {
@@ -43,6 +46,9 @@ public:
     void printAdjMatrix() const;
     void printAdjList() const;
     bool isNodePresent(const std::shared_ptr<IGNode>& node) const;
+    void addNode(const std::shared_ptr<IGNode>& node);
+    void addEdge(const std::shared_ptr<Register>& r1,
+                 const std::shared_ptr<Register>& r2);
 
 private:
     std::vector<std::shared_ptr<IGNode>> m_nodes;
@@ -72,5 +78,25 @@ private:
         std::map<int, std::shared_ptr<Register>> registerMap);
 
     InferenceGraph constructBaseGraph();
+    void addEdgesBasedOnLiveness(InferenceGraph& graph);
     void addAllRegistersAsNodes(InferenceGraph& graph);
+
+    /**
+     * Liveness Analysis Data-Flow Equations:
+     * * 1. Live-Out Equation (Union of Successors):
+     * Out[B] = Union { In[S] | S is a successor of B }
+     * // A register is live exiting block B if it is needed by any
+     * // of the blocks that can execute immediately after B.
+     * * 2. Live-In Equation (Transfer Function):
+     * In[B] = Use[B] U (Out[B] - Def[B])
+     * // A register is live entering block B if:
+     * // a) It is used in B before being redefined (Use[B]).
+     * // b) It was live exiting B and was NOT overwritten by B (Out[B] -
+     * Def[B]).
+     * * Note: Analysis converges when In[B] and Out[B] sets reach a fixed point
+     * for all blocks in the Control Flow Graph (CFG).
+     */
+    void livenessAnalysis();
 };
+
+}  // namespace mina

@@ -6,6 +6,9 @@
 #include <utility>
 #include <stdexcept>
 
+namespace mina
+{
+
 Lexer::Lexer(std::string source)
     : m_source{std::move(source)},
       m_currChar{' '},
@@ -372,3 +375,5 @@ void Lexer::advance()
     }
     m_currChar = m_source[m_currIdx++];
 }
+
+}  // namespace mina

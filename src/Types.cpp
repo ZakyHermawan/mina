@@ -2,6 +2,9 @@
 
 #include <string>
 
+namespace mina
+{
+
 std::string typeToStr(Type type)
 {
     switch (type)
@@ -13,6 +16,8 @@ std::string typeToStr(Type type)
         case Type::UNDEFINED:
             return "undefined";
         default:
-            break;
+            return "";
     }
 }
+
+}  // namespace mina

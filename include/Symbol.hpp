@@ -8,6 +8,9 @@
 #include <unordered_map>
 #include <stdexcept>
 
+namespace mina
+{
+
 using arenaVectorInt = std::vector<int, arena::Allocator<int>>;
 
 class Bucket
@@ -75,3 +78,5 @@ public:
     unsigned int getEndAddr() const;
     unsigned int getLocalNumVar() const;
 };
+
+}  // namespace mina

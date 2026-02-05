@@ -1,5 +1,8 @@
 #include "DisjointSetUnion.hpp"
 
+namespace mina
+{
+
 // Adds a new variable to the DSU, initially in its own set.
 void DisjointSetUnion::make_set(const std::string& v)
 {
@@ -34,3 +37,5 @@ void DisjointSetUnion::unite(const std::string& u, const std::string& v)
         parent[root_v] = root_u;
     }
 }
+
+}  // namespace mina

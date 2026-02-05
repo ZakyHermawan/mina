@@ -4,6 +4,9 @@
 
 #include <string>
 
+namespace mina
+{
+
 class Lexer
 {
 private:
@@ -33,3 +36,5 @@ public:
 	int scanInt();
 	void advance();
 };
+
+}  // namespace mina

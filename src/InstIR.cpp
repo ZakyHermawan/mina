@@ -9,6 +9,9 @@
 #include <utility>
 #include <stdexcept>
 
+namespace mina
+{
+
 IntConstInst::IntConstInst(int val, std::shared_ptr<BasicBlock> block)
     : m_val(val), m_block(std::move(block))
 {
@@ -1033,7 +1036,11 @@ ReturnInst::ReturnInst(std::shared_ptr<Inst> returnExpr, std::shared_ptr<BasicBl
 }
 std::string ReturnInst::getString()
 {
-    return "Return " + m_operands[0]->getTarget()->getString();
+    std::string res = "Return";
+    if(!m_operands.empty()) {
+        res += m_operands[0]->getTarget()->getString();
+    }
+    return res;
 }
 void ReturnInst::push_user(std::shared_ptr<Inst> user)
 {
@@ -1334,3 +1341,5 @@ InstType UndefInst::getInstType() const { return InstType::Undef; }
 std::string NoopInst::getString() { return "noop"; }
 std::shared_ptr<BasicBlock> NoopInst::getBlock() { return m_block; };
 InstType NoopInst::getInstType() const { return InstType::Noop; }
+
+}  // namespace mina

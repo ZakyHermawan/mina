@@ -2,6 +2,9 @@
 
 #include "Visitors.hpp"
 
+namespace mina
+{
+
 class DebugVisitor : public Visitor
 {
 public:
@@ -37,3 +40,5 @@ public:
     void visit(ArrDeclAST&) override;
     void visit(DeclarationsAST&) override;
 };
+
+}  // namespace mina

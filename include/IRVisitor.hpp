@@ -13,6 +13,8 @@
 #include <vector>
 #include <unordered_map>
 
+namespace mina
+{
 
 class IRVisitor : public Visitor
 {
@@ -77,3 +79,5 @@ public:
 
     std::shared_ptr<Inst> popInst();
 };
+
+}  // namespace mina

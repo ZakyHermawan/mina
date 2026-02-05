@@ -7,6 +7,8 @@
 #include <utility>
 #include <string>
 
+namespace mina
+{
 
 StatementsAST::StatementsAST(std::shared_ptr<StatementAST> statement,
                              std::shared_ptr<StatementsAST> statements)
@@ -421,3 +423,5 @@ void FuncDeclAST::accept(Visitor& v)
 }
 std::string FuncDeclAST::getFuncName() const { return m_funcName; }
 Type FuncDeclAST::getType() const { return m_type; }
+
+}  // namespace mina

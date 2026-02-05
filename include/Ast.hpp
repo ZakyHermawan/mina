@@ -7,6 +7,9 @@
 #include "Types.hpp"
 #include "Visitors.hpp"
 
+namespace mina
+{
+
 class StatementAST
 {
 public:  
@@ -750,3 +753,5 @@ public:
     Type getType() const;
     void accept(Visitor& v) override;
 };
+
+}  // namespace mina

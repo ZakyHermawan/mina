@@ -3,6 +3,9 @@
 
 #include <utility>
 
+namespace mina
+{
+
 BasicBlock::BasicBlock(std::string name) : m_name(std::move(name)) {}
 
 void BasicBlock::setInstructions(
@@ -60,3 +63,5 @@ void BasicBlock::pushSuccessor(const std::shared_ptr<BasicBlock>& successor)
 }
 
 std::string BasicBlock::getName() { return m_name; }
+
+}  // namespace mina

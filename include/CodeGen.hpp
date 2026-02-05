@@ -10,6 +10,9 @@
 #include <string>
 #include <vector>
 
+namespace mina
+{
+
 class CodeGen
 {
 	SSA m_ssa;
@@ -29,3 +32,6 @@ public:
 	void addSSA(std::string funcName, SSA& ssa);
 	void generateAllFunctionsMIR();
 };
+
+
+}  // namespace mina

@@ -4,6 +4,9 @@
 #include <iostream>
 #include <string>
 
+namespace mina
+{
+
 enum TokenType
 {
   // Single character tokens
@@ -91,3 +94,5 @@ public:
 
 	friend std::ostream &operator<<(std::ostream &out, const Token &token);
 };
+
+}  // namespace mina

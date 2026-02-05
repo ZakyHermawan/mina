@@ -12,6 +12,9 @@
 #include "arena_alloc.hpp"
 #include "Ast.hpp"
 
+namespace mina
+{
+
 class Parser
 {
 private:
@@ -106,3 +109,5 @@ private:
     std::shared_ptr<InputsAST> moreInputs();
     std::shared_ptr<ExprAST> optSubscript();
 };
+
+}  // namespace mina

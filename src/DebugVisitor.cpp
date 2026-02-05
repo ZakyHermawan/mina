@@ -2,6 +2,9 @@
 #include "Types.hpp"
 #include "Ast.hpp"
 
+namespace mina
+{
+
 void DebugVisitor::visit(StatementsAST& v) { std::cout << "Statements AST\n"; }
 void DebugVisitor::visit(NumberAST& v)
 {
@@ -62,3 +65,5 @@ void DebugVisitor::visit(ArrDeclAST& v)
 
 void DebugVisitor::visit(DeclarationsAST&) { std::cout << "Declarations node\n"; }
 void DebugVisitor::visit(ParametersAST&) { std::cout << "Parameters node\n"; }
+
+}  // namespace mina

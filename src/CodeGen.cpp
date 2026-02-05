@@ -10,11 +10,15 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <cassert>
 #include <utility>
 #include <iostream>
 #include <algorithm>
 #include <stdexcept>
 #include <functional>
+
+namespace mina
+{
 
 CodeGen::CodeGen(SSA ssa) : m_ssa{ssa}
 {
@@ -29,21 +33,21 @@ void CodeGen::linearizeCFG()
     std::set<std::shared_ptr<BasicBlock>> visited;
     std::function<void(std::shared_ptr<BasicBlock>)> dfs =
         [&](std::shared_ptr<BasicBlock> bb)
+    {
+        visited.insert(bb);
+        const auto& successors = bb->getSuccessors();
+        // Traverse successors in reverse order so the first element that is being inserted 
+        // into the successors vector is in front of successors that is added later,
+        // since we will reverse the linearizedBlocks at the end.
+        for (int i = successors.size() - 1; i >= 0; --i)
         {
-          visited.insert(bb);
-          const auto& successors = bb->getSuccessors();
-          // Traverse successors in reverse order so the first element that is being inserted 
-          // into the successors vector is in front of successors that is added later,
-          // since we will reverse the linearizedBlocks at the end.
-          for (int i = successors.size() - 1; i >= 0; --i)
-          {
-              auto& succ = successors[i];
-              if (visited.find(succ) == visited.end())
-              {
-                  dfs(succ);
-              }
-          }
-          m_linearizedBlocks.push_back(bb);
+            auto& succ = successors[i];
+            if (visited.find(succ) == visited.end())
+            {
+                dfs(succ);
+            }
+        }
+        m_linearizedBlocks.push_back(bb);
     };
     dfs(m_ssa.getCFG());
     std::reverse(m_linearizedBlocks.begin(), m_linearizedBlocks.end());
@@ -51,21 +55,20 @@ void CodeGen::linearizeCFG()
 
 void CodeGen::generateMIR()
 {
-    linearizeCFG();
-
-    std::shared_ptr<Register> rbp{new Register{0, "rbp"}};
-    std::shared_ptr<Register> rsp{new Register{1, "rsp"}};
-    std::shared_ptr<Register> rax{
-        new Register{2, "rax", "eax", "ax", "ah", "al"}};
-    std::shared_ptr<Register> rbx{
-        new Register{3, "rbx", "ebx", "bx", "bh", "bl"}};
-    std::shared_ptr<Register> rcx{
-        new Register{4, "rcx", "ecx", "cx", "ch", "cl"}};
-    std::shared_ptr<Register> rdx{
-        new Register{5, "rdx", "edx", "dx", "dh", "dl"}};
-    std::shared_ptr<Register> rip{new Register{6, "rip"}};
-    std::shared_ptr<Register> r8{new Register{7, "r8"}};
-    std::shared_ptr<Register> r9{new Register{8, "r9"}};
+    auto rax = std::make_shared<Register>(0, "rax", "eax", "ax", "ah", "al");
+    auto rbx = std::make_shared<Register>(1, "rbx", "ebx", "bx", "bh", "bl");
+    auto rcx = std::make_shared<Register>(2, "rcx", "ecx", "cx", "ch", "cl");
+    auto rdx = std::make_shared<Register>(3, "rdx", "edx", "dx", "dh", "dl");
+    auto rdi = std::make_shared<Register>(4, "rdi", "edi", "di", "dil", "");
+    auto rsi = std::make_shared<Register>(5, "rsi", "esi", "si", "sil", "");
+    auto r8 = std::make_shared<Register>(6, "r8", "r8d", "r8w", "r8b", "");
+    auto r9 = std::make_shared<Register>(7, "r9", "r9d", "r9w", "r9b", "");
+    auto r12 = std::make_shared<Register>(8, "r12", "r12d", "r12w", "r12b", "");
+    auto r13 = std::make_shared<Register>(9, "r13", "r13d", "r13w", "r13b", "");
+    auto r14 = std::make_shared<Register>(10, "r13", "r13d", "r13w", "r13b", "");
+    auto rbp = std::make_shared<Register>(11, "rbp", "ebp", "bp", "", "");
+    auto rsp = std::make_shared<Register>(12, "rsp", "esp", "sp", "", "");
+    auto rip = std::make_shared<Register>(13, "rip", "eip", "ip", "", "");
 
     std::map<std::string, size_t> vRegToOffset;
     std::map<std::string, unsigned int> arrVRegToSize;
@@ -109,11 +112,38 @@ void CodeGen::generateMIR()
     };
 
     m_mirBlocks.clear();
+    linearizeCFG();
+
+    std::map<std::string, std::shared_ptr<BasicBlockMIR>> nameToMIR;
+    std::vector<std::shared_ptr<BasicBlockMIR>> linearizedMIRBlock;
+
+    for (const auto& bb : m_linearizedBlocks)
+    {
+        auto newMIR = std::make_shared<BasicBlockMIR>(bb->getName());
+        nameToMIR[bb->getName()] = newMIR;
+        linearizedMIRBlock.push_back(newMIR);
+    }
+
+    for (size_t i = 0; i < m_linearizedBlocks.size(); ++i)
+    {
+        auto& oldBB = m_linearizedBlocks[i];
+        auto& mirBB = linearizedMIRBlock[i];
+
+        for (const auto& succ : oldBB->getSuccessors())
+        {
+            mirBB->getSuccessors().push_back(nameToMIR[succ->getName()]);
+        }
+        for (const auto& pred : oldBB->getPredecessors())
+        {
+            mirBB->getPredecessors().push_back(nameToMIR[pred->getName()]);
+        }
+    }
+
     for (int i = 0; i < m_linearizedBlocks.size(); ++i)
     {
         auto& currBlock = m_linearizedBlocks[i];
-        std::shared_ptr<BasicBlockMIR> bbMIR{
-            new BasicBlockMIR{currBlock->getName()}};
+        auto& bbMIR = linearizedMIRBlock[i];
+        assert(bbMIR->getName() == currBlock->getName());
 
         auto& inst = currBlock->getInstructions();
 
@@ -717,6 +747,11 @@ void CodeGen::generateMIR()
             else if (instType == InstType::Return)
             {
                 auto returnInst = std::dynamic_pointer_cast<ReturnInst>(inst[j]);
+                auto& operands = returnInst->getOperands();
+                if (operands.size() == 0)
+                {
+                    continue;
+                }
                 const auto& expr = returnInst->getOperands()[0]->getTarget();
                 if (expr->getInstType() == InstType::IntConst)
                 {
@@ -1176,7 +1211,8 @@ void CodeGen::generateMIR()
                     bbMIR->addInstruction(std::make_shared<MovMIR>(
                         std::vector<std::shared_ptr<MachineIR>>{rax, constMIR}));
                 }
-                else {
+                else
+                {
                     auto op1MemMIR = memoryLocationForVReg(operand1->getString());
 
                     // mov rax, QWORD PTR [op1]
@@ -1184,14 +1220,17 @@ void CodeGen::generateMIR()
                         std::vector<std::shared_ptr<MachineIR>>{rax, op1MemMIR}));
                 }
 
-                if (operand2->getInstType() == InstType::IntConst) {
+                if (operand2->getInstType() == InstType::IntConst)
+                {
                     auto intConst = std::dynamic_pointer_cast<IntConstInst>(operand2);
                     auto constMIR = std::make_shared<ConstMIR>(intConst->getVal());
 
                     // cmp rax, constant
                     bbMIR->addInstruction(std::make_shared<CmpMIR>(
                         std::vector<std::shared_ptr<MachineIR>>{rax, constMIR}));
-                } else {
+                }
+                else
+                {
                     auto op2MemMIR = memoryLocationForVReg(operand2->getString());
 
                     // cmp rax, QWORD PTR [op2]
@@ -1413,6 +1452,23 @@ void CodeGen::generateMIR()
                 bbMIR->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{targetMemMIR, rax}));
             }
         }
+
+        auto& lastInst = currBlock->getInstructions().back();
+        if (lastInst->getInstType() == InstType::Return ||
+            lastInst->getInstType() == InstType::Halt)
+        {
+            // TERMINAL BLOCK: Clear successors to break the circle
+            currBlock->getSuccessors().clear();
+            bbMIR->getSuccessors().clear();
+
+            bbMIR->addInstruction(std::make_shared<MovMIR>(
+                std::vector<std::shared_ptr<MachineIR>>{
+                    rax, std::make_shared<ConstMIR>(0)}));
+
+            // Add RetMIR at the end of terminal block
+            // For Liveness Analysis
+            bbMIR->addInstruction(std::make_shared<RetMIR>());
+        }
         m_mirBlocks.push_back(std::move(bbMIR));
     }
 
@@ -1433,7 +1489,7 @@ void CodeGen::generateMIR()
     // Offset for arrays
     for (const auto& arrPair : arrVRegToSize)
     {
-        offset += arrPair.second * 8;
+        offset += static_cast<size_t>(arrPair.second) * 8;
     }
 
     unsigned int aligned_offset = (offset + 15) & ~15; // 16-byte alignment
@@ -1495,18 +1551,8 @@ void CodeGen::generateAllFunctionsMIR()
     std::cout << "\nnewline_str: .string \"\\n\"\n";
     std::cout << "\n";
 
-    std::vector<std::shared_ptr<BasicBlockMIR>> bbMIR;
-    std::shared_ptr<BasicBlockMIR> mainBB{new BasicBlockMIR{"testBlock"}};
-    std::cout << "block name: " << mainBB->getName() << std::endl;
-
-    // Test Code
-    auto rax = std::make_shared<Register>(0, "rax", "eax", "ax", "ah", "al");
-    auto rbx = std::make_shared<Register>(1, "rbx", "ebx", "bx", "bh", "bl");
-    auto vreg = std::make_shared<Register>(100, "vreg1");
-
-    mainBB->addInstruction(std::make_shared<MovMIR>(
-        std::vector<std::shared_ptr<MachineIR>>{vreg, vreg}));
-
-    bbMIR.push_back(mainBB);
-    RegisterAllocator ra(std::move(bbMIR));
+    // Allocate registers
+    RegisterAllocator ra(std::move(m_mirBlocks));
 }
+
+}  // namespace mina

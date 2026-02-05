@@ -13,6 +13,9 @@
 #include <stdexcept>
 #include <iostream>
 
+namespace mina
+{
+
 IRVisitor::IRVisitor()
     : m_tempCounter(0),
       m_labelCounter(0),
@@ -1063,3 +1066,5 @@ std::shared_ptr<Inst> IRVisitor::popInst()
     m_instStack.pop();
     return inst;
 }
+
+}  // namespace mina

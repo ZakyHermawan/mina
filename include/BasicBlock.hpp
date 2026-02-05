@@ -4,6 +4,9 @@
 #include <vector>
 #include <memory>
 
+namespace mina
+{
+
 class Inst;
 
 class BasicBlock : public std::enable_shared_from_this<BasicBlock>
@@ -39,3 +42,5 @@ public:
 
     std::string getName();
 };
+
+}  // namespace mina

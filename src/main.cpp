@@ -9,6 +9,8 @@
 
 //#include "tests/test_lexer.hpp"
 
+using namespace mina;
+
 static void repl()
 {
     while (1)

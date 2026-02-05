@@ -5,6 +5,9 @@
 #include <utility>
 #include <cassert>
 
+namespace mina
+{
+
 void tests_token()
 {
     Token token(INTEGER, "", 32, 1);
@@ -261,3 +264,5 @@ void tests_lexer()
     
     std::cout << "TESTS LEXER SUCCESS\n";
 }
+
+}  // namespace mina

@@ -1,6 +1,13 @@
 #pragma once
 
+#include "MachineIR.hpp"
+
 #include <string>
+#include <vector>
+#include <memory>
+
+namespace mina
+{
 
 enum class Type
 {
@@ -22,3 +29,5 @@ enum class FType
 };
 
 std::string typeToStr(Type type);
+
+}  // namespace mina

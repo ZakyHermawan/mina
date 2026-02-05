@@ -1,4 +1,7 @@
 #include "MachineIR.hpp"
+
+#include <set>
+#include <array>
 #include <utility>
 #include <stdexcept>
 #include <string>
@@ -7,7 +10,8 @@
 #include <sstream>
 #include <memory>
 
-std::string BasicBlockMIR::getName() const { return m_name; }
+namespace mina
+{
 
 // ==========================================
 // MachineIR (Base)
@@ -37,6 +41,8 @@ BasicBlockMIR::BasicBlockMIR(std::string name)
 {
 }
 
+std::string BasicBlockMIR::getName() const { return m_name; }
+
 std::vector<std::shared_ptr<MachineIR>>&
 BasicBlockMIR::getInstructions()
 {
@@ -47,6 +53,8 @@ void BasicBlockMIR::printInstructions() const
 {
     for (const auto& inst : m_instructions)
     {
+        // RetMIR is only for liveness, skip it
+        if(inst->getMIRType() == MIRType::Ret) continue;
         std::cout << "    " << inst->getString() << "\n";
     }
 }
@@ -54,6 +62,195 @@ void BasicBlockMIR::printInstructions() const
 void BasicBlockMIR::addInstruction(std::shared_ptr<MachineIR> inst)
 {
     m_instructions.push_back(std::move(inst));
+}
+
+void BasicBlockMIR::setSuccessorFromNames(const std::vector<std::string>& successorNames)
+{
+    for (const auto& succName : successorNames)
+    {
+        auto succBB = std::make_shared<BasicBlockMIR>(succName);
+        m_successors.push_back(succBB);
+    }
+}
+
+void BasicBlockMIR::setPredecessorFromNames(const std::vector<std::string>& predecessorNames)
+{
+    for (const auto& predName : predecessorNames)
+    {
+        auto predBB = std::make_shared<BasicBlockMIR>(predName);
+        m_predecessors.push_back(predBB);
+    }
+}
+
+std::vector<std::shared_ptr<BasicBlockMIR>>& BasicBlockMIR::getPredecessors()
+{
+    return m_predecessors;
+}
+
+std::vector<std::shared_ptr<BasicBlockMIR>>& BasicBlockMIR::getSuccessors()
+{
+    return m_successors;
+}
+
+void BasicBlockMIR::addDef(int regID) { m_def.insert(regID); }
+
+void BasicBlockMIR::addUse(int regID) { m_use.insert(regID); }
+
+void BasicBlockMIR::insertDef(int regID) { m_def.insert(regID); }
+
+void BasicBlockMIR::insertLiveIn(int regID) { m_liveIn.insert(regID); }
+
+void BasicBlockMIR::insertLiveOut(int regID) { m_liveOut.insert(regID); }
+
+std::set<int>& BasicBlockMIR::getDef() { return m_def; }
+
+std::set<int>& BasicBlockMIR::getUse() { return m_use; }
+
+std::set<int>& BasicBlockMIR::getLiveIn() { return m_liveIn; }
+
+std::set<int>& BasicBlockMIR::getLiveOut() { return m_liveOut; }
+
+void BasicBlockMIR::generateDefUse()
+{
+    for(const auto& inst : m_instructions)
+    {
+		auto& operands = inst->getOperands();
+        auto mirType = inst->getMIRType();
+
+        // Helper to get ID from operand
+        auto getID = [](const std::shared_ptr<MachineIR>& op)
+        {
+            return std::dynamic_pointer_cast<Register>(op)->getID();
+        };
+
+        switch (mirType)
+        {
+            // Standard Binary Destructive (Dest = Dest op Src)
+            case MIRType::Add:
+            case MIRType::Sub:
+            case MIRType::And:
+            case MIRType::Or:
+            case MIRType::Not:
+                if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
+                {
+                    int id = getID(operands[0]);
+                    addUse(id); // Use the current value
+                    addDef(id); // Then define the new value
+                }
+                // Fallthrough to process operands[1...n] as additional Uses
+                [[fallthrough]];
+
+            // Comparison / Testing (Pure Uses)
+            case MIRType::Cmp:
+            case MIRType::Test:
+            {
+                size_t start = (mirType == MIRType::Cmp || mirType == MIRType::Test) ? 0 : 1;
+                for (size_t i = start; i < operands.size(); ++i)
+                {
+                    if (operands[i]->getMIRType() == MIRType::Reg)
+                    {
+                        addUse(getID(operands[i]));
+                    }
+                }
+                break;
+            }
+
+            // Moving / Loading (Pure Defs of operands[0])
+            case MIRType::Mov:
+            case MIRType::Lea:
+            case MIRType::Movzx:
+                if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
+                {
+                    addDef(getID(operands[0]));
+                }
+                // Sources (operands[1...n]) are uses
+                for (size_t i = 1; i < operands.size(); ++i)
+                {
+                    if (operands[i]->getMIRType() == MIRType::Reg)
+                    {
+                        addUse(getID(operands[i]));
+                    }
+                }
+                break;
+
+            // Implicit Register Operations
+            case MIRType::Mul:
+            case MIRType::Div:
+                addUse(to_int(RegID::RAX)); // Reads RAX
+                addDef(to_int(RegID::RAX)); // Writes RAX
+                addDef(to_int(RegID::RDX)); // Writes RDX (remainder/high bits)
+                if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
+                {
+                    addUse(getID(operands[0]));
+                }
+                break;
+
+            case MIRType::Cqo:
+                addUse(to_int(RegID::RAX)); // Reads RAX sign bit
+                addDef(to_int(RegID::RDX)); // Defines RDX
+                break;
+
+            // Set Flags to Register
+            case MIRType::Sete: case MIRType::Setne:
+            case MIRType::Setl: case MIRType::Setle:
+            case MIRType::Setg: case MIRType::Setge:
+                if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
+                {
+                    addDef(getID(operands[0]));
+                }
+                break;
+
+            case MIRType::Call:
+                // 1. Mark registers used for arguments (Win64 uses RCX, RDX, R8, R9)
+                addUse(to_int(RegID::RCX));
+                addUse(to_int(RegID::RDX));
+
+                // 2. Mark Caller-Saved registers as CLOBBERED (Defined)
+                // This prevents the compiler from assuming RAX/RCX/RDX survive the call
+                addDef(to_int(RegID::RAX));
+                addDef(to_int(RegID::RCX));
+                addDef(to_int(RegID::RDX));
+                // Add others if your RegID enum includes them (RSI, RDI, R8-R11)
+                break;
+
+            case MIRType::Ret:
+                addUse(to_int(RegID::RAX));
+                break;
+
+            default:
+                break;
+            }
+		for(const auto& operand : operands)
+		{
+			auto operandType = operand->getMIRType();
+			if(operandType != MIRType::Reg)
+			{
+				continue; // Only interested in registers
+			}
+			auto regOperand = std::dynamic_pointer_cast<Register>(operand);
+		}
+    }
+}
+
+void BasicBlockMIR::printLivenessSets() const
+{
+    auto printSet = [](const std::string& label, const std::set<int>& s)
+    {
+        std::cout << "  " << label << ": { ";
+        for (int id : s)
+        {
+            // Use your global accessor to get the human-readable name
+            std::cout << getReg(static_cast<RegID>(id))->get64BitName() << " ";
+        }
+        std::cout << "}\n";
+    };
+
+    std::cout << "Block: " << this->getName() << "\n";
+    printSet("USE", m_use);
+    printSet("DEF", m_def);
+    printSet("LIVE-IN", m_liveIn);
+    printSet("LIVE-OUT", m_liveOut);
+    std::cout << "---------------------------\n";
 }
 
 // ==========================================
@@ -258,7 +455,8 @@ MIRType LeaMIR::getMIRType() const
 
 std::string LeaMIR::getString() const 
 {
-    if (m_operands.empty()) {
+    if (m_operands.empty())
+    {
         return "lea <error: no operands>";
     }
 
@@ -266,9 +464,12 @@ std::string LeaMIR::getString() const
     ss << "lea ";
 
     // Operand 0: Destination Register (e.g., "rax")
-    if (m_operands.size() > 0 && m_operands[0]) {
+    if (m_operands.size() > 0 && m_operands[0])
+    {
         ss << m_operands[0]->getString();
-    } else {
+    }
+    else
+    {
         ss << "???";
     }
 
@@ -277,9 +478,12 @@ std::string LeaMIR::getString() const
     // Operand 1: Source Memory Address (e.g., "[rbp - 4]")
     // We assume the operand's own getString() handles the brackets [ ] 
     // or the underlying reference logic.
-    if (m_operands.size() > 1 && m_operands[1]) {
+    if (m_operands.size() > 1 && m_operands[1])
+    {
         ss << m_operands[1]->getString();
-    } else {
+    }
+    else
+    {
         ss << "???";
     }
 
@@ -899,3 +1103,55 @@ std::string JnzMIR::getTargetLabel() const
 {
     return m_targetLabel;
 }
+
+// ==========================================
+// RetMIR
+// ==========================================
+
+RetMIR::RetMIR() {}
+
+MIRType RetMIR::getMIRType() const { return MIRType::Ret; }
+
+// Does not print anything because we assume "ret" is handled at a higher level
+// RetMIR is only for liveness Anaysis
+std::string RetMIR::getString() const { return ""; }
+
+// Prevent this function to be called from another file
+static std::array<std::shared_ptr<Register>, to_int(RegID::COUNT)> registersFactory()
+{
+    // Initialize with COUNT to pre-allocate exact size
+    std::array<std::shared_ptr<Register>, to_int(RegID::COUNT)> registers;
+
+    auto add = [&](RegID id, auto... names)
+    {
+        registers[to_int(id)] = std::make_shared<Register>(to_int(id), names...);
+    };
+
+    add(RegID::RAX, "rax", "eax", "ax",  "ah",  "al");
+    add(RegID::RBX, "rbx", "ebx", "bx",  "bh",  "bl");
+    add(RegID::RCX, "rcx", "ecx", "cx",  "ch",  "cl");
+    add(RegID::RDX, "rdx", "edx", "dx",  "dh",  "dl");
+    add(RegID::RDI, "rdi", "edi", "di",  "dil", "");
+    add(RegID::RSI, "rsi", "esi", "si",  "sil", "");
+    add(RegID::R8,  "r8",  "r8d", "r8w", "r8b", "");
+    add(RegID::R9,  "r9",  "r9d", "r9w", "r9b", "");
+    add(RegID::R12, "r12", "r12d", "r12w", "r12b", "");
+    add(RegID::R13, "r13", "r13d", "r13w", "r13b", "");
+    add(RegID::R14, "r14", "r14d", "r14w", "r14b", "");
+
+    return registers;
+}
+
+const std::array<std::shared_ptr<Register>, to_int(RegID::COUNT)>&
+getAllRegisters()
+{
+    static const auto registers = registersFactory();
+    return registers;
+}
+
+const std::shared_ptr<Register>& getReg(RegID id)
+{
+    return getAllRegisters()[to_int(id)];
+}
+
+}  // namespace mina

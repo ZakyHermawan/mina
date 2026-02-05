@@ -3,6 +3,9 @@
 #include <unordered_map>
 #include <string>
 
+namespace mina
+{
+
 class DisjointSetUnion
 {
 private:
@@ -13,3 +16,5 @@ public:
     std::string find(const std::string& v);
     void unite(const std::string& u, const std::string& v);
 };
+
+}  // namespace mina
