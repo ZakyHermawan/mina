@@ -318,7 +318,7 @@ void CodeGen::generateMIR()
                     bbMIR->addInstruction(movMIR);
                 }
 
-                auto callMIR = std::make_shared<CallMIR>(callee);
+                auto callMIR = std::make_shared<CallMIR>(callee, arguments.size());
                 bbMIR->addInstruction(callMIR);
 
                 // If FuncCall, handle return value: mov targetVReg, rax
@@ -432,6 +432,9 @@ void CodeGen::generateMIR()
                 auto& operands = putInst->getOperands();
                 const auto& targetOp = operands[0]->getTarget();
                 auto outputType = targetOp->getInstType();
+                // Assuming printf only have 2 args, will decrement this
+                // On put literal/newline
+                unsigned int numArgs = 2;
 
                 if (outputType == InstType::IntConst)
                 {
@@ -467,6 +470,7 @@ void CodeGen::generateMIR()
                 }
                 else if (outputType == InstType::StrConst)
                 {
+                    --numArgs; // Only one argument for string literal
                     auto strInst = std::dynamic_pointer_cast<StrConstInst>(targetOp);
                     auto outputStr = strInst->getString();
 
@@ -495,7 +499,7 @@ void CodeGen::generateMIR()
                         std::vector<std::shared_ptr<MachineIR>>{rdx, sourceVReg}));
                 }
 
-                auto callMIR = std::make_shared<CallMIR>("printf");
+                auto callMIR = std::make_shared<CallMIR>("printf", numArgs);
                 bbMIR->addInstruction(callMIR);
             }
             else if (instType == InstType::Get)
@@ -524,7 +528,7 @@ void CodeGen::generateMIR()
                         rdx, memoryLocationForVReg(targetVRegName)});
                 bbMIR->addInstruction(argLeaMIR);
 
-                auto callMIR = std::make_shared<CallMIR>("scanf");
+                auto callMIR = std::make_shared<CallMIR>("scanf", 2);
                 bbMIR->addInstruction(callMIR);
 
                 // Reload the value from memory into the VReg

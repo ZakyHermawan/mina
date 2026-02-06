@@ -508,10 +508,14 @@ void RegisterAllocator::addEdgesBasedOnLiveness(std::shared_ptr<InferenceGraph> 
                     //instDefs.insert(to_int(RegID::R11));
 
                     // Uses: Arguments
-                    instUses.insert(to_int(RegID::RCX));
-                    instUses.insert(to_int(RegID::RDX));
-                    instUses.insert(to_int(RegID::R8));
-                    instUses.insert(to_int(RegID::R9));
+                    const auto callInst =
+                        std::dynamic_pointer_cast<CallMIR>(inst);
+                    unsigned int numArgs = callInst->getNumArgs();
+
+                    if (numArgs >= 1) instUses.insert(to_int(RegID::RCX));
+                    if (numArgs >= 2) instUses.insert(to_int(RegID::RDX));
+                    if (numArgs >= 3) instUses.insert(to_int(RegID::R8));
+                    if (numArgs >= 4) instUses.insert(to_int(RegID::R9));
                     break;
                 }
 

@@ -218,10 +218,12 @@ void BasicBlockMIR::generateDefUse()
             case MIRType::Call:
             {
                 // Uses (Arguments)
-                markUse(to_int(RegID::RCX));
-                markUse(to_int(RegID::RDX));
-                //markUse(to_int(RegID::R8));
-                //markUse(to_int(RegID::R9));
+                const auto callInst = std::dynamic_pointer_cast<CallMIR>(inst);
+                unsigned int numArgs = callInst->getNumArgs();
+                if (numArgs >= 1) markUse(to_int(RegID::RCX));
+                if (numArgs >= 2) markUse(to_int(RegID::RDX));
+                if (numArgs >= 3) markUse(to_int(RegID::R8));
+                if (numArgs >= 4) markUse(to_int(RegID::R9));
 
                 // Defs (Clobbers)
                 markDef(to_int(RegID::RAX));
@@ -542,7 +544,8 @@ std::vector<std::shared_ptr<MachineIR>>& LeaMIR::getOperands()
 // CallMIR
 // ==========================================
 
-CallMIR::CallMIR(std::string calleeName) : m_calleeName{calleeName}
+CallMIR::CallMIR(std::string calleeName, unsigned int numArgs)
+    : m_calleeName{calleeName}, m_numArgs{numArgs}
 {
 }
 
@@ -554,6 +557,11 @@ MIRType CallMIR::getMIRType() const
 std::string CallMIR::getString() const
 {
     return "call " + m_calleeName;
+}
+
+unsigned int CallMIR::getNumArgs() const
+{
+    return m_numArgs;
 }
 
 // ==========================================

@@ -216,11 +216,14 @@ public:
 class CallMIR : public MachineIR
 {
     std::string m_calleeName;
+    unsigned int m_numArgs;
 
 public:
-    CallMIR(std::string calleeName);
+    CallMIR(std::string calleeName, unsigned int numArgs);
     MIRType getMIRType() const override;
-    std::string getString() const override; 
+    std::string getString() const override;
+
+    unsigned int getNumArgs() const;
 };
 
 class AddMIR : public MachineIR
