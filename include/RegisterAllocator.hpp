@@ -77,9 +77,9 @@ private:
     std::vector<std::shared_ptr<BasicBlockMIR>> replaceVirtualRegisters(
         std::map<int, std::shared_ptr<Register>> registerMap);
 
-    InferenceGraph constructBaseGraph();
-    void addEdgesBasedOnLiveness(InferenceGraph& graph);
-    void addAllRegistersAsNodes(InferenceGraph& graph);
+    std::shared_ptr<InferenceGraph> constructBaseGraph();
+    void addEdgesBasedOnLiveness(std::shared_ptr<InferenceGraph> graph);
+    void addAllRegistersAsNodes(std::shared_ptr<InferenceGraph> graph);
 
     /**
      * Liveness Analysis Data-Flow Equations:

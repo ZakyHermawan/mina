@@ -153,17 +153,20 @@ void InferenceGraph::addEdge(const std::shared_ptr<Register>& r1, const std::sha
     std::shared_ptr<IGNode> node1 = nullptr;
     std::shared_ptr<IGNode> node2 = nullptr;
 
-    // Find the nodes associated with these registers
-    for (auto& node : m_nodes) {
+    for (auto& node : m_nodes)
+    {
         if (node->getReg()->getID() == r1->getID()) node1 = node;
         if (node->getReg()->getID() == r2->getID()) node2 = node;
     }
 
-    // Only add if both nodes exist and aren't already neighbors
-    if (node1 && node2) {
-        if (!node1->isNeighborWith(node2)) {
-            node1->getNeighbors().push_back(r2);
-            node2->getNeighbors().push_back(r1);
+    if (node1 && node2)
+    {
+        if (!node1->isNeighborWith(node2))
+        {
+            // Use the existing register pointers from the nodes
+            // to maintain pointer identity throughout the graph
+            node1->getNeighbors().push_back(node2->getReg());
+            node2->getNeighbors().push_back(node1->getReg());
         }
     }
 }
@@ -194,10 +197,10 @@ std::shared_ptr<InferenceGraph> RegisterAllocator::buildGraph()
 	livenessAnalysis();
 	addEdgesBasedOnLiveness(inferenceGraph);
     std::cout << "Adjacency List:\n";
-	inferenceGraph.printAdjList();
-    inferenceGraph.printAdjMatrix();
+	inferenceGraph->printAdjList();
+    inferenceGraph->printAdjMatrix();
 
-	return nullptr;
+	return inferenceGraph;
 }
 
 void RegisterAllocator::addSpillCost(std::shared_ptr<InferenceGraph> graph)
@@ -222,7 +225,7 @@ std::vector<std::shared_ptr<BasicBlockMIR>> RegisterAllocator::replaceVirtualReg
     return {};
 }
 
-InferenceGraph RegisterAllocator::constructBaseGraph()
+std::shared_ptr<InferenceGraph> RegisterAllocator::constructBaseGraph()
 {
 	auto& rax = getReg(RegID::RAX);
 	auto& rbx = getReg(RegID::RBX);
@@ -304,11 +307,13 @@ InferenceGraph RegisterAllocator::constructBaseGraph()
 	nodes.push_back(r13Node);
 	nodes.push_back(r14Node);
 	
-	InferenceGraph ig(std::move(nodes));
+    std::shared_ptr<InferenceGraph> ig =
+        std::make_shared<InferenceGraph>(std::move(nodes));
 	return ig;
 }
 
-void RegisterAllocator::addEdgesBasedOnLiveness(InferenceGraph& graph)
+void RegisterAllocator::addEdgesBasedOnLiveness(
+    std::shared_ptr<InferenceGraph> graph)
 {
     for (const auto& block : m_MIRBlocks)
     {
@@ -409,10 +414,20 @@ void RegisterAllocator::addEdgesBasedOnLiveness(InferenceGraph& graph)
                 {
                     if (a != b)
                     {
-                        graph.addEdge(std::make_shared<Register>(a),
+                        // Check if this is a move-like instruction (Mov, Movzx)
+                        // and if 'b' is the source operand.
+                        bool isMove = (mirType == MIRType::Mov || mirType == MIRType::Movzx);
+                        bool isSource = instUses.count(b);
+
+                        // If it's a Move and b is the source, they don't interfere.
+                        if (isMove && isSource)
+                        {
+                            continue;
+                        }
+
+                        graph->addEdge(std::make_shared<Register>(a),
                                       std::make_shared<Register>(b));
-                    }
-                }
+                    }                }
             }
 
             // Update liveNow (Step: In = Use U (Out - Def))
@@ -429,7 +444,8 @@ void RegisterAllocator::addEdgesBasedOnLiveness(InferenceGraph& graph)
 }
 
 
-void RegisterAllocator::addAllRegistersAsNodes(InferenceGraph& graph)
+void RegisterAllocator::addAllRegistersAsNodes(
+    std::shared_ptr<InferenceGraph> graph)
 {
 	// Iterate through m_MIRBlocks and add all virtual registers as nodes in the graph
 	for(const auto& block : m_MIRBlocks)
@@ -450,12 +466,11 @@ void RegisterAllocator::addAllRegistersAsNodes(InferenceGraph& graph)
 					std::vector<std::shared_ptr<Register>>{},
 					0.0, -1, false));
 
-				if(graph.isNodePresent(igNode))
+				if(graph->isNodePresent(igNode))
 				{
-					//std::cout << "Skipping: " << operand->getString() << std::endl;
 					continue;
 				}
-				graph.addNode(igNode);
+				graph->addNode(igNode);
 			}
 		}
 	}
