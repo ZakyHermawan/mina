@@ -220,8 +220,8 @@ void BasicBlockMIR::generateDefUse()
                 // Uses (Arguments)
                 markUse(to_int(RegID::RCX));
                 markUse(to_int(RegID::RDX));
-                markUse(to_int(RegID::R8));
-                markUse(to_int(RegID::R9));
+                //markUse(to_int(RegID::R8));
+                //markUse(to_int(RegID::R9));
 
                 // Defs (Clobbers)
                 markDef(to_int(RegID::RAX));

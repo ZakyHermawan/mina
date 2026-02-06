@@ -235,7 +235,7 @@ std::shared_ptr<InferenceGraph> RegisterAllocator::buildGraph()
     printLivenessData(inferenceGraph);
 	addEdgesBasedOnLiveness(inferenceGraph);
     //std::cout << "Adjacency List:\n";
-	//inferenceGraph->printAdjList();
+	inferenceGraph->printAdjList();
     inferenceGraph->printAdjMatrix();
 
 	return inferenceGraph;
@@ -385,10 +385,11 @@ void RegisterAllocator::addEdgesBasedOnLiveness(std::shared_ptr<InferenceGraph> 
 {
     for (const auto& block : m_MIRBlocks)
     {
-        // Ensure liveNow starts with the actual registers live at the exit of the block
+        // Start with registers live at the end of the block
         std::set<int> liveNow = block->getLiveOut();
         auto& insts = block->getInstructions();
 
+        // Iterate backward
         for (auto it = insts.rbegin(); it != insts.rend(); ++it)
         {
             const auto& inst = *it;
@@ -398,108 +399,182 @@ void RegisterAllocator::addEdgesBasedOnLiveness(std::shared_ptr<InferenceGraph> 
             std::set<int> instDefs;
             std::set<int> instUses;
 
+            // Helper to get ID safely
             auto getID = [](const std::shared_ptr<MachineIR>& op)
             {
                 return std::dynamic_pointer_cast<Register>(op)->getID();
             };
 
-            // Identify DEFs and USEs based on instruction type
+            // 1. Identify DEFs and USEs
             switch (mirType)
             {
-            case MIRType::Mov:
-            case MIRType::Lea:
-            case MIRType::Movzx:
-            {
-                if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
+                case MIRType::Mov:
+                case MIRType::Lea:
+                case MIRType::Movzx:
                 {
-                    instDefs.insert(getID(operands[0]));
+                    // Destination (Index 0)
+                    if (!operands.empty())
+                    {
+                        if (operands[0]->getMIRType() == MIRType::Reg)
+                        {
+                            // Writing to register -> DEF
+                            instDefs.insert(getID(operands[0]));
+                        }
+                        else if (operands[0]->getMIRType() == MIRType::Memory)
+                        {
+                            // Writing to memory [reg] -> USE of base register
+                            auto memOp = std::dynamic_pointer_cast<MemoryMIR>(operands[0]);
+                            if (memOp && memOp->getBaseRegister())
+                            {
+                                instUses.insert(memOp->getBaseRegister()->getID());
+                            }
+                        }
+                    }
+
+                    // Source (Index 1)
+                    if (operands.size() > 1)
+                    {
+                        if (operands[1]->getMIRType() == MIRType::Reg)
+                        {
+                            instUses.insert(getID(operands[1]));
+                        }
+                        else if (operands[1]->getMIRType() == MIRType::Memory)
+                        {
+                            auto memOp = std::dynamic_pointer_cast<MemoryMIR>(operands[1]);
+                            if (memOp && memOp->getBaseRegister())
+                            {
+                                instUses.insert(memOp->getBaseRegister()->getID());
+                            }
+                        }
+                    }
+                    break;
                 }
-                if (operands.size() > 1)
+
+                case MIRType::Add:
+                case MIRType::Sub:
+                case MIRType::And:
+                case MIRType::Or:
+                case MIRType::Not:
                 {
-                    if (operands[1]->getMIRType() == MIRType::Reg)
+                    if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
+                    {
+                        int id = getID(operands[0]);
+                        instDefs.insert(id);
+                        instUses.insert(id); // Read-Modify-Write
+                    }
+                    if (operands.size() > 1 && operands[1]->getMIRType() == MIRType::Reg)
                     {
                         instUses.insert(getID(operands[1]));
                     }
-                    else if (operands[1]->getMIRType() == MIRType::Memory)
+                    break;
+                }
+
+                case MIRType::Mul:
+                {
+                    // Implicit RDX:RAX = RAX * op
+                    instUses.insert(to_int(RegID::RAX));
+                    instDefs.insert(to_int(RegID::RAX));
+                    instDefs.insert(to_int(RegID::RDX));
+                    if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
                     {
-                        auto memOp = std::dynamic_pointer_cast<MemoryMIR>(operands[1]);
-                        if (memOp && memOp->getBaseRegister())
+                        instUses.insert(getID(operands[0]));
+                    }
+                    break;
+                }
+
+                case MIRType::Div:
+                {
+                    // Implicit RDX:RAX / op
+                    instUses.insert(to_int(RegID::RAX));
+                    instUses.insert(to_int(RegID::RDX));
+                    instDefs.insert(to_int(RegID::RAX));
+                    instDefs.insert(to_int(RegID::RDX));
+                    if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
+                    {
+                        instUses.insert(getID(operands[0]));
+                    }
+                    break;
+                }
+
+                case MIRType::Call:
+                {
+                    // Defs: Caller-saved registers (Clobbers)
+                    instDefs.insert(to_int(RegID::RAX));
+                    instDefs.insert(to_int(RegID::RCX));
+                    instDefs.insert(to_int(RegID::RDX));
+                    instDefs.insert(to_int(RegID::R8));
+                    instDefs.insert(to_int(RegID::R9));
+                    //instDefs.insert(to_int(RegID::R10));
+                    //instDefs.insert(to_int(RegID::R11));
+
+                    // Uses: Arguments
+                    instUses.insert(to_int(RegID::RCX));
+                    instUses.insert(to_int(RegID::RDX));
+                    instUses.insert(to_int(RegID::R8));
+                    instUses.insert(to_int(RegID::R9));
+                    break;
+                }
+
+                case MIRType::Ret:
+                {
+                    instUses.insert(to_int(RegID::RAX));
+                    break;
+                }
+
+                default:
+                {
+                    break;
+                }
+            }
+
+            // 2. Add Interference Edges
+            for (int def : instDefs)
+            {
+                for (int live : liveNow)
+                {
+                    if (def == live)
+                    {
+                        continue;
+                    }
+
+                    // Move Optimization: Don't add edge if live reg is the source of the move
+                    bool isMove = (mirType == MIRType::Mov || mirType == MIRType::Movzx);
+                    bool isSource = false;
+
+                    if (isMove && operands.size() > 1 && operands[1]->getMIRType() == MIRType::Reg)
+                    {
+                        auto srcReg = std::dynamic_pointer_cast<Register>(operands[1]);
+                        if (srcReg && srcReg->getID() == live)
                         {
-                            instUses.insert(memOp->getBaseRegister()->getID());
+                            isSource = true;
                         }
                     }
-                }
-                break;
-            }
-            case MIRType::Add:
-            case MIRType::Sub:
-            {
-                if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
-                {
-                    int id = getID(operands[0]);
-                    instDefs.insert(id);
-                    instUses.insert(id);
-                }
-                if (operands.size() > 1 && operands[1]->getMIRType() == MIRType::Reg)
-                {
-                    instUses.insert(getID(operands[1]));
-                }
-                break;
-            }
-            case MIRType::Call:
-            {
-                // Calls clobber RAX, RCX, RDX. These must interfere with everything currently live.
-                instDefs.insert(to_int(RegID::RAX));
-                instDefs.insert(to_int(RegID::RCX));
-                instDefs.insert(to_int(RegID::RDX));
-                
-                // Arguments are used
-                instUses.insert(to_int(RegID::RCX));
-                instUses.insert(to_int(RegID::RDX));
-                break;
-            }
-            case MIRType::Ret:
-            {
-                instUses.insert(to_int(RegID::RAX));
-                break;
-            }
-            default:
-                break;
-            }
 
-            // For each defined register, add edges to everything currently live
-            for (int a : instDefs)
-            {
-                for (int b : liveNow)
-                {
-                    if (a != b)
+                    if (isMove && isSource)
                     {
-                        // Optimization: Skip interference for move-related instructions
-                        bool isMove = (mirType == MIRType::Mov || mirType == MIRType::Movzx);
-                        bool isSource = instUses.count(b);
-
-                        if (isMove && isSource)
-                        {
-                            continue;
-                        }
-                        graph->addEdge(std::make_shared<Register>(a), std::make_shared<Register>(b));
+                        continue;
                     }
+
+                    graph->addEdge(std::make_shared<Register>(def), std::make_shared<Register>(live));
                 }
             }
 
-            // Update liveNow: In = Use U (Out - Def)
+            // 3. Update Liveness (LiveNow = (LiveNow - Defs) + Uses)
             for (int def : instDefs)
             {
                 liveNow.erase(def);
             }
             for (int use : instUses)
             {
-                liveNow.insert(use);
+                // Filter reserved regs from being tracked in liveness (RBP, RSP, RIP)
+                if (!(use >= 11 && use <= 13))
+                {
+                    liveNow.insert(use);
+                }
             }
         }
     }
 }
-
 
 void RegisterAllocator::addAllRegistersAsNodes(std::shared_ptr<InferenceGraph> graph)
 {
@@ -644,12 +719,17 @@ void RegisterAllocator::printLivenessData(
     {
         std::cout << "Liveness data for block: " << block->getName() << "\n";
 
-        auto printSet = [&](const std::string& label, const std::set<int>& regSet) {
+        auto printSet = [&](const std::string& label, const std::set<int>& regSet)
+        {
             std::cout << "  " << label << ": ";
-            if (regSet.empty()) {
+            if (regSet.empty())
+            {
                 std::cout << "(empty)";
-            } else {
-                for (int id : regSet) {
+            }
+            else
+            {
+                for (int id : regSet)
+                {
                     std::cout << getSafeRegName(id) << " ";
                 }
             }
