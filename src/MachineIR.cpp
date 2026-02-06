@@ -120,14 +120,11 @@ void BasicBlockMIR::generateDefUse()
         auto& operands = inst->getOperands();
         auto mirType = inst->getMIRType();
 
-        // Helper to get ID from operand
         auto getID = [](const std::shared_ptr<MachineIR>& op)
         {
             return std::dynamic_pointer_cast<Register>(op)->getID();
         };
 
-        // A register is a block-level USE only if it is read
-        // before being defined in this block.
         auto markUse = [this](int id) {
             if (m_def.find(id) == m_def.end()) {
                 m_use.insert(id);
@@ -140,7 +137,6 @@ void BasicBlockMIR::generateDefUse()
 
         switch (mirType)
         {
-        // Standard Binary Destructive (Dest = Dest op Src)
         case MIRType::Add:
         case MIRType::Sub:
         case MIRType::And:
@@ -148,77 +144,35 @@ void BasicBlockMIR::generateDefUse()
             if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
             {
                 int id = getID(operands[0]);
-                markUse(id); // Reads current value (e.g., RAX in add rax, 1)
-                markDef(id); // Writes new value
+                markUse(id); 
+                markDef(id); 
             }
-            // Process the second operand (the source)
             if (operands.size() > 1 && operands[1]->getMIRType() == MIRType::Reg)
             {
                 markUse(getID(operands[1]));
             }
             break;
 
-        case MIRType::Not:
-            if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
-            {
-                int id = getID(operands[0]);
-                markUse(id);
-                markDef(id);
-            }
-            break;
-
-        // Comparison / Testing (Pure Uses)
-        case MIRType::Cmp:
-        case MIRType::Test:
-            for (const auto& op : operands)
-            {
-                if (op->getMIRType() == MIRType::Reg)
-                {
-                    markUse(getID(op));
-                }
-            }
-            break;
-
-        // Moving / Loading (Pure Defs of operands[0])
         case MIRType::Mov:
         case MIRType::Lea:
         case MIRType::Movzx:
-            // Process sources (operands[1...n]) as USES first
+            // In 'lea v_tmp0, [rbp - 32]', [rbp - 32] is a USE of rbp.
             for (size_t i = 1; i < operands.size(); ++i)
             {
                 if (operands[i]->getMIRType() == MIRType::Reg)
                 {
                     markUse(getID(operands[i]));
                 }
+                else if (operands[i]->getMIRType() == MIRType::Memory)
+                {
+                    // Peek inside the memory operand for the base register
+                    auto memOp = std::dynamic_pointer_cast<MemoryMIR>(operands[i]);
+                    if (memOp && memOp->getBaseRegister())
+                    {
+                        markUse(memOp->getBaseRegister()->getID());
+                    }
+                }
             }
-            // Destination (operand[0]) is a DEF
-            if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
-            {
-                markDef(getID(operands[0]));
-            }
-            break;
-
-        // Implicit Register Operations
-        case MIRType::Mul:
-        case MIRType::Div:
-            markUse(to_int(RegID::RAX)); // Reads RAX
-            markDef(to_int(RegID::RAX)); // Writes RAX
-            markDef(to_int(RegID::RDX)); // Writes RDX
-            if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
-            {
-                markUse(getID(operands[0]));
-            }
-            break;
-
-        case MIRType::Cqo:
-            markUse(to_int(RegID::RAX));
-            markDef(to_int(RegID::RDX));
-            break;
-
-        // Set Flags to Register (Pure Def)
-        case MIRType::Sete: case MIRType::Setne:
-        case MIRType::Setl: case MIRType::Setle:
-        case MIRType::Setg: case MIRType::Setge:
             if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
             {
                 markDef(getID(operands[0]));
@@ -226,23 +180,26 @@ void BasicBlockMIR::generateDefUse()
             break;
 
         case MIRType::Call:
-            // Standard calling convention uses
             markUse(to_int(RegID::RCX));
             markUse(to_int(RegID::RDX));
-            // Clobbers (caller-saved)
             markDef(to_int(RegID::RAX));
             markDef(to_int(RegID::RCX));
             markDef(to_int(RegID::RDX));
             break;
 
         case MIRType::Ret:
-            markUse(to_int(RegID::RAX));
+            markUse(to_int(RegID::RAX)); // Seed the backward chain with RAX (ID 0)
             break;
-
         default:
             break;
         }
     }
+    std::cout << "[DEBUG] Block " << m_name << " Summary:\n";
+    std::cout << "  Captured USEs (should include rbp/v11): ";
+    for(int id : m_use) std::cout << (id < 11 ? "phys" : "v") << id << " ";
+    std::cout << "\n  Captured DEFs: ";
+    for(int id : m_def) std::cout << (id < 11 ? "phys" : "v") << id << " ";
+    std::cout << "\n---------------------------\n";
 }
 
 void BasicBlockMIR::printLivenessSets() const

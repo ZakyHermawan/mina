@@ -5,6 +5,7 @@
 #include <map>
 #include <set>
 #include <cmath>
+#include <deque>
 #include <limits>
 #include <vector>
 #include <memory>
@@ -13,6 +14,7 @@
 #include <iostream>
 #include <algorithm>
 #include <functional>
+#include <unordered_set>
 
 namespace mina
 {
@@ -30,18 +32,12 @@ IGNode::IGNode(std::shared_ptr<Register> inst,
 
 bool IGNode::isNeighborWith(const std::shared_ptr<IGNode>& other) const
 {
-    if (!other)
-    {
-        return false;
-    }
-    
+    if (!other) return false;
     int targetID = other->getReg()->getID();
 
     return std::any_of(m_neighbors.begin(), m_neighbors.end(),
-        [targetID](const std::shared_ptr<Register>& neighborReg)
-        {
-            // Compare IDs, not pointer addresses
-            return neighborReg->getID() == targetID;
+        [targetID](const std::shared_ptr<Register>& n) {
+            return n->getID() == targetID;
         });
 }
 
@@ -160,6 +156,7 @@ void InferenceGraph::addEdge(const std::shared_ptr<Register>& r1, const std::sha
     std::shared_ptr<IGNode> node1 = nullptr;
     std::shared_ptr<IGNode> node2 = nullptr;
 
+    // Search existing nodes by ID
     for (auto& node : m_nodes)
     {
         if (node->getReg()->getID() == r1->getID()) node1 = node;
@@ -168,15 +165,16 @@ void InferenceGraph::addEdge(const std::shared_ptr<Register>& r1, const std::sha
 
     if (node1 && node2)
     {
+        // Use ID check inside isNeighborWith to prevent duplicates
         if (!node1->isNeighborWith(node2))
         {
-            // Use the existing register pointers from the nodes
-            // to maintain pointer identity throughout the graph
+            // CRITICAL: Add the original register pointers stored in the nodes
             node1->getNeighbors().push_back(node2->getReg());
             node2->getNeighbors().push_back(node1->getReg());
         }
     }
 }
+
 
 std::vector<std::shared_ptr<IGNode>>& InferenceGraph::getNodes()
 {
@@ -192,6 +190,10 @@ RegisterAllocator::RegisterAllocator(
 
 void RegisterAllocator::allocateRegisters()
 {
+    if (!m_MIRBlocks.empty())
+    {
+        calculateLoopDepths(m_MIRBlocks[0]);
+    }
 	auto inferenceGraph = buildGraph();
 	addSpillCost(inferenceGraph);
     printSpillCosts(inferenceGraph);
@@ -356,16 +358,14 @@ std::shared_ptr<InferenceGraph> RegisterAllocator::constructBaseGraph()
 	return ig;
 }
 
-void RegisterAllocator::addEdgesBasedOnLiveness(
-    std::shared_ptr<InferenceGraph> graph)
+void RegisterAllocator::addEdgesBasedOnLiveness(std::shared_ptr<InferenceGraph> graph)
 {
     for (const auto& block : m_MIRBlocks)
     {
-        // Start with the registers live at the end of the block
+        // Ensure liveNow starts with the actual registers live at the exit of the block
         std::set<int> liveNow = block->getLiveOut();
         auto& insts = block->getInstructions();
 
-        // Algorithm: For each instruction v, add edges between def(v) and out(v)
         for (auto it = insts.rbegin(); it != insts.rend(); ++it)
         {
             const auto& inst = *it;
@@ -380,7 +380,7 @@ void RegisterAllocator::addEdgesBasedOnLiveness(
                 return std::dynamic_pointer_cast<Register>(op)->getID();
             };
 
-            // Identify DEFs and USEs for the current instruction
+            // Identify DEFs and USEs based on instruction type
             switch (mirType)
             {
             case MIRType::Mov:
@@ -391,13 +391,12 @@ void RegisterAllocator::addEdgesBasedOnLiveness(
                 {
                     instDefs.insert(getID(operands[0]));
                 }
-
                 if (operands.size() > 1)
                 {
                     if (operands[1]->getMIRType() == MIRType::Reg)
                     {
                         instUses.insert(getID(operands[1]));
-                    } 
+                    }
                     else if (operands[1]->getMIRType() == MIRType::Memory)
                     {
                         auto memOp = std::dynamic_pointer_cast<MemoryMIR>(operands[1]);
@@ -409,17 +408,14 @@ void RegisterAllocator::addEdgesBasedOnLiveness(
                 }
                 break;
             }
-
             case MIRType::Add:
             case MIRType::Sub:
-            case MIRType::And:
-            case MIRType::Or:
             {
                 if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
                 {
                     int id = getID(operands[0]);
                     instDefs.insert(id);
-                    instUses.insert(id); // Destructive x86 ops read then write
+                    instUses.insert(id);
                 }
                 if (operands.size() > 1 && operands[1]->getMIRType() == MIRType::Reg)
                 {
@@ -427,54 +423,48 @@ void RegisterAllocator::addEdgesBasedOnLiveness(
                 }
                 break;
             }
-
             case MIRType::Call:
             {
-                // Physical register constraints for calls
-                instUses.insert(to_int(RegID::RCX));
-                instUses.insert(to_int(RegID::RDX));
-
+                // Calls clobber RAX, RCX, RDX. These must interfere with everything currently live.
                 instDefs.insert(to_int(RegID::RAX));
                 instDefs.insert(to_int(RegID::RCX));
                 instDefs.insert(to_int(RegID::RDX));
+                
+                // Arguments are used
+                instUses.insert(to_int(RegID::RCX));
+                instUses.insert(to_int(RegID::RDX));
                 break;
             }
-
             case MIRType::Ret:
             {
                 instUses.insert(to_int(RegID::RAX));
                 break;
             }
-
             default:
                 break;
             }
 
-            // Implementation of Step 2 from the image:
-            // For each a in def(v), for each b in out(v), add edge {a, b}
+            // For each defined register, add edges to everything currently live
             for (int a : instDefs)
             {
                 for (int b : liveNow)
                 {
                     if (a != b)
                     {
-                        // Check if this is a move-like instruction (Mov, Movzx)
-                        // and if 'b' is the source operand.
+                        // Optimization: Skip interference for move-related instructions
                         bool isMove = (mirType == MIRType::Mov || mirType == MIRType::Movzx);
                         bool isSource = instUses.count(b);
 
-                        // If it's a Move and b is the source, they don't interfere.
                         if (isMove && isSource)
                         {
                             continue;
                         }
-
-                        graph->addEdge(std::make_shared<Register>(a),
-                                      std::make_shared<Register>(b));
-                    }                }
+                        graph->addEdge(std::make_shared<Register>(a), std::make_shared<Register>(b));
+                    }
+                }
             }
 
-            // Update liveNow (Step: In = Use U (Out - Def))
+            // Update liveNow: In = Use U (Out - Def)
             for (int def : instDefs)
             {
                 liveNow.erase(def);
@@ -488,99 +478,128 @@ void RegisterAllocator::addEdgesBasedOnLiveness(
 }
 
 
-void RegisterAllocator::addAllRegistersAsNodes(
-    std::shared_ptr<InferenceGraph> graph)
+void RegisterAllocator::addAllRegistersAsNodes(std::shared_ptr<InferenceGraph> graph)
 {
-	// Iterate through m_MIRBlocks and add all virtual registers as nodes in the graph
-	for(const auto& block : m_MIRBlocks)
-	{
-		for(const auto& inst : block->getInstructions())
-		{
-			auto& operands = inst->getOperands();
-			for(const auto& operand : operands)
-			{
-				auto operandType = operand->getMIRType();
-				if(operandType != MIRType::Reg)
-				{
-					continue; // Only interested in registers
-				}
+    for (const auto& block : m_MIRBlocks)
+    {
+        for (const auto& inst : block->getInstructions())
+        {
+            for (const auto& operand : inst->getOperands())
+            {
+                if (operand->getMIRType() == MIRType::Reg)
+                {
+                    auto regOperand = std::dynamic_pointer_cast<Register>(operand);
+                    auto igNode = std::make_shared<IGNode>(regOperand,
+                        std::vector<std::shared_ptr<Register>>{},
+                        0.0, -1, false);
 
-				auto regOperand = std::dynamic_pointer_cast<Register>(operand);
-				std::shared_ptr<IGNode> igNode(std::make_shared<IGNode>(regOperand,
-					std::vector<std::shared_ptr<Register>>{},
-					0.0, -1, false));
+                    if (!graph->isNodePresent(igNode))
+                    {
+                        graph->addNode(igNode);
+                    }
+                }
+                // Catch Base Registers hidden in Memory operands
+                else if (operand->getMIRType() == MIRType::Memory)
+                {
+                    auto memOp = std::dynamic_pointer_cast<MemoryMIR>(operand);
+                    if (memOp && memOp->getBaseRegister())
+                    {
+                        auto& baseReg = memOp->getBaseRegister();
+                        // Create a node for the base register (e.g., rbp, rip)
+                        auto igNode = std::make_shared<IGNode>(baseReg,
+                            std::vector<std::shared_ptr<Register>>{},
+                            0.0, -1, false);
 
-				if(graph->isNodePresent(igNode))
-				{
-					continue;
-				}
-				graph->addNode(igNode);
-			}
-		}
-	}
+                        if (!graph->isNodePresent(igNode))
+                        {
+                            graph->addNode(igNode);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 void RegisterAllocator::livenessAnalysis()
 {
-	// Create def-use sets for each block
-	for(auto& block: m_MIRBlocks)
-	{
-		block->generateDefUse();
-	}
+    // Initial Setup: Def-Use and clear existing sets
+    for (auto& block : m_MIRBlocks)
+    {
+        block->generateDefUse();
+        block->getLiveIn().clear();
+        block->getLiveOut().clear();
+    }
 
-	// Create live-in and live-out sets
-	for(auto& block: m_MIRBlocks)
-	{
-		block->getLiveIn().clear();
-		block->getLiveOut().clear();
-	}
+    // Initialize Worklist
+    // Using deque for FIFO processing; unordered_set to track membership
+    std::deque<std::shared_ptr<BasicBlockMIR>> worklist;
+    std::unordered_set<std::string> inWorklist;
 
-	// Fixed-point iteration
-	bool changed;
-	do
-	{
-		changed = false;
-		// Iterate backwards through blocks for faster convergence in forward-flow problems
-		for (size_t i = m_MIRBlocks.size(); i > 0; --i)
-		{
-			auto& block = m_MIRBlocks[i - 1];
+    // Initialize with all blocks. Iterating backwards helps liveness converge faster.
+    for (auto it = m_MIRBlocks.rbegin(); it != m_MIRBlocks.rend(); ++it)
+    {
+        worklist.push_back(*it);
+        inWorklist.insert((*it)->getName());
+    }
 
-			std::set<int> oldLiveIn = block->getLiveIn();
-			std::set<int> oldLiveOut = block->getLiveOut();
+    // Process Worklist
+    while (!worklist.empty())
+    {
+        auto& block = worklist.front();
+        worklist.pop_front();
+        inWorklist.erase(block->getName());
 
-			block->getLiveOut().clear();			
-			for (const auto& succ : block->getSuccessors())
-			{
-				for (int reg : succ->getLiveIn())
-				{
-					block->insertLiveOut(reg);
-				}
-			}
+        std::set<int> oldLiveIn = block->getLiveIn();
 
-			block->getLiveIn() = block->getUse(); 
-			for (const auto& reg : block->getLiveOut())
-			{
-				if (block->getDef().find(reg) == block->getDef().end())
-				{
-					block->insertLiveIn(reg);
-				}
-			}
+        // Update LiveOut: Union of successors' LiveIn
+        block->getLiveOut().clear();
+        for (const auto& succ : block->getSuccessors())
+        {
+            for (int reg : succ->getLiveIn())
+            {
+                block->insertLiveOut(reg);
+            }
+        }
 
-			if (block->getLiveIn() != oldLiveIn || block->getLiveOut() != oldLiveOut)
-			{
-				changed = true;
-			}
-		}
+        if (!block->getLiveOut().empty())
+        {
+            std::cout << "[DEBUG] Block " << block->getName()
+                      << " LiveOut updated to size " << block->getLiveOut().size()
+                      << "\n";
+        }
 
-	}
-    while (changed);
+        // Update LiveIn: Use union (LiveOut - Def)
+        block->getLiveIn() = block->getUse();
+        for (int reg : block->getLiveOut())
+        {
+            if (block->getDef().find(reg) == block->getDef().end())
+            {
+                block->insertLiveIn(reg);
+            }
+        }
 
-	for(auto& block: m_MIRBlocks)
-	{
-		block->printLivenessSets();
-	}
+        // If LiveIn changed, predecessors must be re-evaluated
+        if (block->getLiveIn() != oldLiveIn)
+        {
+            for (const auto& pred : block->getPredecessors())
+            {
+                if (inWorklist.find(pred->getName()) == inWorklist.end())
+                {
+                    worklist.push_back(pred);
+                    inWorklist.insert(pred->getName());
+                }
+            }
+        }
+    }
+
+    for (auto& block : m_MIRBlocks)
+    {
+        block->printLivenessSets();
+    }
 }
 
+// We can implement this using dominator tree for better accuracy
 void RegisterAllocator::calculateLoopDepths(std::shared_ptr<BasicBlockMIR> entry) {
     std::map<std::string, bool> visited;
     std::map<std::string, bool> onStack;
