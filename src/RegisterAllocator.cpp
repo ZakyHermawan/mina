@@ -246,16 +246,40 @@ void RegisterAllocator::addSpillCost(std::shared_ptr<InferenceGraph> graph)
 {
     std::map<int, double> costs;
 
+    // Helper to identify reserved registers (RBP, RSP, RIP)
+    auto isReserved = [](int id)
+    {
+        return (id >= 11 && id <= 13);
+    };
+
     for (const auto& block : m_MIRBlocks)
     {
         double weight = std::pow(10, block->getLoopDepth());
+
         for (const auto& inst : block->getInstructions())
         {
             for (const auto& op : inst->getOperands())
             {
+                int id = -1;
+
+                // Check Register Operand
                 if (op->getMIRType() == MIRType::Reg)
                 {
-                    int id = std::dynamic_pointer_cast<Register>(op)->getID();
+                    id = std::dynamic_pointer_cast<Register>(op)->getID();
+                }
+                // Check Memory Operand (Base Register)
+                else if (op->getMIRType() == MIRType::Memory)
+                {
+                    auto memOp = std::dynamic_pointer_cast<MemoryMIR>(op);
+                    if (memOp && memOp->getBaseRegister())
+                    {
+                        id = memOp->getBaseRegister()->getID();
+                    }
+                }
+
+                // Accumulate cost only if valid and NOT reserved
+                if (id != -1 && !isReserved(id))
+                {
                     costs[id] += weight;
                 }
             }
@@ -273,6 +297,7 @@ void RegisterAllocator::addSpillCost(std::shared_ptr<InferenceGraph> graph)
         }
         else
         {
+            // If the register wasn't used (e.g. dead code), default to 0
             node->setSpillCost(costs[id]);
         }
     }
