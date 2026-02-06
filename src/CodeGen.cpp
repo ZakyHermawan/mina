@@ -972,7 +972,7 @@ void CodeGen::generateAllFunctionsMIR()
 
     // Generate MIR for main function first
     m_ssa.renameSSA();
-    //m_ssa.printCFG();
+    m_ssa.printCFG();
     generateMIR();
 
     for (auto& [funcName, ssa] : m_functionSSAMap)

@@ -62,15 +62,19 @@ InferenceGraph::InferenceGraph(std::vector<std::shared_ptr<IGNode>>&& nodes)
 
 void InferenceGraph::printAdjMatrix() const
 {
-    auto getSafeRegName = [](int id) -> std::string
+    auto getSafeRegName = [&](int id) -> std::string
     {
         if (id >= 0 && id < (int)RegID::COUNT)
         {
-            return mina::getReg(static_cast<mina::RegID>(id))->get64BitName();
+             return mina::getReg(static_cast<mina::RegID>(id))->get64BitName();
         }
-        return "v" + std::to_string(id);
-    };
 
+        for(auto& node : m_nodes)
+        {
+            if(node->getReg()->getID() == id) return node->getReg()->getString();
+        }
+        return "v_tmp" + std::to_string(id);
+    };
     // Print Header Row
     std::cout << "\t";
     for (const auto& colNode : m_nodes)
@@ -105,13 +109,18 @@ void InferenceGraph::printAdjMatrix() const
 
 void InferenceGraph::printAdjList() const
 {
-    auto getSafeRegName = [](int id) -> std::string
+    auto getSafeRegName = [&](int id) -> std::string
     {
         if (id >= 0 && id < (int)RegID::COUNT)
         {
-            return mina::getReg(static_cast<mina::RegID>(id))->get64BitName();
+             return mina::getReg(static_cast<mina::RegID>(id))->get64BitName();
         }
-        return "v" + std::to_string(id);
+
+        for(auto& node : m_nodes)
+        {
+            if(node->getReg()->getID() == id) return node->getReg()->getString();
+        }
+        return "v_tmp" + std::to_string(id);
     };
 
     for (const auto& node : m_nodes)
@@ -627,15 +636,19 @@ void RegisterAllocator::calculateLoopDepths(std::shared_ptr<BasicBlockMIR> entry
 
 void RegisterAllocator::printSpillCosts(std::shared_ptr<InferenceGraph> graph)
 {
-    auto getSafeRegName = [](int id) -> std::string
+    auto getSafeRegName = [&](int id) -> std::string
     {
         if (id >= 0 && id < (int)RegID::COUNT)
         {
-            return mina::getReg(static_cast<mina::RegID>(id))->get64BitName();
+             return mina::getReg(static_cast<mina::RegID>(id))->get64BitName();
         }
-        return "v" + std::to_string(id);
-    };
 
+        for(auto& node : graph->getNodes())
+        {
+            if(node->getReg()->getID() == id) return node->getReg()->getString();
+        }
+        return "v_tmp" + std::to_string(id);
+    };
     std::cout << "--- Register Spill Costs ---\n";
     std::cout << "Register\tCost\t\tDegree\tRatio (Cost/Deg)\n";
     std::cout << "------------------------------------------------\n";
