@@ -405,7 +405,7 @@ std::string MemoryMIR::getString() const
     }
     if (m_literal)
     {
-        return "[" + m_reg->getString() + " + " + m_literal->getString() + "]";
+        return "QWORD PTR [" + m_reg->getString() + " + " + m_literal->getString() + "]";
     }
     return "No Representation for MemoryMIR";
 }
@@ -627,7 +627,7 @@ MIRType DivMIR::getMIRType() const
 std::string DivMIR::getString() const
 {
     // Access operands safely assuming the constructor check passed
-    return "idiv QWORD PTR [" + m_divisor->getString() + "]";
+    return "idiv " + m_divisor->getString();
 }
 
 // ==========================================

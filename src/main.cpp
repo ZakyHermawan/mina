@@ -66,6 +66,6 @@ int main(int argc, char* argv[])
 
     //runAllSamples();
 
-    runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes2.txt");
+    runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes10.txt");
     return 0;
 }
