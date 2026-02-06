@@ -75,18 +75,20 @@ void InferenceGraph::printAdjMatrix() const
         }
         return "v" + std::to_string(id);
     };
+
     // Print Header Row
     std::cout << "\t";
     for (const auto& colNode : m_nodes)
     {
-        std::cout << getSafeRegName(colNode->getReg()->getID()) << "\t";
+        std::cout << colNode->getReg()->getString() << "\t";
     }
     std::cout << "\n";
 
     // Print Data Rows
     for (const auto& rowNode : m_nodes)
     {
-        std::cout << getSafeRegName(rowNode->getReg()->getID()) << "\t";
+        //std::cout << getSafeRegName(rowNode->getReg()->getID()) << "\t";
+        std::cout << rowNode->getReg()->getString() << "\t";
         for (const auto& colNode : m_nodes)
         {
             if (rowNode->getReg()->getID() == colNode->getReg()->getID())
@@ -197,6 +199,17 @@ RegisterAllocator::RegisterAllocator(
 	allocateRegisters();
 }
 
+std::vector<std::shared_ptr<BasicBlockMIR>>&
+RegisterAllocator::getMIRBlocks()
+{
+    return m_MIRBlocks;
+}
+
+unsigned int RegisterAllocator::getOffset() const
+{
+    return functionOffset;
+}
+
 void RegisterAllocator::allocateRegisters()
 {
     if (!m_MIRBlocks.empty())
@@ -205,7 +218,7 @@ void RegisterAllocator::allocateRegisters()
     }
 	auto inferenceGraph = buildGraph();
 	addSpillCost(inferenceGraph);
-    printSpillCosts(inferenceGraph);
+    //printSpillCosts(inferenceGraph);
 	//colorGraph(inferenceGraph);
 	//auto registerMap = createRegisterMap(inferenceGraph);
 	//auto transformedInstructions = replaceVirtualRegisters(registerMap);
@@ -218,10 +231,11 @@ std::shared_ptr<InferenceGraph> RegisterAllocator::buildGraph()
     auto inferenceGraph = constructBaseGraph();
 	addAllRegistersAsNodes(inferenceGraph);
 
-	livenessAnalysis();
+	livenessAnalysis(inferenceGraph);
+    printLivenessData(inferenceGraph);
 	addEdgesBasedOnLiveness(inferenceGraph);
-    std::cout << "Adjacency List:\n";
-	inferenceGraph->printAdjList();
+    //std::cout << "Adjacency List:\n";
+	//inferenceGraph->printAdjList();
     inferenceGraph->printAdjMatrix();
 
 	return inferenceGraph;
@@ -539,7 +553,7 @@ void RegisterAllocator::addAllRegistersAsNodes(std::shared_ptr<InferenceGraph> g
     }
 }
 
-void RegisterAllocator::livenessAnalysis()
+void RegisterAllocator::livenessAnalysis(std::shared_ptr<InferenceGraph> graph)
 {
     // Initial Setup: Def-Use and clear existing sets
     for (auto& block : m_MIRBlocks)
@@ -603,10 +617,50 @@ void RegisterAllocator::livenessAnalysis()
             }
         }
     }
+}
 
-    for (auto& block : m_MIRBlocks)
+void RegisterAllocator::printLivenessData(
+    std::shared_ptr<InferenceGraph> graph) const
+{
+
+    auto getSafeRegName = [&](int id) -> std::string
     {
-        block->printLivenessSets();
+        if (id >= 0 && id < (int)RegID::COUNT)
+        {
+             return mina::getReg(static_cast<mina::RegID>(id))->get64BitName();
+        }
+
+        for(auto& node : graph->getNodes())
+        {
+            if(node->getReg()->getID() == id) return node->getReg()->getString();
+        }
+
+        // Fallback, should not go here, unless the register is missing from the
+        // graph
+        return "v" + std::to_string(id);
+    };
+
+    for (const auto& block : m_MIRBlocks)
+    {
+        std::cout << "Liveness data for block: " << block->getName() << "\n";
+
+        auto printSet = [&](const std::string& label, const std::set<int>& regSet) {
+            std::cout << "  " << label << ": ";
+            if (regSet.empty()) {
+                std::cout << "(empty)";
+            } else {
+                for (int id : regSet) {
+                    std::cout << getSafeRegName(id) << " ";
+                }
+            }
+            std::cout << "\n";
+        };
+
+        printSet("Defs    ", block->getDef());
+        printSet("Uses    ", block->getUse());
+        printSet("Live-In ", block->getLiveIn());
+        printSet("Live-Out", block->getLiveOut());
+        std::cout << "--------------------------------------\n";
     }
 }
 

@@ -70,8 +70,12 @@ public:
     RegisterAllocator(RegisterAllocator&&) = default;
     RegisterAllocator& operator=(RegisterAllocator&&) = default;
 
-private:
+    std::vector<std::shared_ptr<BasicBlockMIR>>& getMIRBlocks();
+    unsigned int getOffset() const;
+
+   private:
     std::vector<std::shared_ptr<BasicBlockMIR>> m_MIRBlocks;
+    unsigned int functionOffset = 0;
 
     void allocateRegisters();
     std::shared_ptr<InferenceGraph> buildGraph();
@@ -101,7 +105,8 @@ private:
      * * Note: Analysis converges when In[B] and Out[B] sets reach a fixed point
      * for all blocks in the Control Flow Graph (CFG).
      */
-    void livenessAnalysis();
+    void livenessAnalysis(std::shared_ptr<InferenceGraph> graph);
+    void printLivenessData(std::shared_ptr<InferenceGraph> graph) const;
 
     void calculateLoopDepths(
         std::shared_ptr<BasicBlockMIR> entry);

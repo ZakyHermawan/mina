@@ -49,6 +49,9 @@ enum class MIRType
 // Base Class
 class MachineIR
 {
+protected:
+    std::vector<std::shared_ptr<MachineIR>> m_operands;
+
 public:
     virtual ~MachineIR() = default;
 
@@ -97,6 +100,12 @@ public:
     std::set<int>& getUse();
     std::set<int>& getLiveIn();
     std::set<int>& getLiveOut();
+
+    //std::vector<Register> getDefRegisters() const;
+    //std::vector<Register> getUseRegisters() const;
+    //std::vector<Register> getLiveInRegisters() const;
+    //std::vector<Register> getLiveOutRegisters() const;
+
 
     void generateDefUse();
     void printLivenessSets() const;
@@ -447,7 +456,7 @@ public:
 
 enum class RegID : int
 {
-    RAX, RBX, RCX, RDX, RDI, RSI, R8, R9, R12, R13, R14,
+    RAX, RBX, RCX, RDX, RDI, RSI, R8, R9, R12, R13, R14, RBP, RSP, RIP,
     COUNT 
 };
 

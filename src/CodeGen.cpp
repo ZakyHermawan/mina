@@ -65,7 +65,7 @@ void CodeGen::generateMIR()
     auto r9 = std::make_shared<Register>(7, "r9", "r9d", "r9w", "r9b", "");
     auto r12 = std::make_shared<Register>(8, "r12", "r12d", "r12w", "r12b", "");
     auto r13 = std::make_shared<Register>(9, "r13", "r13d", "r13w", "r13b", "");
-    auto r14 = std::make_shared<Register>(10, "r13", "r13d", "r13w", "r13b", "");
+    auto r14 = std::make_shared<Register>(10, "r14", "r14d", "r14w", "r14b", "");
     auto rbp = std::make_shared<Register>(11, "rbp", "ebp", "bp", "", "");
     auto rsp = std::make_shared<Register>(12, "rsp", "esp", "sp", "", "");
     auto rip = std::make_shared<Register>(13, "rip", "eip", "ip", "", "");
@@ -909,6 +909,7 @@ void CodeGen::generateMIR()
         m_mirBlocks.push_back(std::move(bbMIR));
     }
 
+    // Generate literal first
     for (unsigned int i = 0; i < strLiterals.size(); ++i)
     {
         auto& literalLabel = strLiterals[i];
@@ -929,6 +930,11 @@ void CodeGen::generateMIR()
         offset += static_cast<size_t>(arrPair.second) * 8;
     }
 
+    // Allocate registers
+    RegisterAllocator ra(std::move(m_mirBlocks));
+    m_mirBlocks = ra.getMIRBlocks();
+
+    // Function Prologue
     unsigned int aligned_offset = (offset + 15) & ~15; // 16-byte alignment
     std::cout << "    push rbp\n    mov rbp, rsp\n";
     std::cout << "    sub rsp, " << aligned_offset << std::endl;
@@ -941,6 +947,7 @@ void CodeGen::generateMIR()
         mirBlock->printInstructions();
     }
 
+    // Function epilogue
     std::cout << "    add rsp, " << aligned_offset << std::endl;
     std::cout << "    mov rsp, rbp\n    pop rbp\n    ret\n";
 }
@@ -972,7 +979,7 @@ void CodeGen::generateAllFunctionsMIR()
 
     // Generate MIR for main function first
     m_ssa.renameSSA();
-    m_ssa.printCFG();
+    //m_ssa.printCFG();
     generateMIR();
 
     for (auto& [funcName, ssa] : m_functionSSAMap)
@@ -987,9 +994,6 @@ void CodeGen::generateAllFunctionsMIR()
     // Global epilogue
     std::cout << "\nnewline_str: .string \"\\n\"\n";
     std::cout << "\n";
-
-    // Allocate registers
-    RegisterAllocator ra(std::move(m_mirBlocks));
 }
 
 }  // namespace mina

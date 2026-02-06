@@ -29,8 +29,7 @@ std::string MachineIR::getString() const
 
 std::vector<std::shared_ptr<MachineIR>>& MachineIR::getOperands()
 {
-    static std::vector<std::shared_ptr<MachineIR>> emptyOperands;
-    return emptyOperands;
+    return m_operands;
 }
 
 // ==========================================
@@ -115,6 +114,7 @@ void BasicBlockMIR::generateDefUse()
     m_def.clear();
     m_use.clear();
 
+    // Mark use first
     for (const auto& inst : m_instructions)
     {
         auto& operands = inst->getOperands();
@@ -125,73 +125,124 @@ void BasicBlockMIR::generateDefUse()
             return std::dynamic_pointer_cast<Register>(op)->getID();
         };
 
-        auto markUse = [this](int id) {
-            if (m_def.find(id) == m_def.end()) {
-                m_use.insert(id);
+        auto isReserved = [](int id)
+        {
+            // 11 = RBP, 12 = RSP, 13 = RIP
+            return (id >= 11 && id <= 13);
+        };
+
+        auto markUse = [&](int id)
+        {
+            if (!isReserved(id))
+            {
+                // Only mark as USE if not already defined in this block (Upward Exposed)
+                if (m_def.find(id) == m_def.end())
+                {
+                    m_use.insert(id);
+                }
             }
         };
 
-        auto markDef = [this](int id) {
-            m_def.insert(id);
+        auto markDef = [&](int id)
+        {
+            if (!isReserved(id))
+            {
+                m_def.insert(id);
+            }
         };
 
         switch (mirType)
         {
-        case MIRType::Add:
-        case MIRType::Sub:
-        case MIRType::And:
-        case MIRType::Or:
-            if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
+            case MIRType::Add:
+            case MIRType::Sub:
+            case MIRType::And:
+            case MIRType::Or:
             {
-                int id = getID(operands[0]);
-                markUse(id); 
-                markDef(id); 
-            }
-            if (operands.size() > 1 && operands[1]->getMIRType() == MIRType::Reg)
-            {
-                markUse(getID(operands[1]));
-            }
-            break;
-
-        case MIRType::Mov:
-        case MIRType::Lea:
-        case MIRType::Movzx:
-            // In 'lea v_tmp0, [rbp - 32]', [rbp - 32] is a USE of rbp.
-            for (size_t i = 1; i < operands.size(); ++i)
-            {
-                if (operands[i]->getMIRType() == MIRType::Reg)
+                if (operands.size() > 1)
                 {
-                    markUse(getID(operands[i]));
-                }
-                else if (operands[i]->getMIRType() == MIRType::Memory)
-                {
-                    // Peek inside the memory operand for the base register
-                    auto memOp = std::dynamic_pointer_cast<MemoryMIR>(operands[i]);
-                    if (memOp && memOp->getBaseRegister())
+                    if (operands[1]->getMIRType() == MIRType::Reg)
                     {
-                        markUse(memOp->getBaseRegister()->getID());
+                        markUse(getID(operands[1]));
                     }
                 }
+
+                if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
+                {
+                    int id = getID(operands[0]);
+                    markUse(id); // Read old value
+                    markDef(id); // Write new value
+                }
+                break;
             }
-            if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
+
+            case MIRType::Mov:
+            case MIRType::Lea:
+            case MIRType::Movzx:
             {
-                markDef(getID(operands[0]));
+                for (size_t i = 1; i < operands.size(); ++i)
+                {
+                    if (operands[i]->getMIRType() == MIRType::Reg)
+                    {
+                        markUse(getID(operands[i]));
+                    }
+                    else if (operands[i]->getMIRType() == MIRType::Memory)
+                    {
+                        auto memOp = std::dynamic_pointer_cast<MemoryMIR>(operands[i]);
+                        if (memOp != nullptr && memOp->getBaseRegister() != nullptr)
+                        {
+                            markUse(memOp->getBaseRegister()->getID());
+                        }
+                    }
+                }
+
+                if (!operands.empty())
+                {
+                    if (operands[0]->getMIRType() == MIRType::Reg)
+                    {
+                        // Writing to a register is a DEF
+                        markDef(getID(operands[0]));
+                    }
+                    else if (operands[0]->getMIRType() == MIRType::Memory)
+                    {
+                        // Writing to [reg] is a USE of reg (calculating address)
+                        auto memOp = std::dynamic_pointer_cast<MemoryMIR>(operands[0]);
+                        if (memOp != nullptr && memOp->getBaseRegister() != nullptr)
+                        {
+                            markUse(memOp->getBaseRegister()->getID());
+                        }
+                    }
+                }
+                break;
             }
-            break;
 
-        case MIRType::Call:
-            markUse(to_int(RegID::RCX));
-            markUse(to_int(RegID::RDX));
-            markDef(to_int(RegID::RAX));
-            markDef(to_int(RegID::RCX));
-            markDef(to_int(RegID::RDX));
-            break;
+            case MIRType::Call:
+            {
+                // Uses (Arguments)
+                markUse(to_int(RegID::RCX));
+                markUse(to_int(RegID::RDX));
+                markUse(to_int(RegID::R8));
+                markUse(to_int(RegID::R9));
 
-        case MIRType::Ret:
-            markUse(to_int(RegID::RAX)); // Seed the backward chain with RAX (ID 0)
-            break;
-        default:
-            break;
+                // Defs (Clobbers)
+                markDef(to_int(RegID::RAX));
+                markDef(to_int(RegID::RCX));
+                markDef(to_int(RegID::RDX));
+                markDef(to_int(RegID::R8));
+                markDef(to_int(RegID::R9));
+                // Maybe add R10, R11
+                break;
+            }
+
+            case MIRType::Ret:
+            {
+                markUse(to_int(RegID::RAX));
+                break;
+            }
+
+            default:
+            {
+                break;
+            }
         }
     }
 }
@@ -223,9 +274,15 @@ void BasicBlockMIR::printLivenessSets() const
     std::cout << "---------------------------\n";
 }
 
-void BasicBlockMIR::setLoopDepth(int depth) { m_loopDepth = depth; }
-int BasicBlockMIR::getLoopDepth() const { return m_loopDepth; }
+void BasicBlockMIR::setLoopDepth(int depth)
+{
+    m_loopDepth = depth;
+}
 
+int BasicBlockMIR::getLoopDepth() const
+{
+    return m_loopDepth;
+}
 
 // ==========================================
 // Register
@@ -339,18 +396,23 @@ int ConstMIR::getConst() const
 MemoryMIR::MemoryMIR(std::shared_ptr<Register> reg, int offset)
     : m_reg(std::move(reg)), m_offset(std::make_shared<ConstMIR>(offset))
 {
+    m_operands.push_back(m_reg);
+    m_operands.push_back(m_offset);
 }
 
 MemoryMIR::MemoryMIR(std::shared_ptr<Register> reg,
                      std::shared_ptr<ConstMIR> offset)
     : m_reg(std::move(reg)), m_offset(std::move(offset))
 {
+    m_operands.push_back(m_reg);
+    m_operands.push_back(m_offset);
 }
 
 MemoryMIR::MemoryMIR(std::shared_ptr<Register> reg,
                      std::shared_ptr<LiteralMIR> literal)
     : m_reg(std::move(reg)), m_literal(std::move(literal))
 {
+    m_operands.push_back(m_reg);
 }
 
 MIRType MemoryMIR::getMIRType() const 
@@ -360,11 +422,12 @@ MIRType MemoryMIR::getMIRType() const
 
 std::string MemoryMIR::getString() const
 {
-    
-    if (m_offset)
+    auto reg = std::dynamic_pointer_cast<Register>(m_reg);
+    auto offset = std::dynamic_pointer_cast<ConstMIR>(m_offset);
+    if (offset)
     {
-        std::string strRepr = "QWORD PTR [" + m_reg->getString();
-        int offsetVal = m_offset->getConst();
+        std::string strRepr = "QWORD PTR [" + reg->getString();
+        int offsetVal = offset->getConst();
         if (offsetVal < 0)
         {
             strRepr += " - " + std::to_string(-offsetVal);
@@ -379,7 +442,7 @@ std::string MemoryMIR::getString() const
     }
     if (m_literal)
     {
-        return "QWORD PTR [" + m_reg->getString() + " + " + m_literal->getString() + "]";
+        return "QWORD PTR [" + reg->getString() + " + " + m_literal->getString() + "]";
     }
     return "No Representation for MemoryMIR";
 }
@@ -388,7 +451,6 @@ std::shared_ptr<Register>& MemoryMIR::getBaseRegister()
 {
     return m_reg;
 }
-
 
 // ==========================================
 // MovMIR
@@ -588,15 +650,12 @@ std::string MulMIR::getString() const
 DivMIR::DivMIR(std::shared_ptr<MemoryMIR> divisor)
     : m_divisor{std::move(divisor)}
 {
+    m_operands.push_back(m_divisor);
 }
 
 std::vector<std::shared_ptr<MachineIR>>& DivMIR::getOperands()
 { 
-    // Store the operand in a member variable to return a reference
-    static std::vector<std::shared_ptr<MachineIR>> operands;
-    operands.clear();
-    operands.push_back(m_divisor);
-    return operands;
+    return m_operands;
 }
 
 MIRType DivMIR::getMIRType() const 
@@ -607,7 +666,7 @@ MIRType DivMIR::getMIRType() const
 std::string DivMIR::getString() const
 {
     // Access operands safely assuming the constructor check passed
-    return "idiv " + m_divisor->getString();
+    return "idiv " + m_operands[0]->getString();
 }
 
 // ==========================================
@@ -635,14 +694,12 @@ std::string CqoMIR::getString() const
 NotMIR::NotMIR(std::shared_ptr<Register> operand)
     : m_operand{std::move(operand)}
 {
+    m_operands.push_back(m_operand);
 }
 
 std::vector<std::shared_ptr<MachineIR>>& NotMIR::getOperands()
 {
-    static std::vector<std::shared_ptr<MachineIR>> operands;
-    operands.clear();
-    operands.push_back(m_operand);
-    return operands;
+    return m_operands;
 }
 
 MIRType NotMIR::getMIRType() const 
@@ -652,7 +709,7 @@ MIRType NotMIR::getMIRType() const
 
 std::string NotMIR::getString() const
 {
-    return "xor " + m_operand->getString() + ", 1";
+    return "xor " + m_operands[0]->getString() + ", 1";
 }
 
 // ==========================================
@@ -749,6 +806,7 @@ std::string CmpMIR::getString() const
 SeteMIR::SeteMIR(std::shared_ptr<Register> reg)
     : m_reg{std::move(reg)}
 {
+    m_operands.push_back(m_reg);
 }
 
 MIRType SeteMIR::getMIRType() const
@@ -758,15 +816,13 @@ MIRType SeteMIR::getMIRType() const
 
 std::string SeteMIR::getString() const
 {
-    return "sete " + m_reg->get8BitLowName();
+    auto reg = std::dynamic_pointer_cast<Register>(m_operands[0]);
+    return "sete " + reg->get8BitLowName();
 }
 
 std::vector<std::shared_ptr<MachineIR>>& SeteMIR::getOperands()
 {
-    static std::vector<std::shared_ptr<MachineIR>> operands;
-    operands.clear();
-    operands.push_back(m_reg);
-    return operands;
+    return m_operands;
 }
 
 // ==========================================
@@ -776,6 +832,7 @@ std::vector<std::shared_ptr<MachineIR>>& SeteMIR::getOperands()
 SetneMIR::SetneMIR(std::shared_ptr<Register> reg)
     : m_reg{std::move(reg)}
 {
+    m_operands.push_back(m_reg);
 }
 
 MIRType SetneMIR::getMIRType() const
@@ -785,15 +842,13 @@ MIRType SetneMIR::getMIRType() const
 
 std::string SetneMIR::getString() const
 {
-    return "setne " + m_reg->get8BitLowName();
+    auto reg = std::dynamic_pointer_cast<Register>(m_operands[0]);
+    return "setne " + reg->get8BitLowName();
 }
 
 std::vector<std::shared_ptr<MachineIR>>& SetneMIR::getOperands()
 {
-    static std::vector<std::shared_ptr<MachineIR>> operands;
-    operands.clear();
-    operands.push_back(m_reg);
-    return operands;
+    return m_operands;
 }
 
 // ==========================================
@@ -803,6 +858,7 @@ std::vector<std::shared_ptr<MachineIR>>& SetneMIR::getOperands()
 SetlMIR::SetlMIR(std::shared_ptr<Register> reg)
     : m_reg{std::move(reg)}
 {
+    m_operands.push_back(m_reg);
 }
 
 MIRType SetlMIR::getMIRType() const
@@ -812,15 +868,13 @@ MIRType SetlMIR::getMIRType() const
 
 std::string SetlMIR::getString() const
 {
-    return "setl " + m_reg->get8BitLowName();
+    auto reg = std::dynamic_pointer_cast<Register>(m_operands[0]);
+    return "setl " + reg->get8BitLowName();
 }
 
 std::vector<std::shared_ptr<MachineIR>>& SetlMIR::getOperands()
 {
-    static std::vector<std::shared_ptr<MachineIR>> operands;
-    operands.clear();
-    operands.push_back(m_reg);
-    return operands;
+    return m_operands;
 }
 
 // ==========================================
@@ -830,6 +884,7 @@ std::vector<std::shared_ptr<MachineIR>>& SetlMIR::getOperands()
 SetleMIR::SetleMIR(std::shared_ptr<Register> reg)
     : m_reg{std::move(reg)}
 {
+    m_operands.push_back(m_reg);
 }
 
 MIRType SetleMIR::getMIRType() const
@@ -839,15 +894,13 @@ MIRType SetleMIR::getMIRType() const
 
 std::string SetleMIR::getString() const
 {
-    return "setle " + m_reg->get8BitLowName();
+    auto reg = std::dynamic_pointer_cast<Register>(m_operands[0]);
+    return "setle " + reg->get8BitLowName();
 }
 
 std::vector<std::shared_ptr<MachineIR>>& SetleMIR::getOperands()
 {
-    static std::vector<std::shared_ptr<MachineIR>> operands;
-    operands.clear();
-    operands.push_back(m_reg);
-    return operands;
+    return m_operands;
 }
 
 // ==========================================
@@ -857,6 +910,7 @@ std::vector<std::shared_ptr<MachineIR>>& SetleMIR::getOperands()
 SetgMIR::SetgMIR(std::shared_ptr<Register> reg)
     : m_reg{std::move(reg)}
 {
+    m_operands.push_back(m_reg);
 }
 
 MIRType SetgMIR::getMIRType() const
@@ -866,15 +920,13 @@ MIRType SetgMIR::getMIRType() const
 
 std::string SetgMIR::getString() const
 {
-    return "setg " + m_reg->get8BitLowName();
+    auto reg = std::dynamic_pointer_cast<Register>(m_operands[0]);
+    return "setg " + reg->get8BitLowName();
 }
 
 std::vector<std::shared_ptr<MachineIR>>& SetgMIR::getOperands()
 {
-    static std::vector<std::shared_ptr<MachineIR>> operands;
-    operands.clear();
-    operands.push_back(m_reg);
-    return operands;
+    return m_operands;
 }
 
 // ==========================================
@@ -884,6 +936,7 @@ std::vector<std::shared_ptr<MachineIR>>& SetgMIR::getOperands()
 SetgeMIR::SetgeMIR(std::shared_ptr<Register> reg)
     : m_reg{std::move(reg)}
 {
+    m_operands.push_back(m_reg);
 }
 
 MIRType SetgeMIR::getMIRType() const
@@ -893,15 +946,13 @@ MIRType SetgeMIR::getMIRType() const
 
 std::string SetgeMIR::getString() const
 {
-    return "setge " + m_reg->get8BitLowName();
+    auto reg = std::dynamic_pointer_cast<Register>(m_operands[0]);
+    return "setge " + reg->get8BitLowName();
 }
 
 std::vector<std::shared_ptr<MachineIR>>& SetgeMIR::getOperands()
 {
-    static std::vector<std::shared_ptr<MachineIR>> operands;
-    operands.clear();
-    operands.push_back(m_reg);
-    return operands;
+    return m_operands;
 }
 
 // ==========================================
@@ -915,6 +966,7 @@ MovzxMIR::MovzxMIR(std::shared_ptr<Register> reg, unsigned int toRegSize,
       m_fromRegSize(fromRegSize),
       m_isFromRegLow(isFromRegLow)
 {
+    m_operands.push_back(m_reg);
 }
 
 MIRType MovzxMIR::getMIRType() const
@@ -925,19 +977,19 @@ MIRType MovzxMIR::getMIRType() const
 std::string MovzxMIR::getString() const
 {
     std::string strRepr = "movzx ";
-    
+    auto reg = std::dynamic_pointer_cast<Register>(m_reg);
     // Determine destination register name based on size
     if (m_toRegSize == 64)
     {
-        strRepr += m_reg->getString(); // Full register name for 64-bit
+        strRepr += reg->getString(); // Full register name for 64-bit
     }
     else if (m_toRegSize == 32)
     {
-        strRepr += m_reg->get32BitName();
+        strRepr += reg->get32BitName();
     }
     else if (m_toRegSize == 16)
     {
-        strRepr += m_reg->get16BitName();
+        strRepr += reg->get16BitName();
     }
     else
     {
@@ -950,24 +1002,24 @@ std::string MovzxMIR::getString() const
     {
         if (m_isFromRegLow)
         {
-            strRepr += m_reg->get8BitLowName();
+            strRepr += reg->get8BitLowName();
         }
         else
         {
-            strRepr += m_reg->get8BitHighName();
+            strRepr += reg->get8BitHighName();
         }
     }
     else if (m_fromRegSize == 16)
     {
-        strRepr += m_reg->get16BitName();
+        strRepr += reg->get16BitName();
     }
     else if (m_fromRegSize == 32)
     {
-        strRepr += m_reg->get32BitName();
+        strRepr += reg->get32BitName();
     }
     else if (m_fromRegSize == 64)
     {
-        strRepr += m_reg->getString();
+        strRepr += reg->getString();
     }
     else
     {
@@ -981,10 +1033,7 @@ std::string MovzxMIR::getString() const
 
 std::vector<std::shared_ptr<MachineIR>>& MovzxMIR::getOperands()
 {
-    static std::vector<std::shared_ptr<MachineIR>> operands;
-    operands.clear();
-    operands.push_back(m_reg);
-    return operands;
+    return m_operands;
 }
 
 // ==========================================
@@ -994,6 +1043,8 @@ std::vector<std::shared_ptr<MachineIR>>& MovzxMIR::getOperands()
 TestMIR::TestMIR(std::shared_ptr<Register> reg1, std::shared_ptr<Register> reg2)
     : m_reg1{std::move(reg1)}, m_reg2{std::move(reg2)}
 {
+    m_operands.push_back(m_reg1);
+    m_operands.push_back(m_reg2);
 }
 
 MIRType TestMIR::getMIRType() const
@@ -1003,16 +1054,12 @@ MIRType TestMIR::getMIRType() const
 
 std::string TestMIR::getString() const
 {
-    return "test " + m_reg1->getString() + ", " + m_reg2->getString();
+    return "test " + m_operands[0]->getString() + ", " +  m_operands[1]->getString();
 }
 
 std::vector<std::shared_ptr<MachineIR>>& TestMIR::getOperands()
 {
-    static std::vector<std::shared_ptr<MachineIR>> operands;
-    operands.clear();
-    operands.push_back(m_reg1);
-    operands.push_back(m_reg2);
-    return operands;
+    return m_operands;
 }
 
 // ==========================================
@@ -1118,6 +1165,10 @@ static std::array<std::shared_ptr<Register>, to_int(RegID::COUNT)> registersFact
     add(RegID::R12, "r12", "r12d", "r12w", "r12b", "");
     add(RegID::R13, "r13", "r13d", "r13w", "r13b", "");
     add(RegID::R14, "r14", "r14d", "r14w", "r14b", "");
+
+    add(RegID::RBP, "rbp", "ebp", "bp", "bpl", "");
+    add(RegID::RSP, "rsp", "esp", "sp", "spl", "");
+    add(RegID::RIP, "rip");
 
     return registers;
 }
