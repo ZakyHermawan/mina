@@ -27,16 +27,18 @@ IGNode::IGNode(std::shared_ptr<Register> inst,
 
 bool IGNode::isNeighborWith(const std::shared_ptr<IGNode>& other) const
 {
-    if (!other) return false;
+    if (!other)
+    {
+        return false;
+    }
     
-    // Get the actual register we are looking for
-    const auto& targetReg = other->getReg();
+    int targetID = other->getReg()->getID();
 
-    // Check if that register exists in our neighbor list
     return std::any_of(m_neighbors.begin(), m_neighbors.end(),
-        [&targetReg](const std::shared_ptr<Register>& neighborReg)
-		{
-            return neighborReg == targetReg;
+        [targetID](const std::shared_ptr<Register>& neighborReg)
+        {
+            // Compare IDs, not pointer addresses
+            return neighborReg->getID() == targetID;
         });
 }
 
@@ -57,27 +59,39 @@ InferenceGraph::InferenceGraph(std::vector<std::shared_ptr<IGNode>>&& nodes)
 
 void InferenceGraph::printAdjMatrix() const
 {
+    auto getSafeRegName = [](int id) -> std::string
+    {
+        if (id >= 0 && id < (int)RegID::COUNT)
+        {
+            return mina::getReg(static_cast<mina::RegID>(id))->get64BitName();
+        }
+        return "v" + std::to_string(id);
+    };
+
+    // Print Header Row
     std::cout << "\t";
     for (const auto& colNode : m_nodes)
-	{
-        std::cout << colNode->getReg()->get64BitName() << "\t";
+    {
+        std::cout << getSafeRegName(colNode->getReg()->getID()) << "\t";
     }
     std::cout << "\n";
 
+    // Print Data Rows
     for (const auto& rowNode : m_nodes)
-	{
-        std::cout << rowNode->getReg()->get64BitName() << "\t";
-
-		for (const auto& colNode : m_nodes)
-		{
-            if (rowNode == colNode)
-			{
+    {
+        std::cout << getSafeRegName(rowNode->getReg()->getID()) << "\t";
+        for (const auto& colNode : m_nodes)
+        {
+            if (rowNode->getReg()->getID() == colNode->getReg()->getID())
+            {
                 std::cout << "-\t"; 
-            } else if (rowNode->isNeighborWith(colNode))
-			{
+            }
+            else if (rowNode->isNeighborWith(colNode))
+            {
                 std::cout << "1\t";
-            } else
-			{
+            }
+            else
+            {
                 std::cout << "0\t";
             }
         }
@@ -88,16 +102,30 @@ void InferenceGraph::printAdjMatrix() const
 
 void InferenceGraph::printAdjList() const
 {
-	for(const auto& node : m_nodes)
-	{
-		std::cout << node->getReg()->get64BitName() << ": ";
-		for (const auto& neighbor : node->getNeighbors())
-		{
-			std::cout << neighbor->get64BitName() << " ";
-		}
-		std::cout << std::endl;
-	}
-	std::cout << "\n";
+    auto getSafeRegName = [](int id) -> std::string
+    {
+        if (id >= 0 && id < (int)RegID::COUNT)
+        {
+            return mina::getReg(static_cast<mina::RegID>(id))->get64BitName();
+        }
+        return "v" + std::to_string(id);
+    };
+
+    for (const auto& node : m_nodes)
+    {
+        std::cout << getSafeRegName(node->getReg()->getID()) << ": ";
+
+        auto& neighbors = node->getNeighbors();
+        for (const auto& neighborReg : neighbors)
+        {
+            if (neighborReg)
+            {
+                std::cout << getSafeRegName(neighborReg->getID()) << " ";
+            }
+        }
+        std::cout << "\n";
+    }
+    std::cout << "\n";
 }
 
 bool InferenceGraph::isNodePresent(const std::shared_ptr<IGNode>& node) const
@@ -161,12 +189,13 @@ std::shared_ptr<InferenceGraph> RegisterAllocator::buildGraph()
 {
 	// Build the interference graph from m_MIRBlocks
     auto inferenceGraph = constructBaseGraph();
-	inferenceGraph.printAdjList();
-	inferenceGraph.printAdjMatrix();
 	addAllRegistersAsNodes(inferenceGraph);
 
 	livenessAnalysis();
 	addEdgesBasedOnLiveness(inferenceGraph);
+    std::cout << "Adjacency List:\n";
+	inferenceGraph.printAdjList();
+    inferenceGraph.printAdjMatrix();
 
 	return nullptr;
 }
@@ -281,25 +310,124 @@ InferenceGraph RegisterAllocator::constructBaseGraph()
 
 void RegisterAllocator::addEdgesBasedOnLiveness(InferenceGraph& graph)
 {
-	// Iterate through m_MIRBlocks and add edges based on liveness information
-	for(const auto& block : m_MIRBlocks)
-	{
-		auto& defs = block->getDef();
-		auto& liveOut = block->getLiveOut();
-		for(int def: defs)
-		{
-			for (int out : liveOut)
-			{
-				if (out == def) continue;
-				std::cout << "there is edge between  "<< def << " and " << out << std::endl;
+    for (const auto& block : m_MIRBlocks)
+    {
+        // Start with the registers live at the end of the block
+        std::set<int> liveNow = block->getLiveOut();
+        auto& insts = block->getInstructions();
 
-				// Fix this later after generate code with virtual registers
-				// graph.addEdge(std::make_shared<Register>(def),
-				//	std::make_shared<Register>(out));
-			}
-		}
-	}
+        // Algorithm: For each instruction v, add edges between def(v) and out(v)
+        for (auto it = insts.rbegin(); it != insts.rend(); ++it)
+        {
+            const auto& inst = *it;
+            auto mirType = inst->getMIRType();
+            auto& operands = inst->getOperands();
+
+            std::set<int> instDefs;
+            std::set<int> instUses;
+
+            auto getID = [](const std::shared_ptr<MachineIR>& op)
+            {
+                return std::dynamic_pointer_cast<Register>(op)->getID();
+            };
+
+            // Identify DEFs and USEs for the current instruction
+            switch (mirType)
+            {
+            case MIRType::Mov:
+            case MIRType::Lea:
+            case MIRType::Movzx:
+            {
+                if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
+                {
+                    instDefs.insert(getID(operands[0]));
+                }
+
+                if (operands.size() > 1)
+                {
+                    if (operands[1]->getMIRType() == MIRType::Reg)
+                    {
+                        instUses.insert(getID(operands[1]));
+                    } 
+                    else if (operands[1]->getMIRType() == MIRType::Memory)
+                    {
+                        auto memOp = std::dynamic_pointer_cast<MemoryMIR>(operands[1]);
+                        if (memOp && memOp->getBaseRegister())
+                        {
+                            instUses.insert(memOp->getBaseRegister()->getID());
+                        }
+                    }
+                }
+                break;
+            }
+
+            case MIRType::Add:
+            case MIRType::Sub:
+            case MIRType::And:
+            case MIRType::Or:
+            {
+                if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
+                {
+                    int id = getID(operands[0]);
+                    instDefs.insert(id);
+                    instUses.insert(id); // Destructive x86 ops read then write
+                }
+                if (operands.size() > 1 && operands[1]->getMIRType() == MIRType::Reg)
+                {
+                    instUses.insert(getID(operands[1]));
+                }
+                break;
+            }
+
+            case MIRType::Call:
+            {
+                // Physical register constraints for calls
+                instUses.insert(to_int(RegID::RCX));
+                instUses.insert(to_int(RegID::RDX));
+
+                instDefs.insert(to_int(RegID::RAX));
+                instDefs.insert(to_int(RegID::RCX));
+                instDefs.insert(to_int(RegID::RDX));
+                break;
+            }
+
+            case MIRType::Ret:
+            {
+                instUses.insert(to_int(RegID::RAX));
+                break;
+            }
+
+            default:
+                break;
+            }
+
+            // Implementation of Step 2 from the image:
+            // For each a in def(v), for each b in out(v), add edge {a, b}
+            for (int a : instDefs)
+            {
+                for (int b : liveNow)
+                {
+                    if (a != b)
+                    {
+                        graph.addEdge(std::make_shared<Register>(a),
+                                      std::make_shared<Register>(b));
+                    }
+                }
+            }
+
+            // Update liveNow (Step: In = Use U (Out - Def))
+            for (int def : instDefs)
+            {
+                liveNow.erase(def);
+            }
+            for (int use : instUses)
+            {
+                liveNow.insert(use);
+            }
+        }
+    }
 }
+
 
 void RegisterAllocator::addAllRegistersAsNodes(InferenceGraph& graph)
 {
@@ -328,7 +456,6 @@ void RegisterAllocator::addAllRegistersAsNodes(InferenceGraph& graph)
 					continue;
 				}
 				graph.addNode(igNode);
-				std::cout << operand->getString() << std::endl;
 			}
 		}
 	}
@@ -386,7 +513,8 @@ void RegisterAllocator::livenessAnalysis()
 			}
 		}
 
-	} while (changed);
+	}
+    while (changed);
 
 	for(auto& block: m_MIRBlocks)
 	{

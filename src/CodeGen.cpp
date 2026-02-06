@@ -989,7 +989,7 @@ void CodeGen::generateAllFunctionsMIR()
     std::cout << "\n";
 
     // Allocate registers
-    //RegisterAllocator ra(std::move(m_mirBlocks));
+    RegisterAllocator ra(std::move(m_mirBlocks));
 }
 
 }  // namespace mina

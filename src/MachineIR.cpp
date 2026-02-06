@@ -112,9 +112,12 @@ std::set<int>& BasicBlockMIR::getLiveOut() { return m_liveOut; }
 
 void BasicBlockMIR::generateDefUse()
 {
-    for(const auto& inst : m_instructions)
+    m_def.clear();
+    m_use.clear();
+
+    for (const auto& inst : m_instructions)
     {
-		auto& operands = inst->getOperands();
+        auto& operands = inst->getOperands();
         auto mirType = inst->getMIRType();
 
         // Helper to get ID from operand
@@ -123,112 +126,122 @@ void BasicBlockMIR::generateDefUse()
             return std::dynamic_pointer_cast<Register>(op)->getID();
         };
 
+        // A register is a block-level USE only if it is read
+        // before being defined in this block.
+        auto markUse = [this](int id) {
+            if (m_def.find(id) == m_def.end()) {
+                m_use.insert(id);
+            }
+        };
+
+        auto markDef = [this](int id) {
+            m_def.insert(id);
+        };
+
         switch (mirType)
         {
-            // Standard Binary Destructive (Dest = Dest op Src)
-            case MIRType::Add:
-            case MIRType::Sub:
-            case MIRType::And:
-            case MIRType::Or:
-            case MIRType::Not:
-                if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
-                {
-                    int id = getID(operands[0]);
-                    addUse(id); // Use the current value
-                    addDef(id); // Then define the new value
-                }
-                // Fallthrough to process operands[1...n] as additional Uses
-                [[fallthrough]];
-
-            // Comparison / Testing (Pure Uses)
-            case MIRType::Cmp:
-            case MIRType::Test:
+        // Standard Binary Destructive (Dest = Dest op Src)
+        case MIRType::Add:
+        case MIRType::Sub:
+        case MIRType::And:
+        case MIRType::Or:
+            if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
             {
-                size_t start = (mirType == MIRType::Cmp || mirType == MIRType::Test) ? 0 : 1;
-                for (size_t i = start; i < operands.size(); ++i)
-                {
-                    if (operands[i]->getMIRType() == MIRType::Reg)
-                    {
-                        addUse(getID(operands[i]));
-                    }
-                }
-                break;
+                int id = getID(operands[0]);
+                markUse(id); // Reads current value (e.g., RAX in add rax, 1)
+                markDef(id); // Writes new value
             }
-
-            // Moving / Loading (Pure Defs of operands[0])
-            case MIRType::Mov:
-            case MIRType::Lea:
-            case MIRType::Movzx:
-                if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
-                {
-                    addDef(getID(operands[0]));
-                }
-                // Sources (operands[1...n]) are uses
-                for (size_t i = 1; i < operands.size(); ++i)
-                {
-                    if (operands[i]->getMIRType() == MIRType::Reg)
-                    {
-                        addUse(getID(operands[i]));
-                    }
-                }
-                break;
-
-            // Implicit Register Operations
-            case MIRType::Mul:
-            case MIRType::Div:
-                addUse(to_int(RegID::RAX)); // Reads RAX
-                addDef(to_int(RegID::RAX)); // Writes RAX
-                addDef(to_int(RegID::RDX)); // Writes RDX (remainder/high bits)
-                if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
-                {
-                    addUse(getID(operands[0]));
-                }
-                break;
-
-            case MIRType::Cqo:
-                addUse(to_int(RegID::RAX)); // Reads RAX sign bit
-                addDef(to_int(RegID::RDX)); // Defines RDX
-                break;
-
-            // Set Flags to Register
-            case MIRType::Sete: case MIRType::Setne:
-            case MIRType::Setl: case MIRType::Setle:
-            case MIRType::Setg: case MIRType::Setge:
-                if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
-                {
-                    addDef(getID(operands[0]));
-                }
-                break;
-
-            case MIRType::Call:
-                // Mark registers used for arguments (Win64 uses RCX, RDX, R8, R9)
-                addUse(to_int(RegID::RCX));
-                addUse(to_int(RegID::RDX));
-
-                // Mark Caller-Saved registers as CLOBBERED (Defined)
-                // This prevents the compiler from assuming RAX/RCX/RDX survive the call
-                addDef(to_int(RegID::RAX));
-                addDef(to_int(RegID::RCX));
-                addDef(to_int(RegID::RDX));
-                // Add others if your RegID enum includes them (RSI, RDI, R8-R11)
-                break;
-
-            case MIRType::Ret:
-                addUse(to_int(RegID::RAX));
-                break;
-
-            default:
-                break;
+            // Process the second operand (the source)
+            if (operands.size() > 1 && operands[1]->getMIRType() == MIRType::Reg)
+            {
+                markUse(getID(operands[1]));
             }
-		for(const auto& operand : operands)
-		{
-			auto operandType = operand->getMIRType();
-			if(operandType != MIRType::Reg)
-			{
-				continue; // Only interested in registers
-			}
-			auto regOperand = std::dynamic_pointer_cast<Register>(operand);
-		}
+            break;
+
+        case MIRType::Not:
+            if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
+            {
+                int id = getID(operands[0]);
+                markUse(id);
+                markDef(id);
+            }
+            break;
+
+        // Comparison / Testing (Pure Uses)
+        case MIRType::Cmp:
+        case MIRType::Test:
+            for (const auto& op : operands)
+            {
+                if (op->getMIRType() == MIRType::Reg)
+                {
+                    markUse(getID(op));
+                }
+            }
+            break;
+
+        // Moving / Loading (Pure Defs of operands[0])
+        case MIRType::Mov:
+        case MIRType::Lea:
+        case MIRType::Movzx:
+            // Process sources (operands[1...n]) as USES first
+            for (size_t i = 1; i < operands.size(); ++i)
+            {
+                if (operands[i]->getMIRType() == MIRType::Reg)
+                {
+                    markUse(getID(operands[i]));
+                }
+            }
+            // Destination (operand[0]) is a DEF
+            if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
+            {
+                markDef(getID(operands[0]));
+            }
+            break;
+
+        // Implicit Register Operations
+        case MIRType::Mul:
+        case MIRType::Div:
+            markUse(to_int(RegID::RAX)); // Reads RAX
+            markDef(to_int(RegID::RAX)); // Writes RAX
+            markDef(to_int(RegID::RDX)); // Writes RDX
+            if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
+            {
+                markUse(getID(operands[0]));
+            }
+            break;
+
+        case MIRType::Cqo:
+            markUse(to_int(RegID::RAX));
+            markDef(to_int(RegID::RDX));
+            break;
+
+        // Set Flags to Register (Pure Def)
+        case MIRType::Sete: case MIRType::Setne:
+        case MIRType::Setl: case MIRType::Setle:
+        case MIRType::Setg: case MIRType::Setge:
+            if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg)
+            {
+                markDef(getID(operands[0]));
+            }
+            break;
+
+        case MIRType::Call:
+            // Standard calling convention uses
+            markUse(to_int(RegID::RCX));
+            markUse(to_int(RegID::RDX));
+            // Clobbers (caller-saved)
+            markDef(to_int(RegID::RAX));
+            markDef(to_int(RegID::RCX));
+            markDef(to_int(RegID::RDX));
+            break;
+
+        case MIRType::Ret:
+            markUse(to_int(RegID::RAX));
+            break;
+
+        default:
+            break;
+        }
     }
 }
 
@@ -239,8 +252,14 @@ void BasicBlockMIR::printLivenessSets() const
         std::cout << "  " << label << ": { ";
         for (int id : s)
         {
-            // Use your global accessor to get the human-readable name
-            std::cout << getReg(static_cast<RegID>(id))->get64BitName() << " ";
+            if (id >= 0 && id < (int)RegID::COUNT)
+            {
+                std::cout << getReg(static_cast<RegID>(id))->get64BitName() << " ";
+            }
+            else
+            {
+                std::cout << "v" << id << " ";
+            }
         }
         std::cout << "}\n";
     };
@@ -410,6 +429,12 @@ std::string MemoryMIR::getString() const
     return "No Representation for MemoryMIR";
 }
 
+std::shared_ptr<Register>& MemoryMIR::getBaseRegister()
+{
+    return m_reg;
+}
+
+
 // ==========================================
 // MovMIR
 // ==========================================
@@ -450,7 +475,7 @@ LeaMIR::LeaMIR(std::vector<std::shared_ptr<MachineIR>> operands)
 
 MIRType LeaMIR::getMIRType() const 
 {
-    return MIRType::Lea; // Assuming MIRType::LEA exists in your enum
+    return MIRType::Lea;
 }
 
 std::string LeaMIR::getString() const 

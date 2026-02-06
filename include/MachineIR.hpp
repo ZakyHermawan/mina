@@ -164,6 +164,8 @@ public:
 
     MIRType getMIRType() const override;
     std::string getString() const override;
+
+    std::shared_ptr<Register>& getBaseRegister();
 };
 
 class MovMIR : public MachineIR
