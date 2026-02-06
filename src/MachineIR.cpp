@@ -194,12 +194,6 @@ void BasicBlockMIR::generateDefUse()
             break;
         }
     }
-    std::cout << "[DEBUG] Block " << m_name << " Summary:\n";
-    std::cout << "  Captured USEs (should include rbp/v11): ";
-    for(int id : m_use) std::cout << (id < 11 ? "phys" : "v") << id << " ";
-    std::cout << "\n  Captured DEFs: ";
-    for(int id : m_def) std::cout << (id < 11 ? "phys" : "v") << id << " ";
-    std::cout << "\n---------------------------\n";
 }
 
 void BasicBlockMIR::printLivenessSets() const

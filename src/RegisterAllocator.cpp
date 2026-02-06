@@ -562,13 +562,6 @@ void RegisterAllocator::livenessAnalysis()
             }
         }
 
-        if (!block->getLiveOut().empty())
-        {
-            std::cout << "[DEBUG] Block " << block->getName()
-                      << " LiveOut updated to size " << block->getLiveOut().size()
-                      << "\n";
-        }
-
         // Update LiveIn: Use union (LiveOut - Def)
         block->getLiveIn() = block->getUse();
         for (int reg : block->getLiveOut())
