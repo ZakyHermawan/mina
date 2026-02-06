@@ -216,9 +216,13 @@ void RegisterAllocator::allocateRegisters()
     {
         calculateLoopDepths(m_MIRBlocks[0]);
     }
+
 	auto inferenceGraph = buildGraph();
+    inferenceGraph->printAdjList();
+    inferenceGraph->printAdjMatrix();
+
 	addSpillCost(inferenceGraph);
-    //printSpillCosts(inferenceGraph);
+    printSpillCosts(inferenceGraph);
 	//colorGraph(inferenceGraph);
 	//auto registerMap = createRegisterMap(inferenceGraph);
 	//auto transformedInstructions = replaceVirtualRegisters(registerMap);
@@ -234,9 +238,6 @@ std::shared_ptr<InferenceGraph> RegisterAllocator::buildGraph()
 	livenessAnalysis(inferenceGraph);
     printLivenessData(inferenceGraph);
 	addEdgesBasedOnLiveness(inferenceGraph);
-    //std::cout << "Adjacency List:\n";
-	inferenceGraph->printAdjList();
-    inferenceGraph->printAdjMatrix();
 
 	return inferenceGraph;
 }
@@ -405,7 +406,7 @@ void RegisterAllocator::addEdgesBasedOnLiveness(std::shared_ptr<InferenceGraph> 
                 return std::dynamic_pointer_cast<Register>(op)->getID();
             };
 
-            // 1. Identify DEFs and USEs
+            // Identify DEFs and USEs
             switch (mirType)
             {
                 case MIRType::Mov:
@@ -531,7 +532,7 @@ void RegisterAllocator::addEdgesBasedOnLiveness(std::shared_ptr<InferenceGraph> 
                 }
             }
 
-            // 2. Add Interference Edges
+            // Add Interference Edges
             for (int def : instDefs)
             {
                 for (int live : liveNow)
@@ -563,7 +564,7 @@ void RegisterAllocator::addEdgesBasedOnLiveness(std::shared_ptr<InferenceGraph> 
                 }
             }
 
-            // 3. Update Liveness (LiveNow = (LiveNow - Defs) + Uses)
+            // Update Liveness (LiveNow = (LiveNow - Defs) + Uses)
             for (int def : instDefs)
             {
                 liveNow.erase(def);
