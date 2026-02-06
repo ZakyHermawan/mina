@@ -68,7 +68,7 @@ void SSA::printCFG()
           // Traverse successors in reverse order so the first element that is being inserted 
           // into the successors vector is in front of successors that is added later,
           // since we will reverse the linearizedBlocks at the end.
-          for (int i = successors.size() - 1; i >= 0; --i)
+          for (int i = (int)successors.size() - 1; i >= 0; --i)
           {
               auto& succ = successors[i];
               if (visited.find(succ) == visited.end())

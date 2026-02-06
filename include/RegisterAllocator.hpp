@@ -24,6 +24,9 @@ public:
     std::vector<std::shared_ptr<Register>>& getNeighbors();
     bool isNeighborWith(const std::shared_ptr<IGNode>& other) const;
 
+    void setSpillCost(double cost);
+    double getSpillCost() const;
+
 private:
     std::shared_ptr<Register> m_inst;
     std::vector<std::shared_ptr<Register>> m_neighbors;
@@ -49,6 +52,7 @@ public:
     void addNode(const std::shared_ptr<IGNode>& node);
     void addEdge(const std::shared_ptr<Register>& r1,
                  const std::shared_ptr<Register>& r2);
+    std::vector<std::shared_ptr<IGNode>>& getNodes();
 
 private:
     std::vector<std::shared_ptr<IGNode>> m_nodes;
@@ -97,6 +101,10 @@ private:
      * for all blocks in the Control Flow Graph (CFG).
      */
     void livenessAnalysis();
+
+    void calculateLoopDepths(
+        std::shared_ptr<BasicBlockMIR> entry);
+    void printSpillCosts(std::shared_ptr<InferenceGraph> graph);
 };
 
 }  // namespace mina

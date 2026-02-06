@@ -70,6 +70,8 @@ private:
     std::set<int> m_liveIn;
     std::set<int> m_liveOut;
 
+    int m_loopDepth = 0;
+
 public:
     BasicBlockMIR(std::string name);
     std::string getName() const;
@@ -98,6 +100,9 @@ public:
 
     void generateDefUse();
     void printLivenessSets() const;
+
+    void setLoopDepth(int depth);
+    int getLoopDepth() const;
 };
 
 class Register : public MachineIR

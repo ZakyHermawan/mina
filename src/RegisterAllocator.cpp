@@ -4,12 +4,15 @@
 
 #include <map>
 #include <set>
+#include <cmath>
+#include <limits>
 #include <vector>
 #include <memory>
-#include <utility>
 #include <string>
+#include <utility>
 #include <iostream>
 #include <algorithm>
+#include <functional>
 
 namespace mina
 {
@@ -41,6 +44,10 @@ bool IGNode::isNeighborWith(const std::shared_ptr<IGNode>& other) const
             return neighborReg->getID() == targetID;
         });
 }
+
+void IGNode::setSpillCost(double cost) { m_spill_cost = cost; }
+
+double IGNode::getSpillCost() const { return m_spill_cost; }
 
 std::shared_ptr<Register> IGNode::getReg()
 {
@@ -171,6 +178,11 @@ void InferenceGraph::addEdge(const std::shared_ptr<Register>& r1, const std::sha
     }
 }
 
+std::vector<std::shared_ptr<IGNode>>& InferenceGraph::getNodes()
+{
+    return m_nodes;
+}
+
 RegisterAllocator::RegisterAllocator(
     std::vector<std::shared_ptr<BasicBlockMIR>>&& MIRBlocks)
     : m_MIRBlocks(std::move(MIRBlocks))
@@ -181,7 +193,8 @@ RegisterAllocator::RegisterAllocator(
 void RegisterAllocator::allocateRegisters()
 {
 	auto inferenceGraph = buildGraph();
-	//addSpillCost(inferenceGraph);
+	addSpillCost(inferenceGraph);
+    printSpillCosts(inferenceGraph);
 	//colorGraph(inferenceGraph);
 	//auto registerMap = createRegisterMap(inferenceGraph);
 	//auto transformedInstructions = replaceVirtualRegisters(registerMap);
@@ -205,7 +218,38 @@ std::shared_ptr<InferenceGraph> RegisterAllocator::buildGraph()
 
 void RegisterAllocator::addSpillCost(std::shared_ptr<InferenceGraph> graph)
 {
-	// Calculate and add spill costs to each node in the graph
+    std::map<int, double> costs;
+
+    for (const auto& block : m_MIRBlocks)
+    {
+        double weight = std::pow(10, block->getLoopDepth());
+        for (const auto& inst : block->getInstructions())
+        {
+            for (const auto& op : inst->getOperands())
+            {
+                if (op->getMIRType() == MIRType::Reg)
+                {
+                    int id = std::dynamic_pointer_cast<Register>(op)->getID();
+                    costs[id] += weight;
+                }
+            }
+        }
+    }
+
+    for (auto& node : graph->getNodes())
+    {
+        int id = node->getReg()->getID();
+
+        // Ensure physical registers cannot be spilled
+        if (id < (int)RegID::COUNT)
+        {
+            node->setSpillCost(std::numeric_limits<double>::infinity());
+        }
+        else
+        {
+            node->setSpillCost(costs[id]);
+        }
+    }
 }
 
 void RegisterAllocator::colorGraph(std::shared_ptr<InferenceGraph> graph)
@@ -535,6 +579,89 @@ void RegisterAllocator::livenessAnalysis()
 	{
 		block->printLivenessSets();
 	}
+}
+
+void RegisterAllocator::calculateLoopDepths(std::shared_ptr<BasicBlockMIR> entry) {
+    std::map<std::string, bool> visited;
+    std::map<std::string, bool> onStack;
+
+    std::function<void(std::shared_ptr<BasicBlockMIR>, int)> dfs =
+        [&](std::shared_ptr<BasicBlockMIR> block, int currentDepth)
+    {
+
+        visited[block->getName()] = true;
+        onStack[block->getName()] = true;
+        block->setLoopDepth(currentDepth);
+
+        for (auto& succ : block->getSuccessors())
+        {
+            if (onStack[succ->getName()])
+            {
+                // We found a back-edge! This successor is a loop header.
+                // In a real compiler, we'd mark the header and re-scan,
+                // but for a heuristic, we increment the depth of the current path.
+                block->setLoopDepth(currentDepth + 1);
+            }
+            else if (!visited[succ->getName()])
+            {
+                dfs(succ, currentDepth);
+            }
+        }
+        onStack[block->getName()] = false;
+    };
+
+    dfs(entry, 0);
+}
+
+void RegisterAllocator::printSpillCosts(std::shared_ptr<InferenceGraph> graph)
+{
+    auto getSafeRegName = [](int id) -> std::string
+    {
+        if (id >= 0 && id < (int)RegID::COUNT)
+        {
+            return mina::getReg(static_cast<mina::RegID>(id))->get64BitName();
+        }
+        return "v" + std::to_string(id);
+    };
+
+    std::cout << "--- Register Spill Costs ---\n";
+    std::cout << "Register\tCost\t\tDegree\tRatio (Cost/Deg)\n";
+    std::cout << "------------------------------------------------\n";
+
+    for (const auto& node : graph->getNodes())
+    {
+        double cost = node->getSpillCost();
+        int degree = node->getNeighbors().size();
+        std::string regName = getSafeRegName(node->getReg()->getID());
+
+        std::cout << regName << "\t\t";
+
+        if (cost == std::numeric_limits<double>::infinity())
+        {
+            std::cout << "INF";
+        }
+        else
+        {
+            std::cout << cost;
+        }
+
+        std::cout << "\t\t" << degree << "\t";
+
+        if (cost == std::numeric_limits<double>::infinity())
+        {
+            std::cout << "N/A";
+        }
+        else if (degree > 0)
+        {
+            std::cout << (cost / (double)degree);
+        }
+        else
+        {
+            std::cout << "inf";
+        }
+        std::cout << "\n";
+    }
+    std::cout << "------------------------------------------------\n\n";
 }
 
 }  // namespace mina

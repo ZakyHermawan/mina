@@ -272,6 +272,10 @@ void BasicBlockMIR::printLivenessSets() const
     std::cout << "---------------------------\n";
 }
 
+void BasicBlockMIR::setLoopDepth(int depth) { m_loopDepth = depth; }
+int BasicBlockMIR::getLoopDepth() const { return m_loopDepth; }
+
+
 // ==========================================
 // Register
 // ==========================================
