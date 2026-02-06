@@ -135,6 +135,41 @@ void CodeGen::generateMIR()
         return getOrCreateVReg(name);
     };
 
+    auto legalizeMov = [&](std::shared_ptr<BasicBlockMIR> bb,
+                           std::shared_ptr<MachineIR> dst,
+                           std::shared_ptr<MachineIR> src)
+    {
+        auto dstReg = std::dynamic_pointer_cast<Register>(dst);
+        auto srcReg = std::dynamic_pointer_cast<Register>(src);
+
+        // Determine if destination is a physical register (0-10)
+        bool isDstPhysical = false;
+        if (dstReg)
+        {
+            unsigned int id = dstReg->getID();
+            if (id <= 10)
+            {
+                isDstPhysical = true;
+            }
+        }
+
+        if (isDstPhysical)
+        {
+            // Physical registers can take memory or immediate sources directly
+            bb->addInstruction(std::make_shared<MovMIR>(
+                std::vector<std::shared_ptr<MachineIR>>{dst, src}));
+        }
+        else
+        {
+            // Destination is a VReg (> 10) or MemoryMIR.
+            // Use rax (ID 0) as a bridge to prevent illegal Mem-to-Mem moves.
+            bb->addInstruction(std::make_shared<MovMIR>(
+                std::vector<std::shared_ptr<MachineIR>>{rax, src}));
+            bb->addInstruction(std::make_shared<MovMIR>(
+                std::vector<std::shared_ptr<MachineIR>>{dst, rax}));
+        }
+    };
+
     m_mirBlocks.clear();
     linearizeCFG();
 
@@ -371,33 +406,25 @@ void CodeGen::generateMIR()
             else if (instType == InstType::Assign)
             {
                 auto assignInst = std::dynamic_pointer_cast<AssignInst>(inst[j]);
-                const auto& targetStr = assignInst->getTarget()->getString();
+                auto targetVReg = getOrCreateVReg("v_" + assignInst->getTarget()->getString());
                 auto source = assignInst->getSource();
-                auto sourceType = source->getInstType();
 
-                auto targetVReg = getOrCreateVReg("v_" + targetStr);
                 std::shared_ptr<MachineIR> mirSource;
-
-                if (sourceType == InstType::IntConst)
+                if (source->getInstType() == InstType::IntConst)
                 {
-                    auto intConstInst = std::dynamic_pointer_cast<IntConstInst>(source);
-                    mirSource = std::make_shared<ConstMIR>(intConstInst->getVal());
+                    mirSource = std::make_shared<ConstMIR>(std::dynamic_pointer_cast<IntConstInst>(source)->getVal());
                 }
-                else if (sourceType == InstType::BoolConst)
+                else if (source->getInstType() == InstType::BoolConst)
                 {
-                    auto boolConstInst = std::dynamic_pointer_cast<BoolConstInst>(source);
-                    int boolVal = boolConstInst->getVal() ? 1 : 0;
-                    mirSource = std::make_shared<ConstMIR>(boolVal);
+                    mirSource = std::make_shared<ConstMIR>(std::dynamic_pointer_cast<BoolConstInst>(source)->getVal() ? 1 : 0);
                 }
-                else if (sourceType == InstType::Ident)
+                else
                 {
-                    auto identInst = std::dynamic_pointer_cast<IdentInst>(source);
-                    mirSource = getOrCreateVReg("v_" + identInst->getString());
+                    mirSource = getOrCreateVReg("v_" + source->getString());
                 }
 
-                auto movMIR = std::make_shared<MovMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{targetVReg, mirSource});
-                bbMIR->addInstruction(movMIR);
+                // Make sure no illegal mov occurs (memory to memory)
+                legalizeMov(bbMIR, targetVReg, mirSource);
             }
             else if (instType == InstType::Put)
             {
@@ -510,58 +537,46 @@ void CodeGen::generateMIR()
             }
             else if (instType == InstType::Add || instType == InstType::Sub || instType == InstType::Mul)
             {
-                // The operands must have integer type
                 auto& currInst = inst[j];
                 const auto& targetStr = currInst->getTarget()->getString();
                 const auto& operands = currInst->getOperands();
-                const auto& operand1 = operands[0]->getTarget();
-                const auto& operand2 = operands[1]->getTarget();
 
                 auto targetVReg = getOrCreateVReg("v_" + targetStr);
 
-                if (operand1->getInstType() == InstType::IntConst)
-                {
-                    auto intConst = std::dynamic_pointer_cast<IntConstInst>(operand1);
-                    auto constMIR = std::make_shared<ConstMIR>(intConst->getVal());
-                    
-                    // mov targetVReg, constant
-                    bbMIR->addInstruction(std::make_shared<MovMIR>(
-                        std::vector<std::shared_ptr<MachineIR>>{targetVReg, constMIR}));
-                }
-                else
-                {
-                    auto op1VReg = getOrCreateVReg("v_" + operand1->getString());
-                    
-                    // mov targetVReg, op1VReg
-                    bbMIR->addInstruction(std::make_shared<MovMIR>(
-                        std::vector<std::shared_ptr<MachineIR>>{targetVReg, op1VReg}));
-                }
+                // Resolve Operand 1 and move to target via legalizer
+                auto op1 = operands[0]->getTarget();
+                std::shared_ptr<MachineIR> op1MIR = (op1->getInstType() == InstType::IntConst) ?
+                    std::static_pointer_cast<MachineIR>(std::make_shared<ConstMIR>(std::dynamic_pointer_cast<IntConstInst>(op1)->getVal())) :
+                    std::static_pointer_cast<MachineIR>(getOrCreateVReg("v_" + op1->getString()));
 
-                std::shared_ptr<MachineIR> op2MIR;
-                if (operand2->getInstType() == InstType::IntConst)
-                {
-                    auto intConst = std::dynamic_pointer_cast<IntConstInst>(operand2);
-                    op2MIR = std::make_shared<ConstMIR>(intConst->getVal());
-                }
-                else
-                {
-                    op2MIR = getOrCreateVReg("v_" + operand2->getString());
-                }
+                legalizeMov(bbMIR, targetVReg, op1MIR);
 
+                // Resolve Operand 2 and force it into a physical register (rdx)
+                auto op2 = operands[1]->getTarget();
+                std::shared_ptr<MachineIR> op2MIR = (op2->getInstType() == InstType::IntConst) ?
+                    std::static_pointer_cast<MachineIR>(std::make_shared<ConstMIR>(std::dynamic_pointer_cast<IntConstInst>(op2)->getVal())) :
+                    std::static_pointer_cast<MachineIR>(getOrCreateVReg("v_" + op2->getString()));
+
+                bbMIR->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{rdx, op2MIR}));
+
+                // Emit the actual arithmetic: [Target] Op [RDX]
                 if (instType == InstType::Add)
                 {
                     bbMIR->addInstruction(std::make_shared<AddMIR>(
-                        std::vector<std::shared_ptr<MachineIR>>{targetVReg, op2MIR}));
+                        std::vector<std::shared_ptr<MachineIR>>{targetVReg,
+                                                                rdx}));
                 }
                 else if (instType == InstType::Sub)
                 {
                     bbMIR->addInstruction(std::make_shared<SubMIR>(
-                        std::vector<std::shared_ptr<MachineIR>>{targetVReg, op2MIR}));
+                        std::vector<std::shared_ptr<MachineIR>>{targetVReg,
+                                                                rdx}));
                 }
                 else
                 {
                     bbMIR->addInstruction(std::make_shared<MulMIR>(
-                        std::vector<std::shared_ptr<MachineIR>>{targetVReg, op2MIR}));
+                        std::vector<std::shared_ptr<MachineIR>>{targetVReg,
+                                                                rdx}));
                 }
             }
             else if (instType == InstType::Div)
@@ -694,15 +709,16 @@ void CodeGen::generateMIR()
                         std::vector<std::shared_ptr<MachineIR>>{targetVReg, op2MIR}));
                 }
             }
-            else if (instType == InstType::CmpEq  || instType == InstType::CmpNE  ||
-                     instType == InstType::CmpLT  || instType == InstType::CmpLTE ||
-                     instType == InstType::CmpGT  || instType == InstType::CmpGTE)
+            else if (instType == InstType::CmpEq ||
+                     instType == InstType::CmpNE ||
+                     instType == InstType::CmpLT ||
+                     instType == InstType::CmpLTE ||
+                     instType == InstType::CmpGT ||
+                     instType == InstType::CmpGTE)
             {
                 auto& currInst = inst[j];
                 auto targetStr = currInst->getTarget()->getString();
                 auto& operands = currInst->getOperands();
-                const auto& operand1 = operands[0]->getTarget();
-                const auto& operand2 = operands[1]->getTarget();
 
                 auto targetVReg = getOrCreateVReg("v_" + targetStr);
 
@@ -710,44 +726,41 @@ void CodeGen::generateMIR()
                 {
                     if (op->getInstType() == InstType::IntConst)
                     {
-                        auto intConst = std::dynamic_pointer_cast<IntConstInst>(op);
-                        return std::make_shared<ConstMIR>(intConst->getVal());
+                        return std::make_shared<ConstMIR>(std::dynamic_pointer_cast<IntConstInst>(op)->getVal());
                     }
-                    // Fetch existing register object for referential integrity
                     return getOrCreateVReg("v_" + op->getString());
                 };
 
-                auto op1MIR = getOpMIR(operand1);
-                auto op2MIR = getOpMIR(operand2);
+                auto op1MIR = getOpMIR(operands[0]->getTarget());
+                auto op2MIR = getOpMIR(operands[1]->getTarget());
 
-                // x86 CMP constraint: The first operand cannot be a constant
-                if (op1MIR->getMIRType() == MIRType::Const)
-                {
-                    auto tempVReg = createTempVReg();
-                    bbMIR->addInstruction(std::make_shared<MovMIR>(
-                        std::vector<std::shared_ptr<MachineIR>>{tempVReg, op1MIR}));
-                    op1MIR = tempVReg;
-                }
+                // Legalize Op1 and Op2 into physical registers before CMP.
+                // We use rax and rdx directly as destinations here because 
+                // we know they are physical (IDs 0 and 3).
+                legalizeMov(bbMIR, rax, op1MIR);
+                legalizeMov(bbMIR, rdx, op2MIR);
 
-                // Perform the comparison
+                // Now the CMP is guaranteed to be Reg-to-Reg
                 bbMIR->addInstruction(std::make_shared<CmpMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{op1MIR, op2MIR}));
+                    std::vector<std::shared_ptr<MachineIR>>{rax, rdx}));
 
-                // SETcc based on the condition (cc = condition code)
                 std::shared_ptr<MachineIR> setccMIR;
                 switch (instType)
                 {
-                    case InstType::CmpEq:  setccMIR = std::make_shared<SeteMIR>(targetVReg); break;
-                    case InstType::CmpNE:  setccMIR = std::make_shared<SetneMIR>(targetVReg); break;
-                    case InstType::CmpLT:  setccMIR = std::make_shared<SetlMIR>(targetVReg); break;
-                    case InstType::CmpLTE: setccMIR = std::make_shared<SetleMIR>(targetVReg); break;
-                    case InstType::CmpGT:  setccMIR = std::make_shared<SetgMIR>(targetVReg); break;
-                    case InstType::CmpGTE: setccMIR = std::make_shared<SetgeMIR>(targetVReg); break;
-                    default: break;
+                    case InstType::CmpEq:  { setccMIR = std::make_shared<SeteMIR>(targetVReg); break; }
+                    case InstType::CmpNE:  { setccMIR = std::make_shared<SetneMIR>(targetVReg); break; }
+                    case InstType::CmpLT:  { setccMIR = std::make_shared<SetlMIR>(targetVReg); break; }
+                    case InstType::CmpLTE: { setccMIR = std::make_shared<SetleMIR>(targetVReg); break; }
+                    case InstType::CmpGT:  { setccMIR = std::make_shared<SetgMIR>(targetVReg); break; }
+                    case InstType::CmpGTE: { setccMIR = std::make_shared<SetgeMIR>(targetVReg); break; }
+                    default: { throw std::runtime_error("Unknown comparison type"); }
                 }
+    
+                // Note: setcc results in a byte-sized write.
+                // If targetVReg is a stack slot, this is a memory write.
                 bbMIR->addInstruction(setccMIR);
 
-                // Zero-extend the byte result to 64-bit
+                // Final zero-extension
                 auto movzxMIR = std::make_shared<MovzxMIR>(targetVReg, 64, 8, true);
                 bbMIR->addInstruction(movzxMIR);
             }
@@ -809,7 +822,7 @@ void CodeGen::generateMIR()
                 auto allocaInst = std::dynamic_pointer_cast<AllocaInst>(inst[j]);
                 auto targetStr = allocaInst->getTarget()->getString();
     
-                // Reserve stack space (Your existing logic)
+                // Reserve stack space
                 if (arrVRegToSize.find(targetStr) == arrVRegToSize.end() &&
                     vRegToOffset.find(targetStr) == vRegToOffset.end())
                 {
@@ -843,36 +856,36 @@ void CodeGen::generateMIR()
                     indexOperand = arrAccess->getIndex()->getTarget();
                 }
 
-                // Rematerialize element address for this specific instruction
+                // Rematerialize element address (e.g., lea finalAddrVReg, [rbp - offset])
                 auto finalAddrVReg = resolveArrayAddress(arrayName, indexOperand);
+
+                // Create the memory operand [finalAddrVReg + 0]
                 auto memOp = std::make_shared<MemoryMIR>(finalAddrVReg, 0);
 
                 if (isUpdate)
                 {
                     auto value = arrUpdate->getVal()->getTarget();
-                    std::shared_ptr<MachineIR> valToStore;
+                    std::shared_ptr<MachineIR> valSource;
 
                     if (value->getInstType() == InstType::IntConst)
                     {
-                        valToStore = createTempVReg();
-                        auto valConst = std::make_shared<ConstMIR>(
+                        valSource = std::make_shared<ConstMIR>(
                             std::dynamic_pointer_cast<IntConstInst>(value)->getVal());
-                        bbMIR->addInstruction(std::make_shared<MovMIR>(
-                            std::vector<std::shared_ptr<MachineIR>>{valToStore, valConst}));
                     }
                     else
                     {
-                        valToStore = getOrCreateVReg("v_" + value->getString());
+                        valSource = getOrCreateVReg("v_" + value->getString());
                     }
 
-                    bbMIR->addInstruction(std::make_shared<MovMIR>(
-                        std::vector<std::shared_ptr<MachineIR>>{memOp, valToStore}));
+                    // Prevents mov QWORD PTR [reg_addr], QWORD PTR [stack_slot]
+                    legalizeMov(bbMIR, memOp, valSource);
                 }
                 else
                 {
                     auto targetVReg = getOrCreateVReg("v_" + arrAccess->getTarget()->getString());
-                    bbMIR->addInstruction(std::make_shared<MovMIR>(
-                        std::vector<std::shared_ptr<MachineIR>>{targetVReg, memOp}));
+
+                    // Prevents mov QWORD PTR [stack_slot], QWORD PTR [reg_addr]
+                    legalizeMov(bbMIR, targetVReg, memOp);
                 }
             }
         }
@@ -957,9 +970,9 @@ void CodeGen::generateAllFunctionsMIR()
     m_stringLiterals.insert("false_str");
     m_stringLiterals.insert("newline_str");
 
-    // generate MIR for main function first
+    // Generate MIR for main function first
     m_ssa.renameSSA();
-    m_ssa.printCFG();
+    //m_ssa.printCFG();
     generateMIR();
 
     for (auto& [funcName, ssa] : m_functionSSAMap)

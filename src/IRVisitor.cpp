@@ -819,102 +819,42 @@ void IRVisitor::visit(ExpressionAST& v)
 
 void IRVisitor::visit(VarDeclAST& v)
 {
+    // We get the name and type, but we no longer create IntConst/BoolConst 
+    // or emit an AssignInst. We simply register the variable's existence.
     auto& baseName = v.getIdentifier()->getName();
-    auto ssaName = m_ssa.baseNameToSSA(baseName);
-    auto targetIdentInst = std::make_shared<IdentInst>(ssaName, m_currentBB);
-    targetIdentInst->setup_def_use();
 
-    auto type = v.getIdentifier()->getType();
-    if (type == Type::BOOLEAN)
-    {
-        auto boolConstInst = std::make_shared<BoolConstInst>(false, m_currentBB);
-        boolConstInst->setup_def_use();
-        auto inst = std::make_shared<AssignInst>(
-            std::move(targetIdentInst), std::move(boolConstInst), m_currentBB);
-        inst->setup_def_use();
-        m_ssa.writeVariable(baseName, m_currentBB, inst);
-        m_currentBB->pushInst(inst);
-    }
-    else if (type == Type::INTEGER)
-    {
-        auto intConstInst = std::make_shared<IntConstInst>(0, m_currentBB);
-        intConstInst->setup_def_use();
-
-        auto inst = std::make_shared<AssignInst>(std::move(targetIdentInst), std::move(intConstInst), m_currentBB);
-        inst->setup_def_use();
-
-        m_ssa.writeVariable(baseName, m_currentBB, inst);
-        m_currentBB->pushInst(inst);
-    }
-    else
-    {
-        throw std::runtime_error("Unknown type");
-    }
+    // This tells the SSA manager that the variable is now 'active' in this scope.
+    // If readVariable is called before an actual AssignmentAST, 
+    // it will handle the uninitialized state according SSA logic.
+    m_ssa.baseNameToSSA(baseName);
 }
 
 void IRVisitor::visit(ArrDeclAST& v)
 {
     std::string& baseName = v.getIdentifier()->getName();
+
+    // We only need the AllocaInst to reserve the memory block.
+    // The previous loop that filled the array with zeros is removed.
     auto ssaName = m_ssa.getCurrentSSAName(baseName);
     auto allocaIdentInst = std::make_shared<IdentInst>(ssaName, m_currentBB);
     allocaIdentInst->setup_def_use();
 
     auto type = v.getIdentifier()->getType();
     auto size = v.getSize();
-    auto allocaInst = std::make_shared<AllocaInst>(std::move(allocaIdentInst),
-                                                   type, size, m_currentBB);
+
+    auto allocaInst = std::make_shared<AllocaInst>(
+        std::move(allocaIdentInst),
+        type,
+        size,
+        m_currentBB
+    );
     allocaInst->setup_def_use();
+
+    // Register the Alloca as the definition of the array variable
     m_ssa.writeVariable(baseName, m_currentBB, allocaInst);
 
+    // Only the allocation is pushed to the BasicBlock
     m_currentBB->pushInst(allocaInst);
-
-    for (unsigned int i = 0; i < v.getSize(); ++i)
-    {
-        std::string& baseName = v.getIdentifier()->getName();
-        auto ssaName = m_ssa.getCurrentSSAName(baseName);
-        auto sourceIdentInst =
-            std::make_shared<IdentInst>(ssaName, m_currentBB);
-        sourceIdentInst->setup_def_use();
-
-        auto indexInst = std::make_shared<IntConstInst>((int)i, m_currentBB);
-
-        auto targetSsaName = m_ssa.baseNameToSSA(baseName);
-        auto targetIdentInst =
-            std::make_shared<IdentInst>(targetSsaName, m_currentBB);
-        targetIdentInst->setup_def_use();
-
-        auto type = v.getIdentifier()->getType();
-        if (type == Type::BOOLEAN)
-        {
-          auto boolConstInst =
-              std::make_shared<BoolConstInst>(false, m_currentBB);
-            boolConstInst->setup_def_use();
-            auto inst = std::make_shared<ArrUpdateInst>(
-                std::move(targetIdentInst), std::move(sourceIdentInst),
-                std::move(indexInst), std::move(boolConstInst), m_currentBB, Type::BOOLEAN);
-            inst->setup_def_use();
-            m_ssa.writeVariable(baseName, m_currentBB, inst);
-
-            m_currentBB->pushInst(inst);
-        }
-        else if (type == Type::INTEGER)
-        {
-            auto intConstInst = std::make_shared<IntConstInst>(0, m_currentBB);
-            intConstInst->setup_def_use();
-
-            auto inst = std::make_shared<ArrUpdateInst>(
-                std::move(targetIdentInst), std::move(sourceIdentInst),
-                std::move(indexInst), std::move(intConstInst), m_currentBB, Type::INTEGER);
-            inst->setup_def_use();
-            m_ssa.writeVariable(baseName, m_currentBB, inst);
-
-            m_currentBB->pushInst(inst);
-        }
-        else
-        {
-            throw std::runtime_error("Unknown type");
-        }
-    }
 }
 
 void IRVisitor::visit(DeclarationsAST& v)

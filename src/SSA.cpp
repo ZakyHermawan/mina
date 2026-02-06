@@ -345,11 +345,11 @@ void SSA::renameSSA()
         }
     }
 
-    // 1. Create a map to hold the final name for each set's root.
+    // Create a map to hold the final name for each set's root.
     std::unordered_map<std::string, std::string> root_to_new_name;
 
-    // 2. Choose a representative name for each set.
-    //    A common convention is to use the original name without the SSA suffix.
+    // Choose a representative name for each set.
+    // A common convention is to use the original name without the SSA suffix.
     for (const auto& var : variables) {
         std::string root = dsu.find(var);
         if (root_to_new_name.find(root) == root_to_new_name.end()) {
@@ -359,7 +359,7 @@ void SSA::renameSSA()
         }
     }
 
-    // 3. Create the final, full renaming map for all variables.
+    // Create the final, full renaming map for all variables.
     std::unordered_map<std::string, std::string> final_rename_map;
     for (const auto& var : variables) {
         std::string root = dsu.find(var);

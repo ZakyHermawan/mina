@@ -201,11 +201,11 @@ void BasicBlockMIR::generateDefUse()
                 break;
 
             case MIRType::Call:
-                // 1. Mark registers used for arguments (Win64 uses RCX, RDX, R8, R9)
+                // Mark registers used for arguments (Win64 uses RCX, RDX, R8, R9)
                 addUse(to_int(RegID::RCX));
                 addUse(to_int(RegID::RDX));
 
-                // 2. Mark Caller-Saved registers as CLOBBERED (Defined)
+                // Mark Caller-Saved registers as CLOBBERED (Defined)
                 // This prevents the compiler from assuming RAX/RCX/RDX survive the call
                 addDef(to_int(RegID::RAX));
                 addDef(to_int(RegID::RCX));
