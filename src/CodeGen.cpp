@@ -609,7 +609,7 @@ void CodeGen::generateMIR()
                 if (operand2->getInstType() == InstType::IntConst)
                 {
                     // For constants, create a unique hidden stack variable
-                    divisorName = "v_tmp" + std::to_string(tmpRegId++);
+                    divisorName = "v_" + std::to_string(tmpRegId++);
                     auto intConst = std::dynamic_pointer_cast<IntConstInst>(operand2);
                     
                     assignVRegToOffsetIfDoesNotExist(divisorName);

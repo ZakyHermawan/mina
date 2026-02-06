@@ -73,7 +73,7 @@ void InferenceGraph::printAdjMatrix() const
         {
             if(node->getReg()->getID() == id) return node->getReg()->getString();
         }
-        return "v_tmp" + std::to_string(id);
+        return "v" + std::to_string(id);
     };
     // Print Header Row
     std::cout << "\t";
@@ -120,7 +120,7 @@ void InferenceGraph::printAdjList() const
         {
             if(node->getReg()->getID() == id) return node->getReg()->getString();
         }
-        return "v_tmp" + std::to_string(id);
+        return "v" + std::to_string(id);
     };
 
     for (const auto& node : m_nodes)
@@ -489,6 +489,9 @@ void RegisterAllocator::addEdgesBasedOnLiveness(std::shared_ptr<InferenceGraph> 
 
 void RegisterAllocator::addAllRegistersAsNodes(std::shared_ptr<InferenceGraph> graph)
 {
+    // 11 = RBP, 12 = RSP, 13 = RIP
+    const int RESERVED_START = 11;
+    const int RESERVED_END = 13;
     for (const auto& block : m_MIRBlocks)
     {
         for (const auto& inst : block->getInstructions())
@@ -498,6 +501,9 @@ void RegisterAllocator::addAllRegistersAsNodes(std::shared_ptr<InferenceGraph> g
                 if (operand->getMIRType() == MIRType::Reg)
                 {
                     auto regOperand = std::dynamic_pointer_cast<Register>(operand);
+                    auto id = regOperand->getID();
+                    if (id >= RESERVED_START && id <= RESERVED_END) continue;
+
                     auto igNode = std::make_shared<IGNode>(regOperand,
                         std::vector<std::shared_ptr<Register>>{},
                         0.0, -1, false);
@@ -514,6 +520,9 @@ void RegisterAllocator::addAllRegistersAsNodes(std::shared_ptr<InferenceGraph> g
                     if (memOp && memOp->getBaseRegister())
                     {
                         auto& baseReg = memOp->getBaseRegister();
+                        int id = baseReg->getID();
+                        if (id >= RESERVED_START && id <= RESERVED_END) continue;
+
                         // Create a node for the base register (e.g., rbp, rip)
                         auto igNode = std::make_shared<IGNode>(baseReg,
                             std::vector<std::shared_ptr<Register>>{},
@@ -647,7 +656,7 @@ void RegisterAllocator::printSpillCosts(std::shared_ptr<InferenceGraph> graph)
         {
             if(node->getReg()->getID() == id) return node->getReg()->getString();
         }
-        return "v_tmp" + std::to_string(id);
+        return "v" + std::to_string(id);
     };
     std::cout << "--- Register Spill Costs ---\n";
     std::cout << "Register\tCost\t\tDegree\tRatio (Cost/Deg)\n";
