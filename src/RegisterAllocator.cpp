@@ -36,14 +36,21 @@ bool IGNode::isNeighborWith(const std::shared_ptr<IGNode>& other) const
     int targetID = other->getReg()->getID();
 
     return std::any_of(m_neighbors.begin(), m_neighbors.end(),
-        [targetID](const std::shared_ptr<Register>& n) {
+        [targetID](const std::shared_ptr<Register>& n)
+        {
             return n->getID() == targetID;
         });
 }
 
-void IGNode::setSpillCost(double cost) { m_spill_cost = cost; }
+void IGNode::setSpillCost(double cost)
+{
+    m_spill_cost = cost;
+}
 
-double IGNode::getSpillCost() const { return m_spill_cost; }
+double IGNode::getSpillCost() const
+{
+    return m_spill_cost;
+}
 
 std::shared_ptr<Register> IGNode::getReg()
 {
@@ -223,7 +230,9 @@ void RegisterAllocator::allocateRegisters()
 
 	addSpillCost(inferenceGraph);
     printSpillCosts(inferenceGraph);
-	//colorGraph(inferenceGraph);
+
+	colorGraph(inferenceGraph);
+    printColoringResults(inferenceGraph);
 	//auto registerMap = createRegisterMap(inferenceGraph);
 	//auto transformedInstructions = replaceVirtualRegisters(registerMap);
 	//return transformedInstructions;
@@ -246,10 +255,10 @@ void RegisterAllocator::addSpillCost(std::shared_ptr<InferenceGraph> graph)
 {
     std::map<int, double> costs;
 
-    // Helper to identify reserved registers (RBP, RSP, RIP)
+    // Helper to identify reserved registers (RBP, RSP, RIP, R10, R11)
     auto isReserved = [](int id)
     {
-        return (id >= 11 && id <= 13);
+        return (id >= 11 && id <= 15);
     };
 
     for (const auto& block : m_MIRBlocks)
@@ -303,9 +312,170 @@ void RegisterAllocator::addSpillCost(std::shared_ptr<InferenceGraph> graph)
     }
 }
 
+
 void RegisterAllocator::colorGraph(std::shared_ptr<InferenceGraph> graph)
 {
-	// Implement graph coloring algorithm to assign colors (registers) to nodes
+    auto& nodes = graph->getNodes();
+    std::vector<std::shared_ptr<IGNode>> pruningStack;
+
+    // SIMPLIFY & SPILL (Pruning Virtuals Only)
+    while (true)
+    {
+        bool all_virtual_pruned = true;
+        std::shared_ptr<IGNode> chosen_node = nullptr;
+
+        for (auto& node : nodes)
+        {
+            // Skip already pruned nodes OR Physical Registers (SpillCost is INF)
+            if (node->isPruned() || node->getSpillCost() == std::numeric_limits<double>::infinity()) 
+            {
+                continue;
+            }
+
+            all_virtual_pruned = false;
+
+            int current_degree = 0;
+            for (auto& neighborReg : node->getNeighbors())
+            {
+                for (auto& potentialNeighbor : nodes)
+                {
+                    if (potentialNeighbor->getReg()->getID() == neighborReg->getID() && !potentialNeighbor->isPruned())
+                    {
+                        current_degree++;
+                        break;
+                    }
+                }
+            }
+
+            if (current_degree < m_K_COLORS)
+            {
+                chosen_node = node;
+                break;
+            }
+        }
+
+        // Potential Spill Logic for Virtual Registers
+        if (chosen_node == nullptr && !all_virtual_pruned)
+        {
+            double best_spill_metric = std::numeric_limits<double>::infinity();
+            for (auto& node : nodes)
+            {
+                if (node->isPruned() || node->getSpillCost() == std::numeric_limits<double>::infinity())
+                {
+                    continue;
+                }
+
+                int degree = 0;
+                for (auto& neighborReg : node->getNeighbors())
+                {
+                    for (auto& n : nodes)
+                    {
+                        if (n->getReg()->getID() == neighborReg->getID() && !n->isPruned())
+                        {
+                            degree++;
+                            break;
+                        }
+                    }
+                }
+
+                double spill_metric = node->getSpillCost() / static_cast<double>(std::max(1, degree));
+                if (spill_metric < best_spill_metric)
+                {
+                    best_spill_metric = spill_metric;
+                    chosen_node = node;
+                }
+            }
+        }
+
+        if (all_virtual_pruned || chosen_node == nullptr)
+        {
+            break;
+        }
+
+        chosen_node->setPruned(true);
+        pruningStack.push_back(chosen_node);
+    }
+
+    // SELECT (Coloring)
+    for (auto it = pruningStack.rbegin(); it != pruningStack.rend(); ++it)
+    {
+        auto& node = *it;
+        node->setPruned(false);
+
+        std::set<int> available_colors;
+        for (int i = 0; i < m_K_COLORS; ++i)
+        {
+            available_colors.insert(i);
+        }
+
+        for (auto& neighborReg : node->getNeighbors())
+        {
+            for (auto& potentialNeighbor : nodes)
+            {
+                if (potentialNeighbor->getReg()->getID() == neighborReg->getID())
+                {
+                    int neighbor_color = potentialNeighbor->getColor();
+                    if (neighbor_color != -1)
+                    {
+                        available_colors.erase(neighbor_color);
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (!available_colors.empty())
+        {
+            int regID = node->getReg()->getID();
+            if (regID == to_int(RegID::R12) || regID == to_int(RegID::R13) || regID == to_int(RegID::R14))
+            {
+                node->setColor(*available_colors.rbegin());
+            }
+            else
+            {
+                node->setColor(*available_colors.begin());
+            }
+        }
+        else
+        {
+            node->setColor(-1);
+        }
+    }
+}
+
+void RegisterAllocator::printColoringResults(std::shared_ptr<InferenceGraph> graph)
+{
+    std::cout << "--- Register Coloring Results ---\n";
+    std::cout << "Virtual Reg\tColor ID\tAssigned Phys Reg\n";
+    std::cout << "------------------------------------------------\n";
+
+    auto& nodes = graph->getNodes();
+    for (const auto& node : nodes)
+    {
+        int id = node->getReg()->getID();
+        int color = node->getColor();
+
+        // Use your existing logic to get the string representation
+        std::string vRegName = node->getReg()->getString();
+        std::cout << vRegName << "\t\t";
+
+        if (color == -1)
+        {
+            std::cout << "SPILL\t\t[MEM SLOT REQUIRED]\n";
+        }
+        else
+        {
+            // Translate the color index (0-10) to the physical register name
+            std::string physRegName = "Unknown";
+            if (color >= 0 && color < (int)RegID::COUNT)
+            {
+                physRegName = getReg(static_cast<RegID>(color))->get64BitName();
+            }
+
+            std::cout << color << "\t\t" << physRegName << "\n";
+        }
+    }
+    std::cout << "------------------------------------------------\n\n";
 }
 
 std::map<int, std::shared_ptr<Register>> RegisterAllocator::createRegisterMap(
@@ -322,89 +492,58 @@ std::vector<std::shared_ptr<BasicBlockMIR>> RegisterAllocator::replaceVirtualReg
 
 std::shared_ptr<InferenceGraph> RegisterAllocator::constructBaseGraph()
 {
-	auto& rax = getReg(RegID::RAX);
-	auto& rbx = getReg(RegID::RBX);
-	auto& rcx = getReg(RegID::RCX);
-	auto& rdx = getReg(RegID::RDX);
-	auto& rdi = getReg(RegID::RDI);
-	auto& rsi = getReg(RegID::RSI);
-	auto& r8 = getReg(RegID::R8);
-	auto& r9 = getReg(RegID::R9);
-	auto& r12 = getReg(RegID::R12);
-	auto& r13 = getReg(RegID::R13);
-	auto& r14 = getReg(RegID::R14);
+    auto& rax = getReg(RegID::RAX);
+    auto& rbx = getReg(RegID::RBX);
+    auto& rcx = getReg(RegID::RCX);
+    auto& rdx = getReg(RegID::RDX);
+    auto& rdi = getReg(RegID::RDI);
+    auto& rsi = getReg(RegID::RSI);
+    auto& r8 = getReg(RegID::R8);
+    auto& r9 = getReg(RegID::R9);
+    auto& r12 = getReg(RegID::R12);
+    auto& r13 = getReg(RegID::R13);
+    auto& r14 = getReg(RegID::R14);
 
-	auto raxNode = std::make_shared<IGNode>(rax,
-		std::vector<std::shared_ptr<Register>>{
-		rbx, rcx, rdx, rdi, rsi, r8, r9, r12, r13, r14},
-		0.0, -1, false);
+    // List of registers to build the initial clique
+    std::vector<std::shared_ptr<Register>> physRegs =
+    {
+        rax, rbx, rcx, rdx, rdi, rsi, r8, r9, r12, r13, r14
+    };
 
-	auto rbxNode = std::make_shared<IGNode>(rbx,
-		std::vector<std::shared_ptr<Register>>{
-		rax, rcx, rdx, rdi, rsi, r8, r9, r12, r13, r14},
-		0.0, -1, false);
+    // We assign fixed color indices 0-10 to the physical registers.
+    // This prevents the allocator from thinking they are uncolored (-1).
+    auto raxNode = std::make_shared<IGNode>(rax, std::vector<std::shared_ptr<Register>>{}, 0.0, 0, false);
+    auto rbxNode = std::make_shared<IGNode>(rbx, std::vector<std::shared_ptr<Register>>{}, 0.0, 1, false);
+    auto rcxNode = std::make_shared<IGNode>(rcx, std::vector<std::shared_ptr<Register>>{}, 0.0, 2, false);
+    auto rdxNode = std::make_shared<IGNode>(rdx, std::vector<std::shared_ptr<Register>>{}, 0.0, 3, false);
+    auto rdiNode = std::make_shared<IGNode>(rdi, std::vector<std::shared_ptr<Register>>{}, 0.0, 4, false);
+    auto rsiNode = std::make_shared<IGNode>(rsi, std::vector<std::shared_ptr<Register>>{}, 0.0, 5, false);
+    auto r8Node  = std::make_shared<IGNode>(r8,  std::vector<std::shared_ptr<Register>>{}, 0.0, 6, false);
+    auto r9Node  = std::make_shared<IGNode>(r9,  std::vector<std::shared_ptr<Register>>{}, 0.0, 7, false);
+    auto r12Node = std::make_shared<IGNode>(r12, std::vector<std::shared_ptr<Register>>{}, 0.0, 8, false);
+    auto r13Node = std::make_shared<IGNode>(r13, std::vector<std::shared_ptr<Register>>{}, 0.0, 9, false);
+    auto r14Node = std::make_shared<IGNode>(r14, std::vector<std::shared_ptr<Register>>{}, 0.0, 10, false);
 
-	auto rcxNode = std::make_shared<IGNode>(rcx,
-		std::vector<std::shared_ptr<Register>>{
-		rax, rbx, rdx, rdi, rsi, r8, r9, r12, r13, r14},
-		0.0, -1, false);
+    std::vector<std::shared_ptr<IGNode>> nodes =
+    {
+        raxNode, rbxNode, rcxNode, rdxNode, rdiNode, rsiNode,
+        r8Node, r9Node, r12Node, r13Node, r14Node
+    };
 
-	auto rdxNode = std::make_shared<IGNode>(rdx,
-		std::vector<std::shared_ptr<Register>>{
-		rax, rbx, rcx, rdi, rsi, r8, r9, r12, r13, r14},
-		0.0, -1, false);
-
-	auto rdiNode = std::make_shared<IGNode>(rdi,
-		std::vector<std::shared_ptr<Register>>{
-		rax, rbx, rcx, rdx, rsi, r8, r9, r12, r13, r14},
-		0.0, -1, false);
-
-	auto rsiNode = std::make_shared<IGNode>(rsi,
-		std::vector<std::shared_ptr<Register>>{
-		rax, rbx, rcx, rdx, rdi, r8, r9, r12, r13, r14},
-		0.0, -1, false);
-
-	auto r8Node = std::make_shared<IGNode>(r8,
-		std::vector<std::shared_ptr<Register>>{
-		rax, rbx, rcx, rdx, rdi, rsi, r9, r12, r13, r14},
-		0.0, -1, false);
-
-	auto r9Node = std::make_shared<IGNode>(r9,
-		std::vector<std::shared_ptr<Register>>{
-		rax, rbx, rcx, rdx, rdi, rsi, r8, r12, r13, r14},
-		0.0, -1, false);
-
-	auto r12Node = std::make_shared<IGNode>(r12,
-		std::vector<std::shared_ptr<Register>>{
-		rax, rbx, rcx, rdx, rdi, rsi, r8, r9, r13, r14},
-		0.0, -1, false);
-
-	auto r13Node = std::make_shared<IGNode>(r13,
-		std::vector<std::shared_ptr<Register>>{
-		rax, rbx, rcx, rdx, rdi, rsi, r8, r9, r12, r14},
-		0.0, -1, false);
-
-	auto r14Node = std::make_shared<IGNode>(r14,
-		std::vector<std::shared_ptr<Register>>{
-		rax, rbx, rcx, rdx, rdi, rsi, r8, r9, r12, r13},
-		0.0, -1, false);
-
-	std::vector<std::shared_ptr<IGNode>> nodes;
-	nodes.push_back(raxNode);
-	nodes.push_back(rbxNode);
-	nodes.push_back(rcxNode);
-	nodes.push_back(rdxNode);
-	nodes.push_back(rdiNode);
-	nodes.push_back(rsiNode);
-	nodes.push_back(r8Node);
-	nodes.push_back(r9Node);
-	nodes.push_back(r12Node);
-	nodes.push_back(r13Node);
-	nodes.push_back(r14Node);
-	
     std::shared_ptr<InferenceGraph> ig =
         std::make_shared<InferenceGraph>(std::move(nodes));
-	return ig;
+
+    // CRITICAL: Make physical registers interfere with each other so they don't share colors.
+    // This creates a "Clique" where every physical register has a different color.
+    for (size_t i = 0; i < physRegs.size(); ++i)
+    {
+        for (size_t j = i + 1; j < physRegs.size(); ++j)
+        {
+            ig->addEdge(physRegs[i], physRegs[j]);
+        }
+    }
+
+    return ig;
 }
 
 void RegisterAllocator::addEdgesBasedOnLiveness(std::shared_ptr<InferenceGraph> graph)
@@ -412,6 +551,8 @@ void RegisterAllocator::addEdgesBasedOnLiveness(std::shared_ptr<InferenceGraph> 
     for (const auto& block : m_MIRBlocks)
     {
         // Start with registers live at the end of the block
+        // Note: Should copy, because we will mutate it
+        // And we did not want to change the block's actual liveOut set
         std::set<int> liveNow = block->getLiveOut();
         auto& insts = block->getInstructions();
 
@@ -530,8 +671,6 @@ void RegisterAllocator::addEdgesBasedOnLiveness(std::shared_ptr<InferenceGraph> 
                     instDefs.insert(to_int(RegID::RDX));
                     instDefs.insert(to_int(RegID::R8));
                     instDefs.insert(to_int(RegID::R9));
-                    //instDefs.insert(to_int(RegID::R10));
-                    //instDefs.insert(to_int(RegID::R11));
 
                     // Uses: Arguments
                     const auto callInst =
@@ -596,8 +735,8 @@ void RegisterAllocator::addEdgesBasedOnLiveness(std::shared_ptr<InferenceGraph> 
             }
             for (int use : instUses)
             {
-                // Filter reserved regs from being tracked in liveness (RBP, RSP, RIP)
-                if (!(use >= 11 && use <= 13))
+                // Filter reserved regs from being tracked in liveness (RBP, RSP, RIP, R10, R11)
+                if (!(use >= 11 && use <= 15))
                 {
                     liveNow.insert(use);
                 }
@@ -608,9 +747,6 @@ void RegisterAllocator::addEdgesBasedOnLiveness(std::shared_ptr<InferenceGraph> 
 
 void RegisterAllocator::addAllRegistersAsNodes(std::shared_ptr<InferenceGraph> graph)
 {
-    // 11 = RBP, 12 = RSP, 13 = RIP
-    const int RESERVED_START = 11;
-    const int RESERVED_END = 13;
     for (const auto& block : m_MIRBlocks)
     {
         for (const auto& inst : block->getInstructions())
@@ -621,7 +757,7 @@ void RegisterAllocator::addAllRegistersAsNodes(std::shared_ptr<InferenceGraph> g
                 {
                     auto regOperand = std::dynamic_pointer_cast<Register>(operand);
                     auto id = regOperand->getID();
-                    if (id >= RESERVED_START && id <= RESERVED_END) continue;
+                    if (id >= m_RESERVED_START && id <= m_RESERVED_END) continue;
 
                     auto igNode = std::make_shared<IGNode>(regOperand,
                         std::vector<std::shared_ptr<Register>>{},
@@ -632,6 +768,7 @@ void RegisterAllocator::addAllRegistersAsNodes(std::shared_ptr<InferenceGraph> g
                         graph->addNode(igNode);
                     }
                 }
+
                 // Catch Base Registers hidden in Memory operands
                 else if (operand->getMIRType() == MIRType::Memory)
                 {
@@ -640,7 +777,7 @@ void RegisterAllocator::addAllRegistersAsNodes(std::shared_ptr<InferenceGraph> g
                     {
                         auto& baseReg = memOp->getBaseRegister();
                         int id = baseReg->getID();
-                        if (id >= RESERVED_START && id <= RESERVED_END) continue;
+                        if (id >= m_RESERVED_START && id <= m_RESERVED_END) continue;
 
                         // Create a node for the base register (e.g., rbp, rip)
                         auto igNode = std::make_shared<IGNode>(baseReg,
@@ -775,7 +912,8 @@ void RegisterAllocator::printLivenessData(
 }
 
 // We can implement this using dominator tree for better accuracy
-void RegisterAllocator::calculateLoopDepths(std::shared_ptr<BasicBlockMIR> entry) {
+void RegisterAllocator::calculateLoopDepths(std::shared_ptr<BasicBlockMIR> entry)
+{
     std::map<std::string, bool> visited;
     std::map<std::string, bool> onStack;
 

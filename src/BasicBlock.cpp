@@ -1,12 +1,18 @@
 #include "BasicBlock.hpp"
 #include "InstIR.hpp"
 
+#include <vector>
+#include <string>
 #include <utility>
+#include <memory>
 
 namespace mina
 {
 
-BasicBlock::BasicBlock(std::string name) : m_name(std::move(name)) {}
+BasicBlock::BasicBlock(std::string name)
+    : m_name(std::move(name))
+{
+}
 
 void BasicBlock::setInstructions(
     std::vector<std::shared_ptr<Inst>> instructions)

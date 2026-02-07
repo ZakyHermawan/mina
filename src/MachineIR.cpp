@@ -231,7 +231,8 @@ void BasicBlockMIR::generateDefUse()
                 markDef(to_int(RegID::RDX));
                 markDef(to_int(RegID::R8));
                 markDef(to_int(RegID::R9));
-                // Maybe add R10, R11
+                markDef(to_int(RegID::R10));
+                markDef(to_int(RegID::R11));
                 break;
             }
 
@@ -1151,7 +1152,7 @@ MIRType RetMIR::getMIRType() const { return MIRType::Ret; }
 // RetMIR is only for liveness Anaysis
 std::string RetMIR::getString() const { return ""; }
 
-// Prevent this function to be called from another file
+// Use static to prevent this function to be called from another file
 static std::array<std::shared_ptr<Register>, to_int(RegID::COUNT)> registersFactory()
 {
     // Initialize with COUNT to pre-allocate exact size
@@ -1177,6 +1178,9 @@ static std::array<std::shared_ptr<Register>, to_int(RegID::COUNT)> registersFact
     add(RegID::RBP, "rbp", "ebp", "bp", "bpl", "");
     add(RegID::RSP, "rsp", "esp", "sp", "spl", "");
     add(RegID::RIP, "rip");
+
+    add(RegID::R10, "r10", "r10d", "r10w", "r10b", "");
+    add(RegID::R11, "r11", "r11d", "r11w", "r11b", "");
 
     return registers;
 }

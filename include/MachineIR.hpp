@@ -457,9 +457,15 @@ public:
     std::string getString() const override;
 };
 
+// Register Identifiers
+// Note: Keep in sync with registersFactory() in MachineIR.cpp
+// Also keep in sync with calling convention usage in CodeGen.cpp
+// RBP, RSP, RIP are reserved and should not be used for allocation
+// R10 and R11 are caller-saved that will be used for instruction fixup,
+// Do not include them in interference graph!
 enum class RegID : int
 {
-    RAX, RBX, RCX, RDX, RDI, RSI, R8, R9, R12, R13, R14, RBP, RSP, RIP,
+    RAX, RBX, RCX, RDX, RDI, RSI, R8, R9, R12, R13, R14, RBP, RSP, RIP, R10, R11,
     COUNT 
 };
 
