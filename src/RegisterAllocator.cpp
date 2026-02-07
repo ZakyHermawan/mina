@@ -217,6 +217,11 @@ unsigned int RegisterAllocator::getOffset() const
     return functionOffset;
 }
 
+std::set<int> RegisterAllocator::getUsedCalleeSavedRegs() const
+{
+    return m_usedCalleeSavedRegs;
+}
+
 void RegisterAllocator::allocateRegisters()
 {
     if (!m_MIRBlocks.empty())
@@ -233,7 +238,8 @@ void RegisterAllocator::allocateRegisters()
 
 	colorGraph(inferenceGraph);
     printColoringResults(inferenceGraph);
-	//auto registerMap = createRegisterMap(inferenceGraph);
+	auto registerMap = createRegisterMap(inferenceGraph);
+    printRegisterMappingResults(inferenceGraph, registerMap);
 	//auto transformedInstructions = replaceVirtualRegisters(registerMap);
 	//return transformedInstructions;
 }
@@ -455,7 +461,6 @@ void RegisterAllocator::printColoringResults(std::shared_ptr<InferenceGraph> gra
         int id = node->getReg()->getID();
         int color = node->getColor();
 
-        // Use your existing logic to get the string representation
         std::string vRegName = node->getReg()->getString();
         std::cout << vRegName << "\t\t";
 
@@ -478,10 +483,105 @@ void RegisterAllocator::printColoringResults(std::shared_ptr<InferenceGraph> gra
     std::cout << "------------------------------------------------\n\n";
 }
 
-std::map<int, std::shared_ptr<Register>> RegisterAllocator::createRegisterMap(
-	std::shared_ptr<InferenceGraph> graph)
+std::map<int, std::shared_ptr<Register>> RegisterAllocator::createRegisterMap(std::shared_ptr<InferenceGraph> graph)
 {
-	return {};
+    std::map<int, std::shared_ptr<Register>> registerMap;
+
+    // Reset the tracker for this allocation pass
+    m_usedCalleeSavedRegs.clear();
+
+    // Define Windows x64 Callee-Saved Register IDs
+    // RBX(1), RDI(4), RSI(5), R12(8), R13(9), R14(10)
+    std::set<int> calleeSavedIDs = {to_int(RegID::RBX), to_int(RegID::RDI),
+                                    to_int(RegID::RSI), to_int(RegID::R12),
+                                    to_int(RegID::R13), to_int(RegID::R14)};
+
+    auto& nodes = graph->getNodes();
+
+    for (const auto& node : nodes)
+    {
+        int color = node->getColor();
+
+        // If node.color is null (spilled), continue
+        if (color == -1)
+        {
+            continue;
+        }
+
+        // If hardreg is callee saved -> add to set
+        if (calleeSavedIDs.count(color))
+        {
+            m_usedCalleeSavedRegs.insert(color);
+        }
+
+        auto regNode = node->getReg();
+        int regID = regNode->getID();
+
+        // If the assigned physical register (color) is Callee-Saved (Non-Volatile),
+        // we must record it in 'm_usedCalleeSavedRegs'.
+        // The CodeGen will use this set to emit specific 'push' and 'pop'
+        // instructions in the function prologue/epilogue to preserve the caller's state.
+        if (calleeSavedIDs.count(color))
+        {
+            m_usedCalleeSavedRegs.insert(color);
+        }
+
+        // Map the Virtual Register ID to the actual Physical Register object.
+        registerMap[regID] = getReg(static_cast<RegID>(color));
+    }
+
+    return registerMap;
+}
+
+void RegisterAllocator::printRegisterMappingResults(
+    std::shared_ptr<InferenceGraph> graph,
+    const std::map<int, std::shared_ptr<Register>>& registerMap)
+{
+    std::cout << "\n--- Final Register Mapping (Virtual -> Physical) ---\n";
+    if (registerMap.empty())
+    {
+        std::cout << "  (Empty: No virtual registers mapped)\n";
+    }
+    else
+    {
+        auto& nodes = graph->getNodes();
+
+        // Iterate over the map of assignments
+        for (const auto& pair : registerMap)
+        {
+            int vRegID = pair.first;
+            const auto& physReg = pair.second;
+            std::string vRegName = "v" + std::to_string(vRegID); // Fallback
+
+            // Find the original name in the graph
+            for (const auto& node : nodes)
+            {
+                if (node->getReg()->getID() == vRegID)
+                {
+                    vRegName = node->getReg()->getString();
+                    break;
+                }
+            }
+
+            std::cout << "  " << vRegName << " -> " << physReg->get64BitName() << "\n";
+        }
+    }
+
+    std::cout << "\n--- Callee-Saved Registers To Preserve ---\n";
+    if (m_usedCalleeSavedRegs.empty())
+    {
+        std::cout << "  (None)\n";
+    }
+    else
+    {
+        std::cout << "  [ ";
+        for (int regID : m_usedCalleeSavedRegs)
+        {
+            std::cout << getReg(static_cast<RegID>(regID))->get64BitName() << " ";
+        }
+        std::cout << "]\n";
+    }
+    std::cout << "------------------------------------------------\n\n";
 }
 
 std::vector<std::shared_ptr<BasicBlockMIR>> RegisterAllocator::replaceVirtualRegisters(

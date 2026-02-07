@@ -4,7 +4,7 @@
 
 #include <map>
 #include <memory>
-#include <string>
+#include <set>
 #include <vector>
 
 namespace mina
@@ -78,6 +78,8 @@ public:
     std::vector<std::shared_ptr<BasicBlockMIR>>& getMIRBlocks();
     unsigned int getOffset() const;
 
+    std::set<int> getUsedCalleeSavedRegs() const;
+
 private:
     std::vector<std::shared_ptr<BasicBlockMIR>> m_MIRBlocks;
     unsigned int functionOffset = 0;
@@ -88,6 +90,7 @@ private:
     const int m_RESERVED_START = 11;
     const int m_RESERVED_END = 15;
 
+    std::set<int> m_usedCalleeSavedRegs;
 
     void allocateRegisters();
     std::shared_ptr<InferenceGraph> buildGraph();
@@ -133,6 +136,10 @@ private:
 
     std::map<int, std::shared_ptr<Register>> createRegisterMap(
         std::shared_ptr<InferenceGraph> graph);
+    void printRegisterMappingResults(
+        std::shared_ptr<InferenceGraph> graph,
+        const std::map<int, std::shared_ptr<Register>>& registerMap);
+
     std::vector<std::shared_ptr<BasicBlockMIR>> replaceVirtualRegisters(
         std::map<int, std::shared_ptr<Register>> registerMap);
 
