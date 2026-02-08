@@ -3,11 +3,11 @@ Mina Programming Language
 
 Example:
 
-<img width="1155" height="630" alt="image" src="https://github.com/user-attachments/assets/36a2bc5e-db01-460e-9653-54c2269c56c1" />
+<img width="1185" height="629" alt="image" src="https://github.com/user-attachments/assets/1aeabaeb-d4aa-40e1-9712-9c91510ed3f7" />
 
 Put the output in a file, then compile with GCC:
 
-<img width="950" height="668" alt="image" src="https://github.com/user-attachments/assets/9e78d5a2-c143-4254-8874-0f6cdfee268a" />
+<img width="747" height="631" alt="image" src="https://github.com/user-attachments/assets/2491525e-f891-4875-ae64-31eb0fbdce54" />
 
 
 Features:
@@ -24,3 +24,4 @@ Features:
 * Scoped Expression
 * Static Single Assignment Intermediate Representation
 * Register Allocation by Graph-Coloring
+
