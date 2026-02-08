@@ -13,6 +13,7 @@
 #include <utility>
 #include <iostream>
 #include <algorithm>
+#include <stdexcept>
 #include <functional>
 #include <unordered_set>
 
@@ -69,20 +70,6 @@ InferenceGraph::InferenceGraph(std::vector<std::shared_ptr<IGNode>>&& nodes)
 
 void InferenceGraph::printAdjMatrix() const
 {
-    auto getSafeRegName = [&](int id) -> std::string
-    {
-        if (id >= 0 && id < (int)RegID::COUNT)
-        {
-             return mina::getReg(static_cast<mina::RegID>(id))->get64BitName();
-        }
-
-        for(auto& node : m_nodes)
-        {
-            if(node->getReg()->getID() == id) return node->getReg()->getString();
-        }
-        return "v" + std::to_string(id);
-    };
-
     // Print Header Row
     std::cout << "\t";
     for (const auto& colNode : m_nodes)
@@ -94,7 +81,6 @@ void InferenceGraph::printAdjMatrix() const
     // Print Data Rows
     for (const auto& rowNode : m_nodes)
     {
-        //std::cout << getSafeRegName(rowNode->getReg()->getID()) << "\t";
         std::cout << rowNode->getReg()->getString() << "\t";
         for (const auto& colNode : m_nodes)
         {
@@ -118,30 +104,16 @@ void InferenceGraph::printAdjMatrix() const
 
 void InferenceGraph::printAdjList() const
 {
-    auto getSafeRegName = [&](int id) -> std::string
-    {
-        if (id >= 0 && id < (int)RegID::COUNT)
-        {
-             return mina::getReg(static_cast<mina::RegID>(id))->get64BitName();
-        }
-
-        for(auto& node : m_nodes)
-        {
-            if(node->getReg()->getID() == id) return node->getReg()->getString();
-        }
-        return "v" + std::to_string(id);
-    };
-
     for (const auto& node : m_nodes)
     {
-        std::cout << getSafeRegName(node->getReg()->getID()) << ": ";
+        std::cout << node->getReg()->getString() << ": ";
 
         auto& neighbors = node->getNeighbors();
         for (const auto& neighborReg : neighbors)
         {
             if (neighborReg)
             {
-                std::cout << getSafeRegName(neighborReg->getID()) << " ";
+                std::cout << node->getReg()->getString() << " ";
             }
         }
         std::cout << "\n";
@@ -186,7 +158,7 @@ void InferenceGraph::addEdge(const std::shared_ptr<Register>& r1, const std::sha
         // Use ID check inside isNeighborWith to prevent duplicates
         if (!node1->isNeighborWith(node2))
         {
-            // CRITICAL: Add the original register pointers stored in the nodes
+            // Add the original register pointers stored in the nodes
             node1->getNeighbors().push_back(node2->getReg());
             node2->getNeighbors().push_back(node1->getReg());
         }
@@ -197,6 +169,24 @@ void InferenceGraph::addEdge(const std::shared_ptr<Register>& r1, const std::sha
 std::vector<std::shared_ptr<IGNode>>& InferenceGraph::getNodes()
 {
     return m_nodes;
+}
+
+std::string InferenceGraph::getRegName(int id) const
+{
+    // Try to get from physical registers first
+    if (id >= 0 && id < (int)RegID::COUNT)
+    {
+         return mina::getReg(static_cast<mina::RegID>(id))->get64BitName();
+    }
+
+    // Try to get from virtual registers in the graph
+    for(auto& node : m_nodes)
+    {
+        if(node->getReg()->getID() == id) return node->getReg()->getString();
+    }
+
+    throw std::runtime_error("Register ID " + std::to_string(id) +
+                             " not found in InferenceGraph.");
 }
 
 RegisterAllocator::RegisterAllocator(
@@ -222,26 +212,78 @@ std::set<int> RegisterAllocator::getUsedCalleeSavedRegs() const
     return m_usedCalleeSavedRegs;
 }
 
+int RegisterAllocator::getSpillAreaSize() const
+{
+    return m_spillAreaSize;
+}
+
 void RegisterAllocator::allocateRegisters()
 {
+    // Gather liveness data before running the first pass
+    livenessAnalysis();
+
+    // Do zero-initialization of uninitialized virtual registers pass
+    zeroInitializeUninitializedVirtualRegisters();
+
     if (!m_MIRBlocks.empty())
     {
         calculateLoopDepths(m_MIRBlocks[0]);
     }
 
-	auto inferenceGraph = buildGraph();
-    inferenceGraph->printAdjList();
-    inferenceGraph->printAdjMatrix();
+    auto inferenceGraph = buildGraph();
+    //inferenceGraph->printAdjList(); // Optional debug
+    //inferenceGraph->printAdjMatrix(); // Optional debug
 
-	addSpillCost(inferenceGraph);
-    printSpillCosts(inferenceGraph);
+    addSpillCost(inferenceGraph);
+    //printSpillCosts(inferenceGraph); // Optional debug
 
-	colorGraph(inferenceGraph);
-    printColoringResults(inferenceGraph);
-	auto registerMap = createRegisterMap(inferenceGraph);
-    printRegisterMappingResults(inferenceGraph, registerMap);
-	//auto transformedInstructions = replaceVirtualRegisters(registerMap);
-	//return transformedInstructions;
+    colorGraph(inferenceGraph);
+    //printColoringResults(inferenceGraph); // Optional debug
+
+    auto registerMap = createRegisterMap(inferenceGraph);
+    //printRegisterMappingResults(inferenceGraph, registerMap); // Optional debug
+
+    auto transformedInstructions = replaceVirtualRegisters(registerMap);
+    //printRegisterReplacements(transformedInstructions); // Optional debug
+
+    m_MIRBlocks = std::move(transformedInstructions);
+    return;
+}
+
+void RegisterAllocator::zeroInitializeUninitializedVirtualRegisters()
+{
+    auto& entryBlock = m_MIRBlocks[0];
+    std::vector<int> uninitRegs;
+
+    for (int liveReg : entryBlock->getLiveIn())
+    {
+        // If it is a Virtual Register (ID >= 16)
+        if (liveReg >= (int)RegID::COUNT)
+        {
+            uninitRegs.push_back(liveReg);
+        }
+    }
+
+    if (!uninitRegs.empty())
+    {
+        // We must insert instructions at the VERY BEGINNING of the block
+        // to define these variables.
+        std::vector<std::shared_ptr<MachineIR>> initInstrs;
+
+        for (int regID : uninitRegs)
+        {
+            // mov v_reg, 0
+            auto vReg = std::make_shared<Register>(regID, "v_" + std::to_string(regID)); // Name helps debug
+            auto zero = std::make_shared<ConstMIR>(0);
+            auto movZero = std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{ vReg, zero });
+
+            initInstrs.push_back(movZero);
+        }
+
+        // Prepend initialization instructions
+        auto& insts = entryBlock->getInstructions();
+        insts.insert(insts.begin(), initInstrs.begin(), initInstrs.end());
+    }
 }
 
 std::shared_ptr<InferenceGraph> RegisterAllocator::buildGraph()
@@ -250,8 +292,8 @@ std::shared_ptr<InferenceGraph> RegisterAllocator::buildGraph()
     auto inferenceGraph = constructBaseGraph();
 	addAllRegistersAsNodes(inferenceGraph);
 
-	livenessAnalysis(inferenceGraph);
-    printLivenessData(inferenceGraph);
+	livenessAnalysis();
+    //printLivenessData(inferenceGraph); // Optional debug
 	addEdgesBasedOnLiveness(inferenceGraph);
 
 	return inferenceGraph;
@@ -508,12 +550,6 @@ std::map<int, std::shared_ptr<Register>> RegisterAllocator::createRegisterMap(st
             continue;
         }
 
-        // If hardreg is callee saved -> add to set
-        if (calleeSavedIDs.count(color))
-        {
-            m_usedCalleeSavedRegs.insert(color);
-        }
-
         auto regNode = node->getReg();
         int regID = regNode->getID();
 
@@ -585,9 +621,324 @@ void RegisterAllocator::printRegisterMappingResults(
 }
 
 std::vector<std::shared_ptr<BasicBlockMIR>> RegisterAllocator::replaceVirtualRegisters(
-	std::map<int, std::shared_ptr<Register>> registerMap)
+    const std::map<int, std::shared_ptr<Register>>& registerMap)
 {
-    return {};
+    std::vector<std::shared_ptr<BasicBlockMIR>> newBlocks;
+
+    // Map<VirtualRegisterID, Offset>
+    std::map<int, int> spillOffsets;
+    int currentSpillBytes = 0;
+
+    std::function<std::shared_ptr<MachineIR>(std::shared_ptr<MachineIR>)> resolveOperand;
+    resolveOperand = [&](std::shared_ptr<MachineIR> op) -> std::shared_ptr<MachineIR>
+    {
+        if (op->getMIRType() == MIRType::Reg)
+        {
+            auto regObj = std::dynamic_pointer_cast<Register>(op);
+            int regID = regObj->getID();
+
+            if (regID < (int)RegID::COUNT) return op; // Physical
+
+            if (registerMap.count(regID))
+            {
+                return registerMap.at(regID); // Mapped
+            }
+
+            // Spill
+            if (spillOffsets.find(regID) == spillOffsets.end())
+            {
+                currentSpillBytes += 8;
+                spillOffsets[regID] = currentSpillBytes;
+            }
+
+            int finalOffset = 64 + spillOffsets[regID];
+
+            // return [rbp - offset]
+            return std::make_shared<MemoryMIR>(
+                getReg(RegID::RBP),
+                std::make_shared<ConstMIR>(-finalOffset)
+            );
+        }
+        else if (op->getMIRType() == MIRType::Memory)
+        {
+            auto memOp = std::dynamic_pointer_cast<MemoryMIR>(op);
+            if (memOp && memOp->getBaseRegister())
+            {
+                auto newBase = resolveOperand(memOp->getBaseRegister());
+
+                // If base is a Register, reconstruct MemoryMIR
+                if (newBase->getMIRType() == MIRType::Reg)
+                {
+                    auto newBaseReg = std::dynamic_pointer_cast<Register>(newBase);
+                    auto disp = memOp->getOffsetOrLiteral();
+
+                    // EXPLICIT CASTING for constructors
+                    if (auto constDisp = std::dynamic_pointer_cast<ConstMIR>(disp))
+                    {
+                        return std::make_shared<MemoryMIR>(newBaseReg, constDisp);
+                    }
+                    else if (auto litDisp = std::dynamic_pointer_cast<LiteralMIR>(disp))
+                    {
+                        return std::make_shared<MemoryMIR>(newBaseReg, litDisp);
+                    }
+                    else
+                    {
+                        return std::make_shared<MemoryMIR>(newBaseReg, 0);
+                    }
+                }
+            }
+            return op;
+        }
+
+        return op; // Immediate/Label
+    };
+
+    const auto& r10 = getReg(RegID::R10);
+    const auto& r11 = getReg(RegID::R11);
+
+    for (const auto& oldBlock : m_MIRBlocks)
+    {
+        auto newBlock = std::make_shared<BasicBlockMIR>(oldBlock->getName());
+
+        for (const auto& inst : oldBlock->getInstructions())
+        {
+            auto mirType = inst->getMIRType();
+            const auto& oldOps = inst->getOperands();
+
+            // Resolve Operands
+            std::vector<std::shared_ptr<MachineIR>> newOps;
+            for (auto& op : oldOps)
+            {
+                newOps.push_back(resolveOperand(op));
+            }
+
+            // Legalize Mem-Mem
+            bool op0Mem = (newOps.size() > 0 && newOps[0]->getMIRType() == MIRType::Memory);
+            bool op1Mem = (newOps.size() > 1 && newOps[1]->getMIRType() == MIRType::Memory);
+
+            if (op0Mem && op1Mem && mirType != MIRType::Mov)
+            {
+                // mov r10, src -> op dest, r10
+                newBlock->addInstruction(std::make_shared<MovMIR>(
+                    std::vector<std::shared_ptr<MachineIR>>{ r10, newOps[1] }
+                ));
+                newOps[1] = r10;
+            }
+
+            // Emit Instructions
+            switch (mirType)
+            {
+            // Binary Ops (Constructors take vector<MachineIR>)
+            case MIRType::Mov:   newBlock->addInstruction(std::make_shared<MovMIR>(newOps)); break;
+            case MIRType::Add:   newBlock->addInstruction(std::make_shared<AddMIR>(newOps)); break;
+            case MIRType::Sub:   newBlock->addInstruction(std::make_shared<SubMIR>(newOps)); break;
+            case MIRType::Mul:   newBlock->addInstruction(std::make_shared<MulMIR>(newOps)); break;
+            case MIRType::And:   newBlock->addInstruction(std::make_shared<AndMIR>(newOps)); break;
+            case MIRType::Or:    newBlock->addInstruction(std::make_shared<OrMIR>(newOps)); break;
+            case MIRType::Cmp:   newBlock->addInstruction(std::make_shared<CmpMIR>(newOps)); break;
+            case MIRType::Lea:   newBlock->addInstruction(std::make_shared<LeaMIR>(newOps)); break;
+
+            // Unary Ops (Need Casting)
+            case MIRType::Not:
+            {
+                auto regOp = std::dynamic_pointer_cast<Register>(newOps[0]);
+                if (regOp)
+                {
+                    newBlock->addInstruction(std::make_shared<NotMIR>(regOp));
+                }
+                else
+                {
+                    // Fixup: NOT [mem] -> MOV R11, [mem]; NOT R11; MOV [mem], R11
+                    newBlock->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{ r11, newOps[0] }));
+                    newBlock->addInstruction(std::make_shared<NotMIR>(r11));
+                    newBlock->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{ newOps[0], r11 }));
+                }
+                break;
+            }
+
+            case MIRType::Div:
+            {
+                if (auto mem = std::dynamic_pointer_cast<MemoryMIR>(newOps[0]))
+                {
+                    newBlock->addInstruction(std::make_shared<DivMIR>(mem));
+                }
+                else
+                {
+                    throw std::runtime_error("DivMIR constructor must accept MemoryMIR.");
+                }
+                break;
+            }
+
+            // SetCC Instructions (Require Register)
+            // Macro to handle cast + fixup
+            #define HANDLE_SETCC(CLASS_NAME) \
+                { \
+                    auto regOp = std::dynamic_pointer_cast<Register>(newOps[0]); \
+                    if (regOp) { \
+                        newBlock->addInstruction(std::make_shared<CLASS_NAME>(regOp)); \
+                    } else { \
+                        /* Fixup: SETcc r11b; MOV [mem], r11 */ \
+                        newBlock->addInstruction(std::make_shared<CLASS_NAME>(r11)); \
+                        newBlock->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{ newOps[0], r11 })); \
+                    } \
+                }
+
+            case MIRType::Sete:  HANDLE_SETCC(SeteMIR); break;
+            case MIRType::Setne: HANDLE_SETCC(SetneMIR); break;
+            case MIRType::Setl:  HANDLE_SETCC(SetlMIR); break;
+            case MIRType::Setle: HANDLE_SETCC(SetleMIR); break;
+            case MIRType::Setg:  HANDLE_SETCC(SetgMIR); break;
+            case MIRType::Setge: HANDLE_SETCC(SetgeMIR); break;
+
+            // Movzx (Requires Register Destination)
+            case MIRType::Movzx:
+            {
+                auto oldMovzx = std::dynamic_pointer_cast<MovzxMIR>(inst);
+                auto& op = newOps[0];
+                auto regOp = std::dynamic_pointer_cast<Register>(op);
+
+                if (regOp)
+                {
+                    newBlock->addInstruction(std::make_shared<MovzxMIR>(
+                        regOp,
+                        oldMovzx->getToRegSize(),
+                        oldMovzx->getFromRegSize(),
+                        oldMovzx->isFromRegLow()
+                    ));
+                }
+                else
+                {
+                    // Spill Fixup: MOVZX r11, r11 -> MOV [mem], r11
+                    // Load Spill -> R11
+                    newBlock->addInstruction(std::make_shared<MovMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{ r11, op }
+                    ));
+                    // Ext R11 -> R11
+                    newBlock->addInstruction(std::make_shared<MovzxMIR>(
+                        r11,
+                        oldMovzx->getToRegSize(),
+                        oldMovzx->getFromRegSize(),
+                        oldMovzx->isFromRegLow()
+                    ));
+                    // Store R11 -> Spill
+                    newBlock->addInstruction(std::make_shared<MovMIR>(
+                        std::vector<std::shared_ptr<MachineIR>>{ op, r11 }
+                    ));
+                }
+                break;
+            }
+
+            // Test (Requires Registers)
+            case MIRType::Test:
+            {
+                auto r1 = std::dynamic_pointer_cast<Register>(newOps[0]);
+                auto r2 = std::dynamic_pointer_cast<Register>(newOps[1]);
+
+                // Load spilled operands into scratch regs if necessary
+                if (!r1)
+                {
+                    newBlock->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{ r10, newOps[0] }));
+                    r1 = r10;
+                }
+                if (!r2)
+                {
+                    newBlock->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{ r11, newOps[1] }));
+                    r2 = r11;
+                }
+
+                newBlock->addInstruction(std::make_shared<TestMIR>(r1, r2));
+                break;
+            }
+
+            // Control Flow
+            case MIRType::Call:
+            case MIRType::Ret:
+            case MIRType::Jmp:
+            case MIRType::Jz:
+            case MIRType::Jnz:
+            case MIRType::Cqo:
+                newBlock->addInstruction(inst);
+                break;
+
+            default:
+                newBlock->addInstruction(inst);
+                break;
+            }
+        }
+        newBlocks.push_back(newBlock);
+    }
+
+    m_spillAreaSize = currentSpillBytes;
+    return newBlocks;
+}
+
+void RegisterAllocator::printRegisterReplacements(
+    const std::vector<std::shared_ptr<BasicBlockMIR>>& finalBlocks) const
+{
+    std::cout << "\n=== REGISTER REPLACEMENT DIAGNOSTICS ===\n";
+
+    int totalInsts = 0;
+    int memoryOps = 0;
+    int illegalOps = 0;
+    int remainingVirtuals = 0;
+
+    for (const auto& block : finalBlocks)
+    {
+        for (const auto& inst : block->getInstructions())
+        {
+            totalInsts++;
+            const auto& ops = inst->getOperands();
+
+            // Check 1: Are there any Virtual Registers left?
+            for (const auto& op : ops)
+            {
+                if (op->getMIRType() == MIRType::Reg)
+                {
+                    auto reg = std::dynamic_pointer_cast<Register>(op);
+                    if (reg->getID() >= (int)RegID::COUNT)
+                    {
+                        std::cout << "[ERROR] Found remaining Virtual Register v"
+                                  << reg->getID() << " in block " << block->getName() << "\n";
+                        remainingVirtuals++;
+                    }
+                }
+                else if (op->getMIRType() == MIRType::Memory)
+                {
+                    memoryOps++;
+                }
+            }
+
+            // Check 2: Illegal Memory-to-Memory Operations
+            // (Exclude Mov because we fixed it, but check binary ops like Add, Sub, Cmp)
+            if (ops.size() >= 2 && 
+                ops[0]->getMIRType() == MIRType::Memory &&
+                ops[1]->getMIRType() == MIRType::Memory)
+            {
+                // Move instructions can technically handle mem-mem via scratch, 
+                // but if we see it in the final output as a single instruction, it's illegal.
+                if (inst->getMIRType() != MIRType::Mov)
+                {
+                     std::cout << "[ERROR] Illegal Mov Mem-Mem operation detected in block "
+                               << block->getName() << "\n";
+                     illegalOps++;
+                }
+            }
+        }
+    }
+
+    std::cout << "Total Instructions: " << totalInsts << "\n";
+    std::cout << "Memory Operands (Spills/Locals): " << memoryOps << "\n";
+    std::cout << "Spill Area Size: " << m_spillAreaSize << " bytes\n";
+
+    if (remainingVirtuals == 0 && illegalOps == 0)
+    {
+        std::cout << "[SUCCESS] All virtual registers replaced and instructions legalized.\n";
+    }
+    else
+    {
+        std::cout << "[FAILURE] Issues detected in code generation.\n";
+    }
+    std::cout << "========================================\n\n";
 }
 
 std::shared_ptr<InferenceGraph> RegisterAllocator::constructBaseGraph()
@@ -633,7 +984,7 @@ std::shared_ptr<InferenceGraph> RegisterAllocator::constructBaseGraph()
     std::shared_ptr<InferenceGraph> ig =
         std::make_shared<InferenceGraph>(std::move(nodes));
 
-    // CRITICAL: Make physical registers interfere with each other so they don't share colors.
+    // Make physical registers interfere with each other so they don't share colors.
     // This creates a "Clique" where every physical register has a different color.
     for (size_t i = 0; i < physRegs.size(); ++i)
     {
@@ -895,7 +1246,7 @@ void RegisterAllocator::addAllRegistersAsNodes(std::shared_ptr<InferenceGraph> g
     }
 }
 
-void RegisterAllocator::livenessAnalysis(std::shared_ptr<InferenceGraph> graph)
+void RegisterAllocator::livenessAnalysis()
 {
     // Initial Setup: Def-Use and clear existing sets
     for (auto& block : m_MIRBlocks)
@@ -964,24 +1315,6 @@ void RegisterAllocator::livenessAnalysis(std::shared_ptr<InferenceGraph> graph)
 void RegisterAllocator::printLivenessData(
     std::shared_ptr<InferenceGraph> graph) const
 {
-
-    auto getSafeRegName = [&](int id) -> std::string
-    {
-        if (id >= 0 && id < (int)RegID::COUNT)
-        {
-             return mina::getReg(static_cast<mina::RegID>(id))->get64BitName();
-        }
-
-        for(auto& node : graph->getNodes())
-        {
-            if(node->getReg()->getID() == id) return node->getReg()->getString();
-        }
-
-        // Fallback, should not go here, unless the register is missing from the
-        // graph
-        return "v" + std::to_string(id);
-    };
-
     for (const auto& block : m_MIRBlocks)
     {
         std::cout << "Liveness data for block: " << block->getName() << "\n";
@@ -997,7 +1330,7 @@ void RegisterAllocator::printLivenessData(
             {
                 for (int id : regSet)
                 {
-                    std::cout << getSafeRegName(id) << " ";
+                    std::cout << graph->getRegName(id) << " ";
                 }
             }
             std::cout << "\n";
@@ -1047,19 +1380,6 @@ void RegisterAllocator::calculateLoopDepths(std::shared_ptr<BasicBlockMIR> entry
 
 void RegisterAllocator::printSpillCosts(std::shared_ptr<InferenceGraph> graph)
 {
-    auto getSafeRegName = [&](int id) -> std::string
-    {
-        if (id >= 0 && id < (int)RegID::COUNT)
-        {
-             return mina::getReg(static_cast<mina::RegID>(id))->get64BitName();
-        }
-
-        for(auto& node : graph->getNodes())
-        {
-            if(node->getReg()->getID() == id) return node->getReg()->getString();
-        }
-        return "v" + std::to_string(id);
-    };
     std::cout << "--- Register Spill Costs ---\n";
     std::cout << "Register\tCost\t\tDegree\tRatio (Cost/Deg)\n";
     std::cout << "------------------------------------------------\n";
@@ -1068,7 +1388,7 @@ void RegisterAllocator::printSpillCosts(std::shared_ptr<InferenceGraph> graph)
     {
         double cost = node->getSpillCost();
         int degree = node->getNeighbors().size();
-        std::string regName = getSafeRegName(node->getReg()->getID());
+        std::string regName = node->getReg()->getString();
 
         std::cout << regName << "\t\t";
 

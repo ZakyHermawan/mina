@@ -28,7 +28,7 @@ public:
 	void setSSA(SSA& SSA);
 
 	void linearizeCFG();
-	void generateMIR();
+	void generateMIR(bool isMain = false);
 	void addSSA(std::string funcName, SSA& ssa);
 	void generateAllFunctionsMIR();
 };

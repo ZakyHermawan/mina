@@ -3,6 +3,8 @@
 	var b: boolean
 	var c: boolean
 	;
+	a := false
+	b := false
 	put(b, skip)
 	b := ~b
 	put(b, skip)

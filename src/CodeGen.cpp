@@ -53,7 +53,7 @@ void CodeGen::linearizeCFG()
     std::reverse(m_linearizedBlocks.begin(), m_linearizedBlocks.end());
 }
 
-void CodeGen::generateMIR()
+void CodeGen::generateMIR(bool isMain)
 {
     auto rax = std::make_shared<Register>(0, "rax", "eax", "ax", "ah", "al");
     auto rbx = std::make_shared<Register>(1, "rbx", "ebx", "bx", "bh", "bl");
@@ -69,7 +69,10 @@ void CodeGen::generateMIR()
     auto rbp = std::make_shared<Register>(11, "rbp", "ebp", "bp", "", "");
     auto rsp = std::make_shared<Register>(12, "rsp", "esp", "sp", "", "");
     auto rip = std::make_shared<Register>(13, "rip", "eip", "ip", "", "");
-    unsigned int nextRegId = 14;
+
+    // R10 and R11 are reserved temporaries, so we skip that too, thats why the
+    // register ID of temporary starts with ID 16
+    unsigned int nextRegId = 16;
     unsigned int tmpRegId = 0;
 
     std::map<std::string, size_t> vRegToOffset;
@@ -77,8 +80,8 @@ void CodeGen::generateMIR()
     std::vector<std::string> strLiterals;
     unsigned int strConstCtr = 0;
 
-    auto assignVRegToOffsetIfDoesNotExist =
-        [&](std::string targetStr)
+    // Helper to assign stack offsets to VRegs if not already assigned
+    auto assignVRegToOffsetIfDoesNotExist = [&](std::string targetStr)
     {
         if (vRegToOffset.find(targetStr) == vRegToOffset.end())
         {
@@ -92,6 +95,7 @@ void CodeGen::generateMIR()
         }
     };
 
+    // Helper to create LEA instructions to string literals
     auto leaToLabel = [&](std::string format_str)
     {
         auto literalMIR = std::make_shared<LiteralMIR>(format_str);
@@ -101,6 +105,7 @@ void CodeGen::generateMIR()
         return leaMIR;
     };
 
+    // Helper to get MemoryMIR for a given VReg string
     auto memoryLocationForVReg = [&](std::string vReg)
     {
         if (vRegToOffset.find(vReg) == vRegToOffset.end())
@@ -129,12 +134,15 @@ void CodeGen::generateMIR()
         return newReg;
     };
 
+    // Helper to create temporary VRegs
     auto createTempVReg = [&]() -> std::shared_ptr<Register>
     {
         std::string name = "v_tmp" + std::to_string(tmpRegId++);
         return getOrCreateVReg(name);
     };
 
+    // Helper to legalize mov instructions based on x86-64 constraints
+    // (No memory-to-memory moves)
     auto legalizeMov = [&](std::shared_ptr<BasicBlockMIR> bb,
                            std::shared_ptr<MachineIR> dst,
                            std::shared_ptr<MachineIR> src)
@@ -142,12 +150,12 @@ void CodeGen::generateMIR()
         auto dstReg = std::dynamic_pointer_cast<Register>(dst);
         auto srcReg = std::dynamic_pointer_cast<Register>(src);
 
-        // Determine if destination is a physical register (0-10)
+        // Determine if destination is a physical register (0-15)
         bool isDstPhysical = false;
         if (dstReg)
         {
             unsigned int id = dstReg->getID();
-            if (id <= 10)
+            if (id <= 15)
             {
                 isDstPhysical = true;
             }
@@ -161,7 +169,7 @@ void CodeGen::generateMIR()
         }
         else
         {
-            // Destination is a VReg (> 10) or MemoryMIR.
+            // Destination is a VReg (> 15) or MemoryMIR.
             // Use rax (ID 0) as a bridge to prevent illegal Mem-to-Mem moves.
             bb->addInstruction(std::make_shared<MovMIR>(
                 std::vector<std::shared_ptr<MachineIR>>{rax, src}));
@@ -173,16 +181,20 @@ void CodeGen::generateMIR()
     m_mirBlocks.clear();
     linearizeCFG();
 
-    std::map<std::string, std::shared_ptr<BasicBlockMIR>> nameToMIR;
+    // Copy basic block structure from TAC (Three-Address Code) CFG to MIR CFG
+    std::map<std::string, std::shared_ptr<BasicBlockMIR>> nameToBBMIR;
     std::vector<std::shared_ptr<BasicBlockMIR>> linearizedMIRBlock;
 
+    // Create empty MIR basic blocks
     for (const auto& bb : m_linearizedBlocks)
     {
         auto newMIR = std::make_shared<BasicBlockMIR>(bb->getName());
-        nameToMIR[bb->getName()] = newMIR;
+        nameToBBMIR[bb->getName()] = newMIR;
         linearizedMIRBlock.push_back(newMIR);
     }
 
+    // Link predecessors and successors in MIR basic blocks
+    // Based on TAC basic blocks
     for (size_t i = 0; i < m_linearizedBlocks.size(); ++i)
     {
         auto& oldBB = m_linearizedBlocks[i];
@@ -190,11 +202,11 @@ void CodeGen::generateMIR()
 
         for (const auto& succ : oldBB->getSuccessors())
         {
-            mirBB->getSuccessors().push_back(nameToMIR[succ->getName()]);
+            mirBB->getSuccessors().push_back(nameToBBMIR[succ->getName()]);
         }
         for (const auto& pred : oldBB->getPredecessors())
         {
-            mirBB->getPredecessors().push_back(nameToMIR[pred->getName()]);
+            mirBB->getPredecessors().push_back(nameToBBMIR[pred->getName()]);
         }
     }
 
@@ -202,7 +214,10 @@ void CodeGen::generateMIR()
     {
         auto& currBlock = m_linearizedBlocks[i];
         auto& bbMIR = linearizedMIRBlock[i];
-        assert(bbMIR->getName() == currBlock->getName());
+        if (bbMIR->getName() != currBlock->getName())
+        {
+            throw std::runtime_error("CodeGen Error: Basic Block name mismatch during MIR generation.");
+        }
 
         // Calculates the element address from the base vreg every time it is
         // needed, we need to rematerialize the address each time to avoid
@@ -260,11 +275,9 @@ void CodeGen::generateMIR()
         };
 
         auto& inst = currBlock->getInstructions();
-
         for (int j = 0; j < inst.size(); ++j)
         {
             auto instType = inst[j]->getInstType();
-
             if (instType == InstType::FuncCall || instType == InstType::ProcCall)
             {
                 auto isFunc = (instType == InstType::FuncCall);
@@ -507,7 +520,11 @@ void CodeGen::generateMIR()
                 auto getInst = std::dynamic_pointer_cast<GetInst>(inst[j]);
                 const auto& target = getInst->getTarget();
                 
-                assert(target->getInstType() == InstType::Ident && "Can only get integer");
+                if (target->getInstType() != InstType::Ident)
+                {
+                    throw std::runtime_error("CodeGen Error: Get instruction target must be an identifier.");
+                }
+
                 auto identInst = std::dynamic_pointer_cast<IdentInst>(target);
                 std::string targetVRegName = "v_" + identInst->getString();
 
@@ -894,6 +911,9 @@ void CodeGen::generateMIR()
             }
         }
 
+        // Last processing for the basic block
+        // Make sure the terminal block have no successors and
+        // end with RetMIR
         auto& lastInst = currBlock->getInstructions().back();
         if (lastInst->getInstType() == InstType::Return ||
             lastInst->getInstType() == InstType::Halt)
@@ -902,12 +922,7 @@ void CodeGen::generateMIR()
             currBlock->getSuccessors().clear();
             bbMIR->getSuccessors().clear();
 
-            bbMIR->addInstruction(std::make_shared<MovMIR>(
-                std::vector<std::shared_ptr<MachineIR>>{
-                    rax, std::make_shared<ConstMIR>(0)}));
-
             // Add RetMIR at the end of terminal block
-            // For Liveness Analysis
             bbMIR->addInstruction(std::make_shared<RetMIR>());
         }
         m_mirBlocks.push_back(std::move(bbMIR));
@@ -925,34 +940,106 @@ void CodeGen::generateMIR()
         }
     }
 
-    // Shadow space 32 byte and 8 byte for each variable
-    size_t offset = 32 + vRegToOffset.size() * 8;
-
-    // Offset for arrays
+    // Calculate Base Local Size (Shadow + Pinned variables + Arrays)
+    // Windows x64 Shadow space (32 bytes) + mapped vregs
+    // Note: these variables are the variables that is being pinned to the
+    // stack because of the instruction constrain, for example,
+    // scanf need the variable for the arg to be allocated on stack.
+    size_t locals_size = 32 + vRegToOffset.size() * 8;
     for (const auto& arrPair : arrVRegToSize)
     {
-        offset += static_cast<size_t>(arrPair.second) * 8;
+        locals_size += static_cast<size_t>(arrPair.second) * 8;
     }
 
-    // Allocate registers
+    // For diagnostics only,
+    // disable this later
+    //std::cout << "\n--- BEFORE REGISTER ALLOCATION ---\n";
+    //int counter = 0;
+    //for (const auto& mirBlock : m_mirBlocks)
+    //{
+    //    if (counter++)
+    //        std::cout << mirBlock->getName() << ": \n";
+    //    mirBlock->printInstructions();
+    //}
+
+
+    // Run Register Allocator
     RegisterAllocator ra(std::move(m_mirBlocks));
     m_mirBlocks = ra.getMIRBlocks();
 
-    // Function Prologue
-    unsigned int aligned_offset = (offset + 15) & ~15; // 16-byte alignment
-    std::cout << "    push rbp\n    mov rbp, rsp\n";
-    std::cout << "    sub rsp, " << aligned_offset << std::endl;
+    // Add Spills to Local Size
+    // locals_size already contains: 32 (Shadow) + Pinned variables + Arrays
+    locals_size += ra.getSpillAreaSize();
 
+    // 4. Calculate Stack Alignment logic
+    // The stack must be 16-byte aligned before any 'call' instruction.
+    // Logic:
+    //   Entry RSP ends in 8 (Return Addr).
+    //   push rbp -> RSP ends in 0 (Aligned).
+    //   push N callee-saved regs -> RSP moves by (N * 8).
+    //   sub rsp, X -> RSP moves by X.
+    //   We need (N * 8 + X) to be a multiple of 16 to maintain alignment.
+
+    std::set<int> usedCalleeSaved = ra.getUsedCalleeSavedRegs();
+    size_t callee_saved_size = usedCalleeSaved.size() * 8;
+
+    // Total bytes we want to "add" to the stack frame (Pushes + Sub)
+    size_t total_stack_growth = callee_saved_size + locals_size;
+
+    // Round up the total growth to the nearest 16 bytes
+    size_t aligned_stack_growth = (total_stack_growth + 15) & ~15;
+
+    // The actual amount to subtract from RSP.
+    // The pushes take up 'callee_saved_size', so we subtract the rest.
+    size_t prologue_sub_amount = aligned_stack_growth - callee_saved_size;
+
+    if (isMain)
+    {
+        std::cout << "main: \n";
+    }
+
+    // Function Prologue
+    std::cout << "    push rbp\n";
+    std::cout << "    mov rbp, rsp\n";
+
+    // Push Callee-Saved Registers FIRST.
+    // If we 'sub rsp' first, these pushes would bury our shadow space,
+    // causing printf to overwrite our saved registers.
+    for (int regID : usedCalleeSaved)
+    {
+        std::cout << "    push " << mina::getReg((mina::RegID)regID)->get64BitName() << "\n";
+    }
+
+    // Now allocate space for Locals + Spills + Shadow Space
+    if (prologue_sub_amount > 0)
+    {
+        std::cout << "    sub rsp, " << prologue_sub_amount << "\n";
+    }
+
+    // Print the instructions after Register Allocation
     int ctr = 0;
     for (const auto& mirBlock : m_mirBlocks)
     {
-        if(ctr++)
+        if (ctr++)
+        {
             std::cout << mirBlock->getName() << ": \n";
+        }
         mirBlock->printInstructions();
     }
 
-    // Function epilogue
-    std::cout << "    add rsp, " << aligned_offset << std::endl;
+    // Function Epilogue
+    // Deallocate the stack gap first
+    if (prologue_sub_amount > 0)
+    {
+        std::cout << "    add rsp, " << prologue_sub_amount << "\n";
+    }
+
+    // Pop Callee-Saved Registers (MUST be in REVERSE order of push)
+    for (auto it = usedCalleeSaved.rbegin(); it != usedCalleeSaved.rend(); ++it)
+    {
+        std::cout << "    pop " << mina::getReg((mina::RegID)*it)->get64BitName() << "\n";
+    }
+
     std::cout << "    mov rsp, rbp\n    pop rbp\n    ret\n";
 }
 
@@ -971,11 +1058,10 @@ void CodeGen::generateAllFunctionsMIR()
     std::cout << std::endl << std::endl;
     std::cout << ".intel_syntax noprefix\n.globl main\n";
     std::cout << ".section .text\n";
-    std::cout << "fmt_str: .string \"%d\"\n";
+    std::cout << "fmt_str: .string \"%lld\"\n";
     std::cout << "true_str: .string \"true\"\n";
     std::cout << "false_str: .string \"false\"\n";
 
-    std::cout << "main: \n";
     m_stringLiterals.insert("fmt_str");
     m_stringLiterals.insert("true_str");
     m_stringLiterals.insert("false_str");
@@ -984,7 +1070,7 @@ void CodeGen::generateAllFunctionsMIR()
     // Generate MIR for main function first
     m_ssa.renameSSA();
     //m_ssa.printCFG();
-    generateMIR();
+    generateMIR(/*isMain=*/ true);
 
     for (auto& [funcName, ssa] : m_functionSSAMap)
     {

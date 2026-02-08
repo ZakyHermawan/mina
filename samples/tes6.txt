@@ -1,7 +1,14 @@
 {
-	var a: integer;
-	a := 100
-	put(a, skip)
-	get(a)
-	put(a, skip)
+    var a: integer var b: integer var c: integer var d: integer
+    var e: integer var f: integer var g: integer var h: integer
+    var i: integer var j: integer var k: integer var l: integer
+    var m: integer;
+
+    a := 1  b := 2  c := 3  d := 4
+    e := 5  f := 6  g := 7  h := 8
+    i := 9  j := 10 k := 11 l := 12
+    
+    m := a + b + c + d + e + f + g + h + i + j + k + l
+    
+    put(m, skip)
 }

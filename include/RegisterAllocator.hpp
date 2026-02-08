@@ -3,8 +3,9 @@
 #include "MachineIR.hpp"
 
 #include <map>
-#include <memory>
 #include <set>
+#include <memory>
+#include <string>
 #include <vector>
 
 namespace mina
@@ -59,6 +60,7 @@ public:
     void addEdge(const std::shared_ptr<Register>& r1,
                  const std::shared_ptr<Register>& r2);
     std::vector<std::shared_ptr<IGNode>>& getNodes();
+    std::string getRegName(int id) const;
 
 private:
     std::vector<std::shared_ptr<IGNode>> m_nodes;
@@ -79,6 +81,7 @@ public:
     unsigned int getOffset() const;
 
     std::set<int> getUsedCalleeSavedRegs() const;
+    int getSpillAreaSize() const;
 
 private:
     std::vector<std::shared_ptr<BasicBlockMIR>> m_MIRBlocks;
@@ -92,7 +95,17 @@ private:
 
     std::set<int> m_usedCalleeSavedRegs;
 
+    int m_spillAreaSize = 0; // Tracks bytes needed for spills
+
     void allocateRegisters();
+
+    // ---------------------------------------------------------
+    // Zero-Initialize Uninitialized Locals
+    // If a Virtual Register is Live-In at the Entry Block, it means
+    // the user read it before writing to it. We default it to 0.
+    // ---------------------------------------------------------
+    void zeroInitializeUninitializedVirtualRegisters();
+
     std::shared_ptr<InferenceGraph> buildGraph();
     void addSpillCost(std::shared_ptr<InferenceGraph> graph);
 
@@ -141,7 +154,9 @@ private:
         const std::map<int, std::shared_ptr<Register>>& registerMap);
 
     std::vector<std::shared_ptr<BasicBlockMIR>> replaceVirtualRegisters(
-        std::map<int, std::shared_ptr<Register>> registerMap);
+        const std::map<int, std::shared_ptr<Register>>& registerMap);
+    void printRegisterReplacements(
+        const std::vector<std::shared_ptr<BasicBlockMIR>>& finalBlocks) const;
 
     // Create all physical registers as nodes in the graph
     // and return the base graph with physical registers interconnected
@@ -186,7 +201,7 @@ private:
      * * Note: Analysis converges when In[B] and Out[B] sets reach a fixed point
      * for all blocks in the Control Flow Graph (CFG).
      */
-    void livenessAnalysis(std::shared_ptr<InferenceGraph> graph);
+    void livenessAnalysis();
     void printLivenessData(std::shared_ptr<InferenceGraph> graph) const;
 
     void calculateLoopDepths(

@@ -180,6 +180,7 @@ public:
     std::string getString() const override;
 
     std::shared_ptr<Register>& getBaseRegister();
+    std::shared_ptr<MachineIR>& getOffsetOrLiteral();
 };
 
 class MovMIR : public MachineIR
@@ -402,6 +403,10 @@ public:
     MIRType getMIRType() const override;
     std::string getString() const override;
     std::vector<std::shared_ptr<MachineIR>>& getOperands() override;
+
+    unsigned int getToRegSize() const;
+    unsigned int getFromRegSize() const;
+    bool isFromRegLow() const;
 };
 
 class TestMIR: public MachineIR

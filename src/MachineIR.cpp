@@ -91,23 +91,50 @@ std::vector<std::shared_ptr<BasicBlockMIR>>& BasicBlockMIR::getSuccessors()
     return m_successors;
 }
 
-void BasicBlockMIR::addDef(int regID) { m_def.insert(regID); }
+void BasicBlockMIR::addDef(int regID)
+{
+    m_def.insert(regID);
+}
 
-void BasicBlockMIR::addUse(int regID) { m_use.insert(regID); }
+void BasicBlockMIR::addUse(int regID)
+{
+    m_use.insert(regID);
+}
 
-void BasicBlockMIR::insertDef(int regID) { m_def.insert(regID); }
+void BasicBlockMIR::insertDef(int regID)
+{
+    m_def.insert(regID);
+}
 
-void BasicBlockMIR::insertLiveIn(int regID) { m_liveIn.insert(regID); }
+void BasicBlockMIR::insertLiveIn(int regID)
+{
+    m_liveIn.insert(regID);
+}
 
-void BasicBlockMIR::insertLiveOut(int regID) { m_liveOut.insert(regID); }
+void BasicBlockMIR::insertLiveOut(int regID)
+{
+    m_liveOut.insert(regID);
+}
 
-std::set<int>& BasicBlockMIR::getDef() { return m_def; }
+std::set<int>& BasicBlockMIR::getDef()
+{
+    return m_def;
+}
 
-std::set<int>& BasicBlockMIR::getUse() { return m_use; }
+std::set<int>& BasicBlockMIR::getUse()
+{
+    return m_use;
+}
 
-std::set<int>& BasicBlockMIR::getLiveIn() { return m_liveIn; }
+std::set<int>& BasicBlockMIR::getLiveIn()
+{
+    return m_liveIn;
+}
 
-std::set<int>& BasicBlockMIR::getLiveOut() { return m_liveOut; }
+std::set<int>& BasicBlockMIR::getLiveOut()
+{
+    return m_liveOut;
+}
 
 void BasicBlockMIR::generateDefUse()
 {
@@ -127,8 +154,8 @@ void BasicBlockMIR::generateDefUse()
 
         auto isReserved = [](int id)
         {
-            // 11 = RBP, 12 = RSP, 13 = RIP
-            return (id >= 11 && id <= 13);
+            // RBP = 11, RSP = 12, RIP = 13, R10 = 14, R11 = 15
+            return (id >= 11 && id <= 15);
         };
 
         auto markUse = [&](int id)
@@ -391,7 +418,6 @@ int ConstMIR::getConst() const
     return m_const; 
 }
 
-
 // ==========================================
 // MemoryMIR
 // ==========================================
@@ -401,6 +427,7 @@ MemoryMIR::MemoryMIR(std::shared_ptr<Register> reg, int offset)
 {
     m_operands.push_back(m_reg);
     m_operands.push_back(m_offset);
+    m_operands.push_back(nullptr);  // Placeholder for literal
 }
 
 MemoryMIR::MemoryMIR(std::shared_ptr<Register> reg,
@@ -409,6 +436,7 @@ MemoryMIR::MemoryMIR(std::shared_ptr<Register> reg,
 {
     m_operands.push_back(m_reg);
     m_operands.push_back(m_offset);
+    m_operands.push_back(nullptr);  // Placeholder for literal
 }
 
 MemoryMIR::MemoryMIR(std::shared_ptr<Register> reg,
@@ -416,6 +444,8 @@ MemoryMIR::MemoryMIR(std::shared_ptr<Register> reg,
     : m_reg(std::move(reg)), m_literal(std::move(literal))
 {
     m_operands.push_back(m_reg);
+    m_operands.push_back(nullptr);  // Placeholder for offset
+    m_operands.push_back(m_literal);
 }
 
 MIRType MemoryMIR::getMIRType() const 
@@ -425,8 +455,10 @@ MIRType MemoryMIR::getMIRType() const
 
 std::string MemoryMIR::getString() const
 {
-    auto reg = std::dynamic_pointer_cast<Register>(m_reg);
-    auto offset = std::dynamic_pointer_cast<ConstMIR>(m_offset);
+    auto reg = std::dynamic_pointer_cast<Register>(m_operands[0]);
+    auto offset = std::dynamic_pointer_cast<ConstMIR>(m_operands[1]);
+    auto literal = std::dynamic_pointer_cast<LiteralMIR>(m_operands[2]);
+
     if (offset)
     {
         std::string strRepr = "QWORD PTR [" + reg->getString();
@@ -443,9 +475,9 @@ std::string MemoryMIR::getString() const
         strRepr += "]";
         return strRepr;
     }
-    if (m_literal)
+    if (literal)
     {
-        return "QWORD PTR [" + reg->getString() + " + " + m_literal->getString() + "]";
+        return "QWORD PTR [" + reg->getString() + " + " + literal->getString() + "]";
     }
     return "No Representation for MemoryMIR";
 }
@@ -453,6 +485,15 @@ std::string MemoryMIR::getString() const
 std::shared_ptr<Register>& MemoryMIR::getBaseRegister()
 {
     return m_reg;
+}
+
+std::shared_ptr<MachineIR>& MemoryMIR::getOffsetOrLiteral()
+{
+    if (m_operands[1])
+    {
+        return m_operands[1];
+    }
+    return m_operands[2];
 }
 
 // ==========================================
@@ -794,12 +835,12 @@ CmpMIR::CmpMIR(std::vector<std::shared_ptr<MachineIR>> operands)
 
 std::vector<std::shared_ptr<MachineIR>>& CmpMIR::getOperands()
 { 
-    return m_operands; 
+    return m_operands;
 }
 
 MIRType CmpMIR::getMIRType() const 
 { 
-    return MIRType::Or;
+    return MIRType::Cmp;
 }
 
 std::string CmpMIR::getString() const
@@ -1044,6 +1085,22 @@ std::vector<std::shared_ptr<MachineIR>>& MovzxMIR::getOperands()
 {
     return m_operands;
 }
+
+unsigned int MovzxMIR::getToRegSize() const
+{
+    return m_toRegSize;
+}
+
+unsigned int MovzxMIR::getFromRegSize() const
+{
+    return m_fromRegSize;
+}
+
+bool MovzxMIR::isFromRegLow() const
+{
+    return m_isFromRegLow;
+}
+
 
 // ==========================================
 // TestMIR

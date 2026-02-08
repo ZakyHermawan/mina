@@ -1171,7 +1171,7 @@ std::shared_ptr<ExprAST> Parser::primary()
                  |   LEFT_PAREN arguments RIGHT_PAREN
                  |   LEFT_SQUARE subscript RIGHT_SQUARE ;
  * */
-// will emit / push smething to the stack, this is derived from primary
+// will emit / push something to the stack, this is derived from primary
 // Expression (not a statement)
 std::shared_ptr<ExprAST> Parser::subsOrCall(std::string &identifier)
 {
@@ -1179,10 +1179,6 @@ std::shared_ptr<ExprAST> Parser::subsOrCall(std::string &identifier)
     {
         advance();
         auto argumentsAST = arguments();
-        if (argumentsAST == nullptr)
-        {
-            std::cout << "nullarg\n";
-        }
 
         if (getCurrTokenType() != RIGHT_PAREN)
         {
