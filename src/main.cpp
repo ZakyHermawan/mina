@@ -64,8 +64,8 @@ int main(int argc, char* argv[])
     //tests_token();
     //tests_lexer();
 
-    //runAllSamples();
+    runAllSamples();
 
-    runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes6.txt");
+    //runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes6.txt");
     return 0;
 }

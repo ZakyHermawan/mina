@@ -119,7 +119,7 @@ void CodeGen::generateMIR(bool isMain)
     };
 
     // Map variable name strings to shared Register objects
-    std::map<std::string, std::shared_ptr<Register>> m_vregMap;
+    m_vregMap.clear();
     auto getOrCreateVReg = [&](const std::string& name) -> std::shared_ptr<Register>
     {
         auto it = m_vregMap.find(name);
@@ -940,107 +940,92 @@ void CodeGen::generateMIR(bool isMain)
         }
     }
 
-    // Calculate Base Local Size (Shadow + Pinned variables + Arrays)
-    // Windows x64 Shadow space (32 bytes) + mapped vregs
-    // Note: these variables are the variables that is being pinned to the
-    // stack because of the instruction constrain, for example,
-    // scanf need the variable for the arg to be allocated on stack.
-    size_t locals_size = 32 + vRegToOffset.size() * 8;
+    // Calculate Pinned Size (ONLY Arrays + Pinned Scalars)
+    size_t pinned_size = vRegToOffset.size() * 8;
     for (const auto& arrPair : arrVRegToSize)
     {
-        locals_size += static_cast<size_t>(arrPair.second) * 8;
+      pinned_size += static_cast<size_t>(arrPair.second) * 8;
     }
 
-    // For diagnostics only,
-    // disable this later
-    //std::cout << "\n--- BEFORE REGISTER ALLOCATION ---\n";
-    //int counter = 0;
-    //for (const auto& mirBlock : m_mirBlocks)
-    //{
-    //    if (counter++)
-    //        std::cout << mirBlock->getName() << ": \n";
-    //    mirBlock->printInstructions();
-    //}
-
-
-    // Run Register Allocator
+    // Initialize Allocator
     RegisterAllocator ra(std::move(m_mirBlocks));
-    m_mirBlocks = ra.getMIRBlocks();
-
-    // Add Spills to Local Size
-    // locals_size already contains: 32 (Shadow) + Pinned variables + Arrays
-    locals_size += ra.getSpillAreaSize();
-
-    // 4. Calculate Stack Alignment logic
-    // The stack must be 16-byte aligned before any 'call' instruction.
-    // Logic:
-    //   Entry RSP ends in 8 (Return Addr).
-    //   push rbp -> RSP ends in 0 (Aligned).
-    //   push N callee-saved regs -> RSP moves by (N * 8).
-    //   sub rsp, X -> RSP moves by X.
-    //   We need (N * 8 + X) to be a multiple of 16 to maintain alignment.
-
     std::set<int> usedCalleeSaved = ra.getUsedCalleeSavedRegs();
-    size_t callee_saved_size = usedCalleeSaved.size() * 8;
+    size_t pushed_regs_size = (usedCalleeSaved.size() + 1) * 8;  // RBP + Callee
 
-    // Total bytes we want to "add" to the stack frame (Pushes + Sub)
-    size_t total_stack_growth = callee_saved_size + locals_size;
+    // Base Offset for Spills
+    // Spills start immediately after Pushed Regs + Pinned Variables.
+    // We do NOT add 32 here. This keeps spills "high" in the stack.
+    int reserved_base_offset = static_cast<int>(pushed_regs_size + pinned_size);
 
-    // Round up the total growth to the nearest 16 bytes
-    size_t aligned_stack_growth = (total_stack_growth + 15) & ~15;
+    // Run Replacement
+    // Now spills will generate offsets like [rbp - 40], [rbp - 48]
+    m_mirBlocks = ra.replaceVirtualRegisters(m_vregMap, reserved_base_offset);
 
-    // The actual amount to subtract from RSP.
-    // The pushes take up 'callee_saved_size', so we subtract the rest.
-    size_t prologue_sub_amount = aligned_stack_growth - callee_saved_size;
+    // Final Stack Math
+    // NOW we add the 32 bytes for Shadow Space to the total size.
+    // The layout is: [Pushed] [Pinned] [Spills] [Shadow Space] [RSP]
+    size_t total_stack_growth =
+        pinned_size + ra.getSpillAreaSize() + 32 + pushed_regs_size;
 
-    if (isMain)
-    {
-        std::cout << "main: \n";
-    }
+    // Alignment (Total Frame must be multiple of 16)
+    // We align the entire growth (Pushed Callee + Local Frame) excluding RBP
+    // Actually, simply ensuring (CalleePushes + SubAmount) % 16 == 0 is the
+    // goal. Since 'pushed_regs_size' includes RBP (8 bytes), let's separate
+    // them.
+    size_t callee_pushes = usedCalleeSaved.size() * 8;
+    size_t local_frame = pinned_size + ra.getSpillAreaSize() + 32;
 
-    // Function Prologue
+    // Total change to RSP after 'push rbp'
+    size_t total_rsp_move = callee_pushes + local_frame;
+
+    // Round up to 16
+    size_t aligned_rsp_move = (total_rsp_move + 15) & ~15;
+
+    // The 'sub rsp' value
+    size_t prologue_sub_amount = aligned_rsp_move - callee_pushes;
+
+    // Assembly Emission
+    if (isMain) std::cout << "main: \n";
+
+    // Prologue
     std::cout << "    push rbp\n";
     std::cout << "    mov rbp, rsp\n";
 
-    // Push Callee-Saved Registers FIRST.
-    // If we 'sub rsp' first, these pushes would bury our shadow space,
-    // causing printf to overwrite our saved registers.
+    // Pushes for callee-saved registers identified by the allocator
     for (int regID : usedCalleeSaved)
     {
         std::cout << "    push " << mina::getReg((mina::RegID)regID)->get64BitName() << "\n";
     }
 
-    // Now allocate space for Locals + Spills + Shadow Space
+    // Allocate the calculated gap
     if (prologue_sub_amount > 0)
     {
         std::cout << "    sub rsp, " << prologue_sub_amount << "\n";
     }
 
-    // Print the instructions after Register Allocation
-    int ctr = 0;
+    // Body: Print the transformed instructions
+    int blockCtr = 0;
     for (const auto& mirBlock : m_mirBlocks)
     {
-        if (ctr++)
-        {
-            std::cout << mirBlock->getName() << ": \n";
-        }
+        if (blockCtr++ > 0) std::cout << mirBlock->getName() << ": \n";
         mirBlock->printInstructions();
     }
 
-    // Function Epilogue
-    // Deallocate the stack gap first
+    // Epilogue
     if (prologue_sub_amount > 0)
     {
         std::cout << "    add rsp, " << prologue_sub_amount << "\n";
     }
 
-    // Pop Callee-Saved Registers (MUST be in REVERSE order of push)
+    // Restore registers in reverse order
     for (auto it = usedCalleeSaved.rbegin(); it != usedCalleeSaved.rend(); ++it)
     {
         std::cout << "    pop " << mina::getReg((mina::RegID)*it)->get64BitName() << "\n";
     }
 
-    std::cout << "    mov rsp, rbp\n    pop rbp\n    ret\n";
+    std::cout << "    mov rsp, rbp\n";
+    std::cout << "    pop rbp\n";
+    std::cout << "    ret\n";
 }
 
 void CodeGen::addSSA(std::string funcName, SSA& ssa)

@@ -22,6 +22,7 @@ class CodeGen
 
 	std::set<std::string> m_stringLiterals;
 	std::map<std::string, SSA> m_functionSSAMap;
+	std::map<std::string, std::shared_ptr<Register>> m_vregMap;
 
 public:
 	CodeGen(SSA ssa);

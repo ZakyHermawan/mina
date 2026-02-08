@@ -240,13 +240,13 @@ void RegisterAllocator::allocateRegisters()
     colorGraph(inferenceGraph);
     //printColoringResults(inferenceGraph); // Optional debug
 
-    auto registerMap = createRegisterMap(inferenceGraph);
+    m_registerAssignment = createRegisterMap(inferenceGraph);
     //printRegisterMappingResults(inferenceGraph, registerMap); // Optional debug
 
-    auto transformedInstructions = replaceVirtualRegisters(registerMap);
+    //auto transformedInstructions = replaceVirtualRegisters(m_registerAssignment, );
     //printRegisterReplacements(transformedInstructions); // Optional debug
 
-    m_MIRBlocks = std::move(transformedInstructions);
+    //m_MIRBlocks = std::move(transformedInstructions);
     return;
 }
 
@@ -528,44 +528,32 @@ void RegisterAllocator::printColoringResults(std::shared_ptr<InferenceGraph> gra
 std::map<int, std::shared_ptr<Register>> RegisterAllocator::createRegisterMap(std::shared_ptr<InferenceGraph> graph)
 {
     std::map<int, std::shared_ptr<Register>> registerMap;
-
-    // Reset the tracker for this allocation pass
     m_usedCalleeSavedRegs.clear();
 
-    // Define Windows x64 Callee-Saved Register IDs
-    // RBX(1), RDI(4), RSI(5), R12(8), R13(9), R14(10)
-    std::set<int> calleeSavedIDs = {to_int(RegID::RBX), to_int(RegID::RDI),
-                                    to_int(RegID::RSI), to_int(RegID::R12),
-                                    to_int(RegID::R13), to_int(RegID::R14)};
+    std::vector<std::shared_ptr<Register>> colorPalette =
+    {
+        getReg(RegID::RAX), getReg(RegID::RBX), getReg(RegID::RCX), getReg(RegID::RDX),
+        getReg(RegID::RDI), getReg(RegID::RSI), getReg(RegID::R8),  getReg(RegID::R9),
+        getReg(RegID::R12), getReg(RegID::R13), getReg(RegID::R14)
+    };
 
-    auto& nodes = graph->getNodes();
-
-    for (const auto& node : nodes)
+    for (const auto& node : graph->getNodes())
     {
         int color = node->getColor();
+        int regID = node->getReg()->getID();
 
-        // If node.color is null (spilled), continue
-        if (color == -1)
+        // Map virtual registers (ID >= 16) that successfully colored
+        if (regID >= 16 && color != -1)
         {
-            continue;
+            registerMap[regID] = colorPalette[color];
+
+            // Track used callee-saved registers (R12, R13, R14 in palette)
+            if (color >= 8)
+            {
+                m_usedCalleeSavedRegs.insert(colorPalette[color]->getID());
+            }
         }
-
-        auto regNode = node->getReg();
-        int regID = regNode->getID();
-
-        // If the assigned physical register (color) is Callee-Saved (Non-Volatile),
-        // we must record it in 'm_usedCalleeSavedRegs'.
-        // The CodeGen will use this set to emit specific 'push' and 'pop'
-        // instructions in the function prologue/epilogue to preserve the caller's state.
-        if (calleeSavedIDs.count(color))
-        {
-            m_usedCalleeSavedRegs.insert(color);
-        }
-
-        // Map the Virtual Register ID to the actual Physical Register object.
-        registerMap[regID] = getReg(static_cast<RegID>(color));
     }
-
     return registerMap;
 }
 
@@ -620,40 +608,55 @@ void RegisterAllocator::printRegisterMappingResults(
     std::cout << "------------------------------------------------\n\n";
 }
 
+// In RegisterAllocator.cpp
+
 std::vector<std::shared_ptr<BasicBlockMIR>> RegisterAllocator::replaceVirtualRegisters(
-    const std::map<int, std::shared_ptr<Register>>& registerMap)
+    const std::map<std::string, std::shared_ptr<Register>>& vregMap,
+    int baseOffset)
 {
     std::vector<std::shared_ptr<BasicBlockMIR>> newBlocks;
-
-    // Map<VirtualRegisterID, Offset>
     std::map<int, int> spillOffsets;
     int currentSpillBytes = 0;
 
+    // Helper: Scratch registers for legalization
+    // R10 and R11 are caller-saved and safe to use as scratch within a function body
+    // provided we aren't relying on them across function calls (which we aren't here).
+    const auto& r10 = getReg(RegID::R10);
+    const auto& r11 = getReg(RegID::R11);
+
+    // Lambda to resolve MachineIR operands (Registers or Memory references)
     std::function<std::shared_ptr<MachineIR>(std::shared_ptr<MachineIR>)> resolveOperand;
     resolveOperand = [&](std::shared_ptr<MachineIR> op) -> std::shared_ptr<MachineIR>
     {
+        if (!op) return nullptr;
+
         if (op->getMIRType() == MIRType::Reg)
         {
             auto regObj = std::dynamic_pointer_cast<Register>(op);
             int regID = regObj->getID();
 
-            if (regID < (int)RegID::COUNT) return op; // Physical
+            // Physical Register (0-15): Keep as is.
+            if (regID < 16) return op;
 
-            if (registerMap.count(regID))
+            // Assigned Register: Replace with the physical register chosen by graph coloring.
+            // m_registerAssignment is populated in allocateRegisters()
+            if (m_registerAssignment.count(regID))
             {
-                return registerMap.at(regID); // Mapped
+                return m_registerAssignment.at(regID);
             }
 
-            // Spill
+            // Spill: No color available. Assign a stack slot index.
             if (spillOffsets.find(regID) == spillOffsets.end())
             {
                 currentSpillBytes += 8;
                 spillOffsets[regID] = currentSpillBytes;
             }
 
-            int finalOffset = 64 + spillOffsets[regID];
+            // Calculate the absolute offset from RBP: 
+            // baseOffset (Shadow + Pinned) + this specific spill slot.
+            int finalOffset = baseOffset + spillOffsets[regID];
 
-            // return [rbp - offset]
+            // Return memory reference [rbp - finalOffset]
             return std::make_shared<MemoryMIR>(
                 getReg(RegID::RBP),
                 std::make_shared<ConstMIR>(-finalOffset)
@@ -664,210 +667,181 @@ std::vector<std::shared_ptr<BasicBlockMIR>> RegisterAllocator::replaceVirtualReg
             auto memOp = std::dynamic_pointer_cast<MemoryMIR>(op);
             if (memOp && memOp->getBaseRegister())
             {
+                // Recursively resolve the base register (in case it was a VReg)
                 auto newBase = resolveOperand(memOp->getBaseRegister());
 
-                // If base is a Register, reconstruct MemoryMIR
-                if (newBase->getMIRType() == MIRType::Reg)
+                if (auto newBaseReg = std::dynamic_pointer_cast<Register>(newBase))
                 {
-                    auto newBaseReg = std::dynamic_pointer_cast<Register>(newBase);
-                    auto disp = memOp->getOffsetOrLiteral();
+                    // We must explicitly cast the MachineIR pointer back to ConstMIR or LiteralMIR
+                    // because the MemoryMIR constructor expects specific derived types.
+                    auto rawDisp = memOp->getOffsetOrLiteral();
 
-                    // EXPLICIT CASTING for constructors
-                    if (auto constDisp = std::dynamic_pointer_cast<ConstMIR>(disp))
+                    if (auto constDisp = std::dynamic_pointer_cast<ConstMIR>(rawDisp))
                     {
                         return std::make_shared<MemoryMIR>(newBaseReg, constDisp);
                     }
-                    else if (auto litDisp = std::dynamic_pointer_cast<LiteralMIR>(disp))
+                    else if (auto litDisp = std::dynamic_pointer_cast<LiteralMIR>(rawDisp))
                     {
                         return std::make_shared<MemoryMIR>(newBaseReg, litDisp);
                     }
                     else
                     {
+                        // Fallback: No offset/literal, just base register [reg]
                         return std::make_shared<MemoryMIR>(newBaseReg, 0);
                     }
                 }
             }
-            return op;
         }
-
-        return op; // Immediate/Label
+        return op; // Constants and Literals are returned unchanged
     };
 
-    const auto& r10 = getReg(RegID::R10);
-    const auto& r11 = getReg(RegID::R11);
-
+    // Iterate through every Basic Block in the MIR
     for (const auto& oldBlock : m_MIRBlocks)
     {
         auto newBlock = std::make_shared<BasicBlockMIR>(oldBlock->getName());
 
+        // Process every instruction within the block
         for (const auto& inst : oldBlock->getInstructions())
         {
             auto mirType = inst->getMIRType();
             const auto& oldOps = inst->getOperands();
 
-            // Resolve Operands
+            // Resolve all operands for the current instruction
             std::vector<std::shared_ptr<MachineIR>> newOps;
             for (auto& op : oldOps)
             {
                 newOps.push_back(resolveOperand(op));
             }
 
-            // Legalize Mem-Mem
+            // Instruction Legalization
+            // x86 does not allow two memory operands in a single instruction (except movs, but usually handled by regs).
+            // Example: add [rbp-8], [rbp-16] is ILLEGAL.
             bool op0Mem = (newOps.size() > 0 && newOps[0]->getMIRType() == MIRType::Memory);
             bool op1Mem = (newOps.size() > 1 && newOps[1]->getMIRType() == MIRType::Memory);
 
             if (op0Mem && op1Mem && mirType != MIRType::Mov)
             {
-                // mov r10, src -> op dest, r10
                 newBlock->addInstruction(std::make_shared<MovMIR>(
                     std::vector<std::shared_ptr<MachineIR>>{ r10, newOps[1] }
                 ));
                 newOps[1] = r10;
             }
 
-            // Emit Instructions
+            // Instruction Emission based on MIRType
             switch (mirType)
             {
-            // Binary Ops (Constructors take vector<MachineIR>)
-            case MIRType::Mov:   newBlock->addInstruction(std::make_shared<MovMIR>(newOps)); break;
-            case MIRType::Add:   newBlock->addInstruction(std::make_shared<AddMIR>(newOps)); break;
-            case MIRType::Sub:   newBlock->addInstruction(std::make_shared<SubMIR>(newOps)); break;
-            case MIRType::Mul:   newBlock->addInstruction(std::make_shared<MulMIR>(newOps)); break;
-            case MIRType::And:   newBlock->addInstruction(std::make_shared<AndMIR>(newOps)); break;
-            case MIRType::Or:    newBlock->addInstruction(std::make_shared<OrMIR>(newOps)); break;
-            case MIRType::Cmp:   newBlock->addInstruction(std::make_shared<CmpMIR>(newOps)); break;
-            case MIRType::Lea:   newBlock->addInstruction(std::make_shared<LeaMIR>(newOps)); break;
+                // Instructions that accept vector<MachineIR>
+                case MIRType::Mov:   newBlock->addInstruction(std::make_shared<MovMIR>(newOps)); break;
+                case MIRType::Add:   newBlock->addInstruction(std::make_shared<AddMIR>(newOps)); break;
+                case MIRType::Sub:   newBlock->addInstruction(std::make_shared<SubMIR>(newOps)); break;
+                case MIRType::Mul:   newBlock->addInstruction(std::make_shared<MulMIR>(newOps)); break;
+                case MIRType::And:   newBlock->addInstruction(std::make_shared<AndMIR>(newOps)); break;
+                case MIRType::Or:    newBlock->addInstruction(std::make_shared<OrMIR>(newOps)); break;
+                case MIRType::Cmp:   newBlock->addInstruction(std::make_shared<CmpMIR>(newOps)); break;
+                case MIRType::Lea:   newBlock->addInstruction(std::make_shared<LeaMIR>(newOps)); break;
 
-            // Unary Ops (Need Casting)
-            case MIRType::Not:
-            {
-                auto regOp = std::dynamic_pointer_cast<Register>(newOps[0]);
-                if (regOp)
+                // Unary Not requires a Register. If spilled (Memory), use R11 as a bridge.
+                case MIRType::Not:
                 {
-                    newBlock->addInstruction(std::make_shared<NotMIR>(regOp));
+                    auto regOp = std::dynamic_pointer_cast<Register>(newOps[0]);
+                    if (regOp)
+                    {
+                        newBlock->addInstruction(std::make_shared<NotMIR>(regOp));
+                    }
+                    else
+                    {
+                        // Fixup: NOT [mem] -> MOV R11, [mem]; NOT R11; MOV [mem], R11
+                        newBlock->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{ r11, newOps[0] }));
+                        newBlock->addInstruction(std::make_shared<NotMIR>(r11));
+                        newBlock->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{ newOps[0], r11 }));
+                    }
+                    break;
                 }
-                else
-                {
-                    // Fixup: NOT [mem] -> MOV R11, [mem]; NOT R11; MOV [mem], R11
-                    newBlock->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{ r11, newOps[0] }));
-                    newBlock->addInstruction(std::make_shared<NotMIR>(r11));
-                    newBlock->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{ newOps[0], r11 }));
-                }
-                break;
-            }
 
-            case MIRType::Div:
-            {
-                if (auto mem = std::dynamic_pointer_cast<MemoryMIR>(newOps[0]))
+                // Div requires Memory operand in our implementation (idiv [mem])
+                case MIRType::Div:
                 {
-                    newBlock->addInstruction(std::make_shared<DivMIR>(mem));
+                    if (auto mem = std::dynamic_pointer_cast<MemoryMIR>(newOps[0]))
+                    {
+                        newBlock->addInstruction(std::make_shared<DivMIR>(mem));
+                    }
+                    else
+                    {
+                        throw std::runtime_error("DivMIR replacement error: Operand must be Memory.");
+                    }
+                    break;
                 }
-                else
-                {
-                    throw std::runtime_error("DivMIR constructor must accept MemoryMIR.");
-                }
-                break;
-            }
 
-            // SetCC Instructions (Require Register)
-            // Macro to handle cast + fixup
-            #define HANDLE_SETCC(CLASS_NAME) \
-                { \
-                    auto regOp = std::dynamic_pointer_cast<Register>(newOps[0]); \
-                    if (regOp) { \
-                        newBlock->addInstruction(std::make_shared<CLASS_NAME>(regOp)); \
+                // SetCC instructions (Sete, Setne, etc.) require a Register (8-bit writes)
+                // If the operand is memory (spill), we must use a scratch register.
+                #define HANDLE_SETCC(MIR_CLASS) \
+                    if (auto r = std::dynamic_pointer_cast<Register>(newOps[0])) { \
+                        newBlock->addInstruction(std::make_shared<MIR_CLASS>(r)); \
                     } else { \
-                        /* Fixup: SETcc r11b; MOV [mem], r11 */ \
-                        newBlock->addInstruction(std::make_shared<CLASS_NAME>(r11)); \
+                        newBlock->addInstruction(std::make_shared<MIR_CLASS>(r11)); \
                         newBlock->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{ newOps[0], r11 })); \
-                    } \
-                }
+                    }
 
-            case MIRType::Sete:  HANDLE_SETCC(SeteMIR); break;
-            case MIRType::Setne: HANDLE_SETCC(SetneMIR); break;
-            case MIRType::Setl:  HANDLE_SETCC(SetlMIR); break;
-            case MIRType::Setle: HANDLE_SETCC(SetleMIR); break;
-            case MIRType::Setg:  HANDLE_SETCC(SetgMIR); break;
-            case MIRType::Setge: HANDLE_SETCC(SetgeMIR); break;
+                case MIRType::Sete:  HANDLE_SETCC(SeteMIR);  break;
+                case MIRType::Setne: HANDLE_SETCC(SetneMIR); break;
+                case MIRType::Setl:  HANDLE_SETCC(SetlMIR);  break;
+                case MIRType::Setle: HANDLE_SETCC(SetleMIR); break;
+                case MIRType::Setg:  HANDLE_SETCC(SetgMIR);  break;
+                case MIRType::Setge: HANDLE_SETCC(SetgeMIR); break;
 
-            // Movzx (Requires Register Destination)
-            case MIRType::Movzx:
-            {
-                auto oldMovzx = std::dynamic_pointer_cast<MovzxMIR>(inst);
-                auto& op = newOps[0];
-                auto regOp = std::dynamic_pointer_cast<Register>(op);
-
-                if (regOp)
+                // Movzx requires a Register destination.
+                case MIRType::Movzx:
                 {
-                    newBlock->addInstruction(std::make_shared<MovzxMIR>(
-                        regOp,
-                        oldMovzx->getToRegSize(),
-                        oldMovzx->getFromRegSize(),
-                        oldMovzx->isFromRegLow()
-                    ));
+                    auto old = std::dynamic_pointer_cast<MovzxMIR>(inst);
+                    auto r = std::dynamic_pointer_cast<Register>(newOps[0]);
+                    if (r)
+                    {
+                        newBlock->addInstruction(std::make_shared<MovzxMIR>(r, old->getToRegSize(), old->getFromRegSize(), old->isFromRegLow()));
+                    }
+                    else
+                    {
+                        // Fixup: MOVZX [mem], src -> MOVZX R11, src; MOV [mem], R11 (Logic implies dest is R11)
+                        // However, Movzx destination is usually a register. If it was spilled, we load it back?
+                        // Actually Movzx destination IS a register. If it got spilled, we need to store the result.
+                        // Movzx r11, src
+                        newBlock->addInstruction(std::make_shared<MovzxMIR>(r11, old->getToRegSize(), old->getFromRegSize(), old->isFromRegLow()));
+                        // Mov [spill], r11
+                        newBlock->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{ newOps[0], r11 }));
+                    }
+                    break;
                 }
-                else
+
+                // Test instruction
+                case MIRType::Test:
                 {
-                    // Spill Fixup: MOVZX r11, r11 -> MOV [mem], r11
-                    // Load Spill -> R11
-                    newBlock->addInstruction(std::make_shared<MovMIR>(
-                        std::vector<std::shared_ptr<MachineIR>>{ r11, op }
-                    ));
-                    // Ext R11 -> R11
-                    newBlock->addInstruction(std::make_shared<MovzxMIR>(
-                        r11,
-                        oldMovzx->getToRegSize(),
-                        oldMovzx->getFromRegSize(),
-                        oldMovzx->isFromRegLow()
-                    ));
-                    // Store R11 -> Spill
-                    newBlock->addInstruction(std::make_shared<MovMIR>(
-                        std::vector<std::shared_ptr<MachineIR>>{ op, r11 }
-                    ));
-                }
-                break;
-            }
+                    auto r_a = std::dynamic_pointer_cast<Register>(newOps[0]);
+                    auto r_b = std::dynamic_pointer_cast<Register>(newOps[1]);
 
-            // Test (Requires Registers)
-            case MIRType::Test:
-            {
-                auto r1 = std::dynamic_pointer_cast<Register>(newOps[0]);
-                auto r2 = std::dynamic_pointer_cast<Register>(newOps[1]);
-
-                // Load spilled operands into scratch regs if necessary
-                if (!r1)
-                {
-                    newBlock->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{ r10, newOps[0] }));
-                    r1 = r10;
-                }
-                if (!r2)
-                {
-                    newBlock->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{ r11, newOps[1] }));
-                    r2 = r11;
+                    // If operands are memory, load them into scratch registers
+                    if (!r_a)
+                    {
+                        newBlock->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{ r10, newOps[0] }));
+                        r_a = r10;
+                    }
+                    if (!r_b)
+                    {
+                        newBlock->addInstruction(std::make_shared<MovMIR>(std::vector<std::shared_ptr<MachineIR>>{ r11, newOps[1] }));
+                        r_b = r11;
+                    }
+                    newBlock->addInstruction(std::make_shared<TestMIR>(r_a, r_b));
+                    break;
                 }
 
-                newBlock->addInstruction(std::make_shared<TestMIR>(r1, r2));
-                break;
-            }
-
-            // Control Flow
-            case MIRType::Call:
-            case MIRType::Ret:
-            case MIRType::Jmp:
-            case MIRType::Jz:
-            case MIRType::Jnz:
-            case MIRType::Cqo:
-                newBlock->addInstruction(inst);
-                break;
-
-            default:
-                newBlock->addInstruction(inst);
-                break;
+                // Control Flow (Jmp, Jz, etc.) and Ret are passed through
+                default:
+                    newBlock->addInstruction(inst);
+                    break;
             }
         }
         newBlocks.push_back(newBlock);
     }
 
+    // Capture the total size of the newly created spill area for the CodeGen to use in prologue calculation
     m_spillAreaSize = currentSpillBytes;
     return newBlocks;
 }

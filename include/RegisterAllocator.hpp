@@ -83,6 +83,9 @@ public:
     std::set<int> getUsedCalleeSavedRegs() const;
     int getSpillAreaSize() const;
 
+    std::vector<std::shared_ptr<BasicBlockMIR>> replaceVirtualRegisters(
+        const std::map<std::string, std::shared_ptr<Register>>& vregMap,
+        int baseOffset);
 private:
     std::vector<std::shared_ptr<BasicBlockMIR>> m_MIRBlocks;
     unsigned int functionOffset = 0;
@@ -96,6 +99,7 @@ private:
     std::set<int> m_usedCalleeSavedRegs;
 
     int m_spillAreaSize = 0; // Tracks bytes needed for spills
+    std::map<int, std::shared_ptr<Register>> m_registerAssignment;
 
     void allocateRegisters();
 
@@ -153,8 +157,6 @@ private:
         std::shared_ptr<InferenceGraph> graph,
         const std::map<int, std::shared_ptr<Register>>& registerMap);
 
-    std::vector<std::shared_ptr<BasicBlockMIR>> replaceVirtualRegisters(
-        const std::map<int, std::shared_ptr<Register>>& registerMap);
     void printRegisterReplacements(
         const std::vector<std::shared_ptr<BasicBlockMIR>>& finalBlocks) const;
 
