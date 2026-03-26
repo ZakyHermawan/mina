@@ -305,6 +305,13 @@ void SSA::renameSSA()
         visited.insert(current_bb);
         worklist.pop();
 
+        // Critical edge checking
+        if (current_bb->getPredecessors().size() > 1 &&
+            current_bb->getSuccessors().size() > 1)
+        {
+            // TODO: Implement critical edge splitting, then uncomment the code below.
+        }
+
         auto& instructions = current_bb->getInstructions();
 
         for (unsigned int i = 0; i < instructions.size(); ++i)
@@ -320,7 +327,6 @@ void SSA::renameSSA()
                 for (int i = 0; i < operands.size(); ++i)
                 {
                     const auto& opStr = operands[i]->getString();
-
                     // Merges two sets that targetStr and opStr belong to.
                     // Create phiweb.
                     dsu.unite(targetStr, opStr);

@@ -31,6 +31,8 @@ public:
     void setSuccessors(std::vector<std::shared_ptr<BasicBlock>> successors);
     std::vector<std::shared_ptr<BasicBlock>> getPredecessors();
     std::vector<std::shared_ptr<BasicBlock>> getSuccessors();
+    size_t getNumPredecessors() const { return m_predecessors.size(); }
+    size_t getNumSuccessors() const { return m_successors.size(); }
     void pushPredecessor(const std::shared_ptr<BasicBlock>& predecessor);
     void pushSuccessor(const std::shared_ptr<BasicBlock>& successor);
 
