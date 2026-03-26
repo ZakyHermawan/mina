@@ -1023,6 +1023,10 @@ void CodeGen::generateMIR(bool isMain)
         std::cout << "    pop " << mina::getReg((mina::RegID)*it)->get64BitName() << "\n";
     }
 
+    if (isMain)
+    {
+        std::cout << "    xor rax, rax\n";  // Default return value for main"
+    }
     std::cout << "    mov rsp, rbp\n";
     std::cout << "    pop rbp\n";
     std::cout << "    ret\n";

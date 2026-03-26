@@ -45,12 +45,14 @@ static void runFile(const char* fileName)
     parser.program();
 }
 
+// Do not run samples that take user input, since it will block the execution of
+// other samples. Samples that take user input should be tested separately.
 static void runAllSamples()
 {
-    runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes.txt");
+    //runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes.txt");
     runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes2.txt");
     runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes3.txt");
-    runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes4.txt");
+    //runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes4.txt");
     runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes5.txt");
     runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes6.txt");
     runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes7.txt");
@@ -64,8 +66,8 @@ int main(int argc, char* argv[])
     //tests_token();
     //tests_lexer();
 
-    runAllSamples();
+    //runAllSamples();
 
-    //runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes6.txt");
+    runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes6.txt");
     return 0;
 }

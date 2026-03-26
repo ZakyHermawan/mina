@@ -326,12 +326,6 @@ void SSA::renameSSA()
                     dsu.unite(targetStr, opStr);
                 }
             }
-            else if (currInst->getInstType() == InstType::Put)
-            {
-                const auto& operandStr = currInst->getOperands()[0]->getTarget()->getString();
-                variables.push_back(operandStr);
-                dsu.make_set(operandStr);
-            }
             variables.push_back(targetStr);
         }
 
@@ -413,13 +407,13 @@ void SSA::renameSSA()
                     }
                     const auto& operandTarget = operands[i]->getTarget();
                     const auto& operandTargetStr = operandTarget->getString();
-                    if (root_to_new_name.find(operandTargetStr) ==
-                        root_to_new_name.end())
+                    if (final_rename_map.find(operandTargetStr) ==
+                        final_rename_map.end())
                     {
                         continue;
                     }
 
-                    auto& new_operand_target_str = root_to_new_name[operandTargetStr];
+                    auto& new_operand_target_str = final_rename_map[operandTargetStr];
                     std::shared_ptr<IdentInst> newOperandTargetInst =
                         std::make_shared<IdentInst>(new_operand_target_str,
                                                     currInst->getBlock());
@@ -428,12 +422,12 @@ void SSA::renameSSA()
             }
             else
             {
-                if (root_to_new_name.find(targetStr) == root_to_new_name.end())
+                if (final_rename_map.find(targetStr) == final_rename_map.end())
                 {
                     throw std::runtime_error("can't find target str " + targetStr +
                                              "in the hashmap");
                 }
-                auto& new_target_str = root_to_new_name[targetStr];
+                auto& new_target_str = final_rename_map[targetStr];
 
                 std::shared_ptr<IdentInst> newTargetInst = std::make_shared<IdentInst>(new_target_str, currInst->getBlock());
                 auto& operands = currInst->getOperands();
@@ -445,13 +439,13 @@ void SSA::renameSSA()
                     }
                     const auto& operandTarget = operands[i]->getTarget();
                     const auto& operandTargetStr = operandTarget->getString();
-                    if (root_to_new_name.find(operandTargetStr) ==
-                        root_to_new_name.end())
+                    if (final_rename_map.find(operandTargetStr) ==
+                        final_rename_map.end())
                     {
                         continue;
                     }
 
-                    auto& new_operand_target_str = root_to_new_name[operandTargetStr];
+                    auto& new_operand_target_str = final_rename_map[operandTargetStr];
                     std::shared_ptr<IdentInst> newOperandTargetInst =
                         std::make_shared<IdentInst>(new_operand_target_str,
                                                     currInst->getBlock());
