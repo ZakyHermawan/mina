@@ -306,14 +306,20 @@ void SSA::renameSSA()
         worklist.pop();
 
         // Critical edge checking
-        if (current_bb->getPredecessors().size() > 1 &&
-            current_bb->getSuccessors().size() > 1)
+        if (current_bb->getNumSuccessors() > 1)
         {
-            // TODO: Implement critical edge splitting, then uncomment the code below.
+            for (const auto& successor : current_bb->getSuccessors())
+            {
+                if (successor->getNumPredecessors() > 1)
+                {
+                    //std::cout << "There is a critical edge between "
+                    //          << current_bb->getName() << " and "
+                    //          << successor->getName() << std::endl;
+                }
+            }
         }
 
         auto& instructions = current_bb->getInstructions();
-
         for (unsigned int i = 0; i < instructions.size(); ++i)
         {
             auto& currInst = instructions[i];
