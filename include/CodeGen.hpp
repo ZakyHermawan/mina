@@ -28,7 +28,6 @@ public:
 	CodeGen(SSA ssa);
 	void setSSA(SSA& SSA);
 
-	void linearizeCFG();
 	void generateMIR(bool isMain = false);
 	void addSSA(std::string funcName, SSA& ssa);
 	void generateAllFunctionsMIR();

@@ -101,12 +101,6 @@ public:
     std::set<int>& getLiveIn();
     std::set<int>& getLiveOut();
 
-    //std::vector<Register> getDefRegisters() const;
-    //std::vector<Register> getUseRegisters() const;
-    //std::vector<Register> getLiveInRegisters() const;
-    //std::vector<Register> getLiveOutRegisters() const;
-
-
     void generateDefUse();
     void printLivenessSets() const;
 

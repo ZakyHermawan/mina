@@ -57,33 +57,10 @@ std::string SSA::getCurrentSSAName(const std::string& name)
 
 void SSA::printCFG()
 {
-    // Implement Reverse Post-Order Traversal to linearize the CFG
-    std::set<std::shared_ptr<BasicBlock>> visited;
-    std::vector<std::shared_ptr<BasicBlock>> linearizedBlocks;
-    std::function<void(std::shared_ptr<BasicBlock>)> dfs =
-        [&](std::shared_ptr<BasicBlock> bb)
-        {
-          visited.insert(bb);
-          const auto& successors = bb->getSuccessors();
-          // Traverse successors in reverse order so the first element that is being inserted 
-          // into the successors vector is in front of successors that is added later,
-          // since we will reverse the linearizedBlocks at the end.
-          for (int i = (int)successors.size() - 1; i >= 0; --i)
-          {
-              auto& succ = successors[i];
-              if (visited.find(succ) == visited.end())
-              {
-                  dfs(succ);
-              }
-          }
-          linearizedBlocks.push_back(bb);
-    };
-    dfs(m_cfg);
-    std::reverse(linearizedBlocks.begin(), linearizedBlocks.end());
-
-    for (int i = 0; i < linearizedBlocks.size(); ++i)
+    auto rpo = getRPONodes(m_cfg);
+    for (auto& node : rpo)
     {
-        auto& currBlock = linearizedBlocks[i];
+        auto& currBlock = node;
         std::cout << currBlock->getName() << ":\n";
         auto& inst = currBlock->getInstructions();
         for (int j = 0; j < inst.size(); ++j)
@@ -290,30 +267,10 @@ void SSA::sealBlock(std::shared_ptr<BasicBlock> block)
 // some optimization like coalescing can make this algorithm wrong.
 void SSA::renameSSA()
 {
-    // RPO traversal to ensure that we visit the predecessor blocks before the
-    // successor blocks.
-    std::vector<std::string> variables;
-    std::vector<std::shared_ptr<BasicBlock>> rpo;
-    std::set<std::shared_ptr<BasicBlock>> rpo_visited;
-    std::function<void(std::shared_ptr<BasicBlock>)> dfs =
-        [&](std::shared_ptr<BasicBlock> bb)
-    {
-        rpo_visited.insert(bb);
-        const auto& successors = bb->getSuccessors();
-        for (int i = successors.size() - 1; i >= 0; --i)
-        {
-            auto& succ = successors[i];
-            if (rpo_visited.find(succ) == rpo_visited.end())
-            {
-                dfs(succ);
-            }
-        }
-        rpo.push_back(bb);
-    };
-    dfs(getCFG());
-    std::reverse(rpo.begin(), rpo.end());
-
     DisjointSetUnion dsu;
+    std::vector<std::string> variables;
+
+    auto rpo = getRPONodes(getCFG());
     for (auto& node : rpo)
     {
         std::shared_ptr<BasicBlock> current_bb = node;

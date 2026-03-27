@@ -45,4 +45,9 @@ public:
     std::string getName();
 };
 
+// Implement Reverse Post-Order Traversal to traverse the CFG and return the
+// basic blocks in RPO order
+std::vector<std::shared_ptr<BasicBlock>> getRPONodes(
+    std::shared_ptr<BasicBlock> root);
+
 }  // namespace mina

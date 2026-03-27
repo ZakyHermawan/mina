@@ -26,33 +26,6 @@ CodeGen::CodeGen(SSA ssa) : m_ssa{ssa}
 
 void CodeGen::setSSA(SSA& ssa) { m_ssa = ssa; }
 
-void CodeGen::linearizeCFG()
-{
-    // Implement Reverse Post-Order Traversal to linearize the CFG
-    m_linearizedBlocks.clear();
-    std::set<std::shared_ptr<BasicBlock>> visited;
-    std::function<void(std::shared_ptr<BasicBlock>)> dfs =
-        [&](std::shared_ptr<BasicBlock> bb)
-    {
-        visited.insert(bb);
-        const auto& successors = bb->getSuccessors();
-        // Traverse successors in reverse order so the first element that is being inserted 
-        // into the successors vector is in front of successors that is added later,
-        // since we will reverse the linearizedBlocks at the end.
-        for (int i = successors.size() - 1; i >= 0; --i)
-        {
-            auto& succ = successors[i];
-            if (visited.find(succ) == visited.end())
-            {
-                dfs(succ);
-            }
-        }
-        m_linearizedBlocks.push_back(bb);
-    };
-    dfs(m_ssa.getCFG());
-    std::reverse(m_linearizedBlocks.begin(), m_linearizedBlocks.end());
-}
-
 void CodeGen::generateMIR(bool isMain)
 {
     auto rax = std::make_shared<Register>(0, "rax", "eax", "ax", "ah", "al");
@@ -179,14 +152,14 @@ void CodeGen::generateMIR(bool isMain)
     };
 
     m_mirBlocks.clear();
-    linearizeCFG();
+    auto rpo = getRPONodes(m_ssa.getCFG());
 
     // Copy basic block structure from TAC (Three-Address Code) CFG to MIR CFG
     std::map<std::string, std::shared_ptr<BasicBlockMIR>> nameToBBMIR;
     std::vector<std::shared_ptr<BasicBlockMIR>> linearizedMIRBlock;
 
     // Create empty MIR basic blocks
-    for (const auto& bb : m_linearizedBlocks)
+    for (const auto& bb : rpo)
     {
         auto newMIR = std::make_shared<BasicBlockMIR>(bb->getName());
         nameToBBMIR[bb->getName()] = newMIR;
@@ -195,9 +168,9 @@ void CodeGen::generateMIR(bool isMain)
 
     // Link predecessors and successors in MIR basic blocks
     // Based on TAC basic blocks
-    for (size_t i = 0; i < m_linearizedBlocks.size(); ++i)
+    for (size_t i = 0; i < rpo.size(); ++i)
     {
-        auto& oldBB = m_linearizedBlocks[i];
+        auto& oldBB = rpo[i];
         auto& mirBB = linearizedMIRBlock[i];
 
         for (const auto& succ : oldBB->getSuccessors())
@@ -210,9 +183,9 @@ void CodeGen::generateMIR(bool isMain)
         }
     }
 
-    for (int i = 0; i < m_linearizedBlocks.size(); ++i)
+    for (int i = 0; i < rpo.size(); ++i)
     {
-        auto& currBlock = m_linearizedBlocks[i];
+        auto& currBlock = rpo[i];
         auto& bbMIR = linearizedMIRBlock[i];
         if (bbMIR->getName() != currBlock->getName())
         {

@@ -1,10 +1,13 @@
 #include "BasicBlock.hpp"
 #include "InstIR.hpp"
 
+#include <set>
 #include <vector>
 #include <string>
 #include <utility>
 #include <memory>
+#include <algorithm>
+#include <functional>
 
 namespace mina
 {
@@ -69,5 +72,37 @@ void BasicBlock::pushSuccessor(const std::shared_ptr<BasicBlock>& successor)
 }
 
 std::string BasicBlock::getName() { return m_name; }
+
+std::vector<std::shared_ptr<BasicBlock>> getRPONodes(
+    std::shared_ptr<BasicBlock> root)
+{
+    std::vector<std::shared_ptr<BasicBlock>> rpo;
+    std::set<std::shared_ptr<BasicBlock>> rpo_visited;
+    std::function<void(std::shared_ptr<BasicBlock>)> dfs =
+        [&](std::shared_ptr<BasicBlock> bb)
+    {
+        rpo_visited.insert(bb);
+        const auto& successors = bb->getSuccessors();
+
+        // Traverse successors in reverse order so the first element that is
+        // being inserted
+        // into the successors vector is in front of successors that is added
+        // later, since we will reverse the linearizedBlocks at the end.
+        for (int i = successors.size() - 1; i >= 0; --i)
+        {
+            auto& succ = successors[i];
+            if (rpo_visited.find(succ) == rpo_visited.end())
+            {
+                dfs(succ);
+            }
+        }
+        rpo.push_back(bb);
+    };
+
+    dfs(root);
+    std::reverse(rpo.begin(), rpo.end());
+
+    return rpo;
+}
 
 }  // namespace mina
