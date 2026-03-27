@@ -290,20 +290,33 @@ void SSA::sealBlock(std::shared_ptr<BasicBlock> block)
 // some optimization like coalescing can make this algorithm wrong.
 void SSA::renameSSA()
 {
-    DisjointSetUnion dsu;
-
-    // BFS
-    std::queue<std::shared_ptr<BasicBlock>> worklist;
-    std::set<std::shared_ptr<BasicBlock>> visited;
-    worklist.push(getCFG());
-    visited.insert(getCFG());
+    // RPO traversal to ensure that we visit the predecessor blocks before the
+    // successor blocks.
     std::vector<std::string> variables;
-
-    while (!worklist.empty())
+    std::vector<std::shared_ptr<BasicBlock>> rpo;
+    std::set<std::shared_ptr<BasicBlock>> rpo_visited;
+    std::function<void(std::shared_ptr<BasicBlock>)> dfs =
+        [&](std::shared_ptr<BasicBlock> bb)
     {
-        std::shared_ptr<BasicBlock> current_bb = worklist.front();
-        visited.insert(current_bb);
-        worklist.pop();
+        rpo_visited.insert(bb);
+        const auto& successors = bb->getSuccessors();
+        for (int i = successors.size() - 1; i >= 0; --i)
+        {
+            auto& succ = successors[i];
+            if (rpo_visited.find(succ) == rpo_visited.end())
+            {
+                dfs(succ);
+            }
+        }
+        rpo.push_back(bb);
+    };
+    dfs(getCFG());
+    std::reverse(rpo.begin(), rpo.end());
+
+    DisjointSetUnion dsu;
+    for (auto& node : rpo)
+    {
+        std::shared_ptr<BasicBlock> current_bb = node;
 
         // Critical edge checking
         if (current_bb->getNumSuccessors() > 1)
@@ -340,15 +353,6 @@ void SSA::renameSSA()
             }
             variables.push_back(targetStr);
         }
-
-        for (const auto& successor : current_bb->getSuccessors())
-        {
-            if (visited.find(successor) == visited.end())
-            {
-                visited.insert(successor);
-                worklist.push(successor);
-            }
-        }
     }
 
     // Create a map to hold the final name for each set's root.
@@ -372,19 +376,11 @@ void SSA::renameSSA()
         final_rename_map[var] = root_to_new_name[root];
     }
 
-    // BFS
-    worklist = {};
-    visited = {};
-
-    worklist.push(getCFG());
-
-    while (!worklist.empty())
+    for (auto& node : rpo)
     {
-        std::shared_ptr<BasicBlock> current_bb = worklist.front();
-        visited.insert(current_bb);
-        worklist.pop();
-
+        std::shared_ptr<BasicBlock> current_bb = node;
         auto& instructions = current_bb->getInstructions();
+
         if (instructions.size() == 0)
         {
             continue;
@@ -466,15 +462,6 @@ void SSA::renameSSA()
                 currInst->setTarget(newTargetInst);
             }
             ++instruction_idx;
-        }
-
-        for (const auto& successor : current_bb->getSuccessors())
-        {
-            if (visited.find(successor) == visited.end())
-            {
-                visited.insert(successor);
-                worklist.push(successor);
-            }
         }
     }
 }
