@@ -896,6 +896,7 @@ JumpInst::JumpInst(std::shared_ptr<BasicBlock> target)
 {
 }
 std::shared_ptr<BasicBlock> JumpInst::getJumpTarget() { return m_target; }
+void JumpInst::setTarget(std::shared_ptr<BasicBlock> target) { m_target = target; }
 std::string JumpInst::getString()
 {
     auto target = m_target->getName();
@@ -926,6 +927,14 @@ BRTInst::BRTInst(std::shared_ptr<Inst> cond,
 std::shared_ptr<Inst> BRTInst::getCond() { return m_operands[0]; }
 std::shared_ptr<BasicBlock> BRTInst::getTargetSuccess() { return m_targetSuccess; }
 std::shared_ptr<BasicBlock> BRTInst::getTargetFailed() { return m_targetFailed; }
+void BRTInst::setTargetSuccess(std::shared_ptr<BasicBlock> targetSuccess)
+{
+    m_targetSuccess = targetSuccess;
+}
+void BRTInst::setTargetFailed(std::shared_ptr<BasicBlock> targetFailed)
+{
+    m_targetFailed = targetFailed;
+}
 std::string BRTInst::getString()
 {
     auto targetSuccess = m_targetSuccess->getName();
@@ -961,6 +970,15 @@ BRFInst::BRFInst(std::shared_ptr<Inst> cond,
 std::shared_ptr<Inst> BRFInst::getCond() { return m_operands[0]; }
 std::shared_ptr<BasicBlock> BRFInst::getTargetSuccess() { return m_targetSuccess; }
 std::shared_ptr<BasicBlock> BRFInst::getTargetFailed() { return m_targetFailed; }
+void BRFInst::setTargetSuccess(std::shared_ptr<BasicBlock> targetSuccess)
+{
+    m_targetSuccess = targetSuccess;
+}
+void BRFInst::setTargetFailed(std::shared_ptr<BasicBlock> targetFailed)
+{
+    m_targetFailed = targetFailed;
+}
+
 std::string BRFInst::getString()
 {
     auto targetSuccess = m_targetSuccess->getName();
@@ -1279,10 +1297,20 @@ PhiInst::PhiInst(std::string name, std::shared_ptr<BasicBlock> block)
     : m_target(std::make_shared<IdentInst>(name, block)), m_block(std::move(block))
 {
 }
-void PhiInst::appendOperand(std::shared_ptr<Inst> operand)
+void PhiInst::appendOperand(std::shared_ptr<Inst> operand, std::shared_ptr<BasicBlock> operandBB)
 {
     m_operands.push_back(operand);
+    m_operandBBs.push_back(operandBB);
 }
+std::shared_ptr<BasicBlock> PhiInst::getOperandBB(unsigned index)
+{
+    if (index >= m_operandBBs.size())
+    {
+        throw std::runtime_error("PhiInst: operand index out of range!");
+    }
+    return m_operandBBs[index];
+}
+
 std::shared_ptr<Inst> PhiInst::getTarget() { return m_target; }
 std::shared_ptr<BasicBlock> PhiInst::getBlock() { return m_block; }
 std::string PhiInst::getString()
@@ -1301,6 +1329,7 @@ std::string PhiInst::getString()
             continue;
         }
         res += m_operands[i]->getTarget()->getString();
+        res += ": " + m_operandBBs[i]->getName();
     }
     res += ")";
     return res;

@@ -1,17 +1,11 @@
 #include "SSA.hpp"
 #include "InstIR.hpp"
 #include "BasicBlock.hpp"
-#include "DisjointSetUnion.hpp"
 
-#include <set>
-#include <queue>
 #include <memory>
 #include <string>
 #include <vector>
 #include <iostream>
-#include <algorithm>
-#include <stdexcept>
-#include <functional>
 #include <unordered_map>
 
 namespace mina
@@ -19,10 +13,11 @@ namespace mina
 
 SSA::SSA()
     : m_cfg{std::make_shared<BasicBlock>("Entry_0")},
-      m_currBBNameWithoutCtr {"Entry"},
-      m_currBBCtr {0},
+      m_currBBNameWithoutCtr{"Entry"},
+      m_currBBCtr{0},
       m_currentBB{}
-    {}
+{
+}
 
 void SSA::setCFG(std::shared_ptr<BasicBlock> cfg) { m_cfg = cfg; }
 
@@ -66,9 +61,10 @@ void SSA::printCFG()
         for (int j = 0; j < inst.size(); ++j)
         {
             // Don't print function signature
-            if (inst[j]->getInstType() == InstType::Func) continue;
+            //if (inst[j]->getInstType() == InstType::Func) continue;
             std::cout << inst[j]->getString() << std::endl;
         }
+        std::cout << std::endl;
     }
 }
 
@@ -90,16 +86,13 @@ std::shared_ptr<BasicBlock> SSA::getCurrBB() { return m_currentBB; }
 
 std::shared_ptr<BasicBlock> SSA::getCFG() { return m_cfg; }
 
-void SSA::writeVariable(
-    std::string varName,
-    std::shared_ptr<BasicBlock> block,
-    std::shared_ptr<Inst> value)
+void SSA::writeVariable(std::string varName, std::shared_ptr<BasicBlock> block,
+                        std::shared_ptr<Inst> value)
 {
     m_currDef[block][varName] = value;
 }
-std::shared_ptr<Inst> SSA::readVariable(
-    std::string varName,
-    std::shared_ptr<BasicBlock> block)
+std::shared_ptr<Inst> SSA::readVariable(std::string varName,
+                                        std::shared_ptr<BasicBlock> block)
 {
     if (m_currDef[block].find(varName) != m_currDef[block].end())
     {
@@ -108,8 +101,7 @@ std::shared_ptr<Inst> SSA::readVariable(
     return readVariableRecursive(varName, block);
 }
 std::shared_ptr<Inst> SSA::readVariableRecursive(
-    std::string varName,
-    std::shared_ptr<BasicBlock> block)
+    std::string varName, std::shared_ptr<BasicBlock> block)
 {
     if (m_sealedBlocks.find(block) == m_sealedBlocks.end())
     {
@@ -118,7 +110,7 @@ std::shared_ptr<Inst> SSA::readVariableRecursive(
         auto val = std::make_shared<PhiInst>(phiName, block);
         val->setup_def_use();
         block->pushInstBegin(val);
-
+        
         m_incompletePhis[block][varName] = val;
         writeVariable(varName, block, val);
         return val;
@@ -135,7 +127,7 @@ std::shared_ptr<Inst> SSA::readVariableRecursive(
         auto phiName = baseNameToSSA(baseName);
         auto val = std::make_shared<PhiInst>(phiName, block);
         val->setup_def_use();
-
+        
         writeVariable(varName, block, val);
         block->pushInstBegin(val);
         auto aval = addPhiOperands(baseName, val);
@@ -143,25 +135,25 @@ std::shared_ptr<Inst> SSA::readVariableRecursive(
         return aval;
     }
 }
-std::shared_ptr<Inst> SSA::addPhiOperands(
-    std::string varName,
-    std::shared_ptr<PhiInst> phi)
+
+std::shared_ptr<Inst> SSA::addPhiOperands(std::string varName,
+                                          std::shared_ptr<PhiInst> phi)
 {
     auto preds = phi->getBlock()->getPredecessors();
     for (auto& pred : preds)
     {
         auto val = readVariable(varName, pred);
-        phi->appendOperand(val);
+        phi->appendOperand(val, pred);
     }
-
+    
     return tryRemoveTrivialPhi(phi);
 }
 
 std::shared_ptr<Inst> SSA::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> phi)
 {
     std::shared_ptr<Inst> same = nullptr;
-    auto& operan = phi->getOperands();
-    for (auto& op : operan)
+    auto& operandList = phi->getOperands();
+    for (auto& op : operandList)
     {
         if (op == same || op == phi)
         {
@@ -173,15 +165,15 @@ std::shared_ptr<Inst> SSA::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> phi)
         }
         same = op;
     }
-
+    
     if (same == nullptr)
     {
         same = std::shared_ptr<UndefInst>();
     }
-
+    
     auto& users = phi->get_users();
     auto users_without_phi = std::vector<std::shared_ptr<Inst>>();
-
+    
     // get every users of phi except phi itself
     for (const auto& user : users)
     {
@@ -190,7 +182,7 @@ std::shared_ptr<Inst> SSA::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> phi)
             users_without_phi.push_back(user);
         }
     }
-
+    
     // replace all uses of phi with same
     for (auto& user : users_without_phi)
     {
@@ -202,7 +194,7 @@ std::shared_ptr<Inst> SSA::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> phi)
             {
                 auto& inst = instructions[i];
                 auto& operands = inst->getOperands();
-
+                
                 for (int i = 0; i < operands.size(); ++i)
                 {
                     if (operands[i] == phi)
@@ -215,28 +207,29 @@ std::shared_ptr<Inst> SSA::tryRemoveTrivialPhi(std::shared_ptr<PhiInst> phi)
             }
         }
     }
-
+    
     // remove phi from the hash table
     const auto& block = phi->getBlock();
     for (auto& [varName, value] : m_currDef[block])
     {
-        if (value == phi)
-        {
-          m_currDef[block][varName] = same;
-        }
+      if (value == phi)
+      {
+        m_currDef[block][varName] = same;
+      }
     }
-
+    
     // remove phi from instructions
-    for (auto it = block->getInstructions().begin(); it != block->getInstructions().end(); )
+    for (auto it = block->getInstructions().begin();
+         it != block->getInstructions().end();)
     {
-        if (*it == phi) // Compare shared_ptr directly for equality
+        if (*it == phi)  // Compare shared_ptr directly for equality
         {
             // erase returns an iterator to the next element
             it = block->getInstructions().erase(it);
         }
         else
         {
-            ++it; // Move to the next element only if not erased
+            ++it;  // Move to the next element only if not erased
         }
     }
 
@@ -259,168 +252,80 @@ void SSA::sealBlock(std::shared_ptr<BasicBlock> block)
     m_sealedBlocks.insert(block);
 }
 
-// Use DSU data structure to collect all related variable name
-// for example: x.0 and x.1 are related, so we group them together in one set
-// later, we rename all of these related variable
-
-// Please improve this algorithm using better out of SSA algorithm before implementing optimizations,
-// some optimization like coalescing can make this algorithm wrong.
+// Implement method I (Naive Translation) from paper
+// Optimizing translation out of SSA using renaming constraints.
 void SSA::renameSSA()
 {
-    DisjointSetUnion dsu;
-    std::vector<std::string> variables;
-
     auto rpo = getRPONodes(getCFG());
+    //printCFG();
     for (auto& node : rpo)
     {
         std::shared_ptr<BasicBlock> current_bb = node;
-
-        // Critical edge checking
-        if (current_bb->getNumSuccessors() > 1)
-        {
-            for (const auto& successor : current_bb->getSuccessors())
-            {
-                if (successor->getNumPredecessors() > 1)
-                {
-                    //std::cout << "There is a critical edge between "
-                    //          << current_bb->getName() << " and "
-                    //          << successor->getName() << std::endl;
-                }
-            }
-        }
-
         auto& instructions = current_bb->getInstructions();
-        for (unsigned int i = 0; i < instructions.size(); ++i)
+        for (unsigned int inst_idx = 0; inst_idx < instructions.size();
+             ++inst_idx)
         {
-            auto& currInst = instructions[i];
+            auto& currInst = instructions[inst_idx];
             const auto& target = currInst->getTarget();
             const auto& targetStr = target->getString();
-            dsu.make_set(targetStr);
-
+            
             if (currInst->isPhi())
             {
-                auto& operands = currInst->getOperands();
+                auto phiInst = std::dynamic_pointer_cast<PhiInst>(currInst);
+                auto& operands = phiInst->getOperands();
                 for (int i = 0; i < operands.size(); ++i)
                 {
                     const auto& opStr = operands[i]->getString();
-                    // Merges two sets that targetStr and opStr belong to.
-                    // Create phiweb.
-                    dsu.unite(targetStr, opStr);
+                    auto predBlock = phiInst->getOperandBB(i);
+                    auto newTargetInst =
+                        std::make_shared<IdentInst>(targetStr + "'", predBlock);
+                    // predBlock->pushInst(std::make_shared<AssignInst>(
+                    //     newTargetInst, operands[i]->getTarget(), predBlock));
+                    auto& lastInst =
+                        predBlock
+                            ->getInstructions()[predBlock->getInstructions().size() - 1];
+                    if (lastInst->getInstType() == InstType::BRT ||
+                        lastInst->getInstType() == InstType::BRF)
+                    {
+                        predBlock->insertInstAtIndex(
+                            predBlock->getInstructions().size() - 2,
+                            std::make_shared<AssignInst>(newTargetInst,
+                                                        operands[i]->getTarget(),
+                                                        predBlock));
+                    }
+                    else
+                    {
+                        predBlock->insertInstAtIndex(
+                            predBlock->getInstructions().size() - 1,
+                            std::make_shared<AssignInst>(newTargetInst,
+                                                        operands[i]->getTarget(),
+                                                        predBlock));
+                    }
                 }
-            }
-            variables.push_back(targetStr);
-        }
-    }
 
-    // Create a map to hold the final name for each set's root.
-    std::unordered_map<std::string, std::string> root_to_new_name;
+                // Remove phi instruction and add assign instruction at the
+                // beginning of the block
+                current_bb->removeInstAtIndex(inst_idx);
 
-    // Choose a representative name for each set.
-    // A common convention is to use the original name without the SSA suffix.
-    for (const auto& var : variables) {
-        std::string root = dsu.find(var);
-        if (root_to_new_name.find(root) == root_to_new_name.end()) {
-            // Example: if root is "x_1", new name becomes "x".
-            std::string base_name = root.substr(0, root.find('.')); 
-            root_to_new_name[root] = base_name;
-        }
-    }
+                // reset index to the beginning of the block since we
+                // just added a new instruction at the beginning
+                inst_idx = -1;
 
-    // Create the final, full renaming map for all variables.
-    std::unordered_map<std::string, std::string> final_rename_map;
-    for (const auto& var : variables) {
-        std::string root = dsu.find(var);
-        final_rename_map[var] = root_to_new_name[root];
-    }
-
-    for (auto& node : rpo)
-    {
-        std::shared_ptr<BasicBlock> current_bb = node;
-        auto& instructions = current_bb->getInstructions();
-
-        if (instructions.size() == 0)
-        {
-            continue;
-        }
-
-        unsigned int instruction_idx = 0;
-        while (true)
-        {
-            if (instruction_idx == instructions.size())
-            {
-                break;
-            }
-
-            auto& currInst = instructions[instruction_idx];
-            const auto& target = currInst->getTarget();
-            const auto& operands = currInst->getOperands();
-            const auto& targetStr = target->getString();
-
-            if (currInst->isPhi())
-            {
-                instructions.erase(instructions.begin() + instruction_idx);
-                continue;
-            }
-            else if (currInst->getInstType() == InstType::ProcCall)
-            {
-                auto& operands = currInst->getOperands();
-                for (int i = 0; i < operands.size(); ++i)
+                if (operands.size() == 0)
                 {
-                    if (operands[i]->canBeRenamed() == false)
-                    {
-                        continue;
-                    }
-                    const auto& operandTarget = operands[i]->getTarget();
-                    const auto& operandTargetStr = operandTarget->getString();
-                    if (final_rename_map.find(operandTargetStr) ==
-                        final_rename_map.end())
-                    {
-                        continue;
-                    }
-
-                    auto& new_operand_target_str = final_rename_map[operandTargetStr];
-                    std::shared_ptr<IdentInst> newOperandTargetInst =
-                        std::make_shared<IdentInst>(new_operand_target_str,
-                                                    currInst->getBlock());
-                    operands[i] = newOperandTargetInst;
+                    continue;
                 }
+
+                auto newTargetInst =
+                    std::make_shared<IdentInst>(targetStr, current_bb);
+                auto whatever =
+                    std::make_shared<IdentInst>(targetStr + "'", current_bb);
+                current_bb->pushInstBegin(std::make_shared<AssignInst>(
+                    newTargetInst, whatever, current_bb));
             }
-            else
-            {
-                if (final_rename_map.find(targetStr) == final_rename_map.end())
-                {
-                    throw std::runtime_error("can't find target str " + targetStr +
-                                             "in the hashmap");
-                }
-                auto& new_target_str = final_rename_map[targetStr];
-
-                std::shared_ptr<IdentInst> newTargetInst = std::make_shared<IdentInst>(new_target_str, currInst->getBlock());
-                auto& operands = currInst->getOperands();
-                for (int i = 0; i < operands.size(); ++i)
-                {
-                    if (operands[i]->canBeRenamed() == false)
-                    {
-                        continue;
-                    }
-                    const auto& operandTarget = operands[i]->getTarget();
-                    const auto& operandTargetStr = operandTarget->getString();
-                    if (final_rename_map.find(operandTargetStr) ==
-                        final_rename_map.end())
-                    {
-                        continue;
-                    }
-
-                    auto& new_operand_target_str = final_rename_map[operandTargetStr];
-                    std::shared_ptr<IdentInst> newOperandTargetInst =
-                        std::make_shared<IdentInst>(new_operand_target_str,
-                                                    currInst->getBlock());
-                    operands[i] = newOperandTargetInst;
-                }
-                currInst->setTarget(newTargetInst);
-            }
-            ++instruction_idx;
         }
     }
+    //printCFG();
 }
 
 }  // namespace mina

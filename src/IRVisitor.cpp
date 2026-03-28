@@ -383,11 +383,6 @@ void IRVisitor::visit(IfAST& v)
 
     auto mergeBlockLabel = "mergeBlock_" + std::to_string(m_labelCounter);
     auto mergeBB = std::make_shared<BasicBlock>(mergeBlockLabel);
-    mergeBB->pushPredecessor(thenBB);
-    mergeBB->pushPredecessor(elseBB);
-
-    thenBB->pushSuccessor(mergeBB);
-    elseBB->pushSuccessor(mergeBB);
 
     auto branchInst =
         std::make_shared<BRTInst>(exprInst, thenBB, elseBB, m_currentBB);
@@ -396,16 +391,17 @@ void IRVisitor::visit(IfAST& v)
     m_currentBB->pushSuccessor(thenBB);
     m_currentBB->pushSuccessor(elseBB);
 
-
     m_ssa.sealBlock(m_currentBB);
     m_currentBB = thenBB;
 
     thenArm->accept(*this);
 
+    mergeBB->pushPredecessor(m_currentBB);
+    m_currentBB->pushSuccessor(mergeBB);
+
     auto otherjumpInst = std::make_shared<JumpInst>(mergeBB);
     otherjumpInst->setup_def_use();
     m_currentBB->pushInst(otherjumpInst);
-    m_currentBB->pushSuccessor(mergeBB);
 
     m_ssa.sealBlock(m_currentBB);
     m_currentBB = elseBB;
@@ -414,13 +410,16 @@ void IRVisitor::visit(IfAST& v)
     {
         elseArm->accept(*this);
     }
+
+    mergeBB->pushPredecessor(m_currentBB);
+    m_currentBB->pushSuccessor(mergeBB);
+
     auto moreJumpInst = std::make_shared<JumpInst>(mergeBB);
     moreJumpInst->setup_def_use();
     m_currentBB->pushInst(moreJumpInst);
-    m_currentBB->pushSuccessor(mergeBB);
 
-    m_ssa.sealBlock(m_currentBB);
     m_currentBB = mergeBB;
+    m_ssa.sealBlock(m_currentBB);
 
     ++m_labelCounter;
 }
@@ -437,6 +436,7 @@ void IRVisitor::visit(RepeatUntilAST& v)
     repeatUntilBB->pushPredecessor(m_currentBB);
     repeatUntilBB->pushPredecessor(repeatUntilBB);
     repeatUntilBB->pushSuccessor(repeatUntilBB);
+
     m_ssa.sealBlock(m_currentBB);
     m_currentBB = repeatUntilBB;
 
@@ -454,7 +454,6 @@ void IRVisitor::visit(RepeatUntilAST& v)
     m_currentBB->pushInst(std::move(newJumpInst));
     m_currentBB->pushSuccessor(repeatUntilExitBB);
     repeatUntilExitBB->pushPredecessor(m_currentBB);
-    repeatUntilExitBB->pushSuccessor(repeatUntilExitBB);
     m_ssa.sealBlock(m_currentBB);
     m_currentBB = repeatUntilExitBB;
 }
@@ -872,31 +871,16 @@ void IRVisitor::visit(ParameterAST& v)
 {
     auto ident = v.getIdentifier();
     auto identType = ident->getType();
-    m_parameters.push_back(ident);
 
     // curerntBB here is the basic block for the function declaration
     std::string& identName = ident->getName();
     std::shared_ptr<Inst> assignmentValue;
-    if (ident->getType() == Type::INTEGER)
-    {
-        assignmentValue = std::make_shared<IntConstInst>(0, m_currentBB);
-    }
-    else if (ident->getType() == Type::BOOLEAN)
-    {
-        assignmentValue = std::make_shared<BoolConstInst>(false, m_currentBB);
-    }
-    else
-    {
-        throw std::runtime_error("Only integer and boolean types are supported as parameter!");
-    }
-
-    auto assignInst = std::make_shared<AssignInst>(
-    std::make_shared<IdentInst>(m_ssa.baseNameToSSA(identName),
-                                m_currentBB), assignmentValue, m_currentBB);
-    assignInst->setup_def_use();
-    m_ssa.writeVariable(m_ssa.baseNameToSSA(identName), m_currentBB,
-                        assignmentValue);
-    m_currentBB->pushInst(assignInst);
+    auto baseNameToSSA = m_ssa.baseNameToSSA(identName);
+    auto parameter = std::make_shared<VariableAST>(baseNameToSSA, identType,
+                                                   IdentType::VARIABLE);
+    m_parameters.push_back(parameter);
+    auto val = std::make_shared<IdentInst>(baseNameToSSA, m_currentBB);
+    m_ssa.writeVariable(identName, m_currentBB, val);
 }
 
 void IRVisitor::visit(ParametersAST& v)

@@ -1,6 +1,5 @@
-#include "RegisterAllocator.hpp"
-
 #include "MachineIR.hpp"
+#include "RegisterAllocator.hpp"
 
 #include <map>
 #include <set>
@@ -608,8 +607,6 @@ void RegisterAllocator::printRegisterMappingResults(
     std::cout << "------------------------------------------------\n\n";
 }
 
-// In RegisterAllocator.cpp
-
 std::vector<std::shared_ptr<BasicBlockMIR>> RegisterAllocator::replaceVirtualRegisters(
     const std::map<std::string, std::shared_ptr<Register>>& vregMap,
     int baseOffset)
@@ -1112,6 +1109,33 @@ void RegisterAllocator::addEdgesBasedOnLiveness(std::shared_ptr<InferenceGraph> 
                 case MIRType::Ret:
                 {
                     instUses.insert(to_int(RegID::RAX));
+                    break;
+                }
+
+                case MIRType::Cmp:
+                case MIRType::Test:
+                {
+                    // These instructions only READ their operands (Uses)
+                    if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg) {
+                        instUses.insert(getID(operands[0]));
+                    }
+                    if (operands.size() > 1 && operands[1]->getMIRType() == MIRType::Reg) {
+                        instUses.insert(getID(operands[1]));
+                    }
+                    break;
+                }
+
+                case MIRType::Sete:
+                case MIRType::Setne:
+                case MIRType::Setl:
+                case MIRType::Setle:
+                case MIRType::Setg:
+                case MIRType::Setge:
+                {
+                    // SetCC WRITES to its destination operand (Def)
+                    if (!operands.empty() && operands[0]->getMIRType() == MIRType::Reg) {
+                        instDefs.insert(getID(operands[0]));
+                    }
                     break;
                 }
 

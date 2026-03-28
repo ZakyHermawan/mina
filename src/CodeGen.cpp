@@ -199,19 +199,14 @@ void CodeGen::generateMIR(bool isMain)
         auto resolveArrayAddress = [&](const std::string& arrayName, std::shared_ptr<Inst> index) -> std::shared_ptr<Register>
         {
             auto addrVReg = createTempVReg();
-
-            // Check if we can fold the constant index
             if (index->getInstType() == InstType::IntConst)
             {
                 int indexVal = std::dynamic_pointer_cast<IntConstInst>(index)->getVal();
                 int elementOffset = indexVal * 8; // Scale by 8 bytes
 
-                // Get the base array offset from map
-                // If array is at [rbp-8], and index is 2, target is [rbp-8-16] = [rbp-24]
                 unsigned int baseOffset = vRegToOffset[arrayName];
                 int finalOffset = -(static_cast<int>(baseOffset) + elementOffset);
 
-                // Emit a single LEA directly to the calculated element address
                 auto foldedMem = std::make_shared<MemoryMIR>(rbp, std::make_shared<ConstMIR>(finalOffset));
                 bbMIR->addInstruction(std::make_shared<LeaMIR>(
                     std::vector<std::shared_ptr<MachineIR>>{addrVReg, foldedMem}));
@@ -219,29 +214,21 @@ void CodeGen::generateMIR(bool isMain)
             else
             {
                 // Fallback: Dynamic rematerialization
-                auto scaledIdxVReg = createTempVReg();
                 auto rawIdxVReg = getOrCreateVReg("v_" + index->getString());
-
-                // mov scaledIdxVReg, rawIdxVReg
+        
                 bbMIR->addInstruction(std::make_shared<MovMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{scaledIdxVReg,
-                                                            rawIdxVReg}));
+                    std::vector<std::shared_ptr<MachineIR>>{rax, rawIdxVReg}));
 
-                // mul scaledIdxVReg, 8
                 bbMIR->addInstruction(std::make_shared<MulMIR>(
                     std::vector<std::shared_ptr<MachineIR>>{
-                        scaledIdxVReg, std::make_shared<ConstMIR>(8)}));
+                        rax, std::make_shared<ConstMIR>(8)}));
 
-                // lea addrVReg, [rbp - baseOffset]
                 auto memLocation = memoryLocationForVReg(arrayName);
                 bbMIR->addInstruction(std::make_shared<LeaMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{addrVReg,
-                                                            memLocation}));
+                    std::vector<std::shared_ptr<MachineIR>>{addrVReg, memLocation}));
 
-                // sub addrVReg, scaledIdxVReg
                 bbMIR->addInstruction(std::make_shared<SubMIR>(
-                    std::vector<std::shared_ptr<MachineIR>>{addrVReg,
-                                                            scaledIdxVReg}));
+                    std::vector<std::shared_ptr<MachineIR>>{addrVReg, rax}));
             }
 
             return addrVReg;
@@ -392,8 +379,26 @@ void CodeGen::generateMIR(bool isMain)
             else if (instType == InstType::Assign)
             {
                 auto assignInst = std::dynamic_pointer_cast<AssignInst>(inst[j]);
-                auto targetVReg = getOrCreateVReg("v_" + assignInst->getTarget()->getString());
+                auto targetStr = assignInst->getTarget()->getString();
+                auto targetVRegName = "v_" + targetStr;
+                auto targetVReg = getOrCreateVReg(targetVRegName);
                 auto source = assignInst->getSource();
+
+                if (source->getInstType() == InstType::Ident)
+                {
+                    std::string sourceStr = source->getString();
+                    std::string sourceVRegName = "v_" + sourceStr;
+                    
+                    // If the source variable is a pinned stack array, the target MUST share it
+                    if (vRegToOffset.find(sourceVRegName) != vRegToOffset.end())
+                    {
+                        vRegToOffset[targetVRegName] = vRegToOffset[sourceVRegName];
+                        if (arrVRegToSize.find(sourceStr) != arrVRegToSize.end())
+                        {
+                            arrVRegToSize[targetStr] = arrVRegToSize[sourceStr];
+                        }
+                    }
+                }
 
                 std::shared_ptr<MachineIR> mirSource;
                 if (source->getInstType() == InstType::IntConst)
@@ -815,12 +820,13 @@ void CodeGen::generateMIR(bool isMain)
             {
                 auto allocaInst = std::dynamic_pointer_cast<AllocaInst>(inst[j]);
                 auto targetStr = allocaInst->getTarget()->getString();
+                std::string targetVRegName = "v_" + targetStr;
     
                 // Reserve stack space
                 if (arrVRegToSize.find(targetStr) == arrVRegToSize.end() &&
-                    vRegToOffset.find(targetStr) == vRegToOffset.end())
+                    vRegToOffset.find(targetVRegName) == vRegToOffset.end())
                 {
-                    assignVRegToOffsetIfDoesNotExist(targetStr);
+                    assignVRegToOffsetIfDoesNotExist(targetVRegName);
                     arrVRegToSize[targetStr] = allocaInst->getSize();
                 }
                 else
@@ -840,8 +846,23 @@ void CodeGen::generateMIR(bool isMain)
                 if (isUpdate)
                 {
                     arrUpdate = std::dynamic_pointer_cast<ArrUpdateInst>(inst[j]);
+                    std::string sourceArrayName = arrUpdate->getSource()->getTarget()->getString();
                     arrayName = arrUpdate->getTarget()->getString();
                     indexOperand = arrUpdate->getIndex()->getTarget();
+
+                    std::string sourceVRegName = "v_" + sourceArrayName;
+                    if (vRegToOffset.find(sourceVRegName) != vRegToOffset.end())
+                    {
+                        vRegToOffset["v_" + arrayName] = vRegToOffset[sourceVRegName];
+                        if (arrVRegToSize.find(sourceArrayName) != arrVRegToSize.end())
+                        {
+                            arrVRegToSize[arrayName] = arrVRegToSize[sourceArrayName];
+                        }
+                    }
+                    else
+                    {
+                        throw std::runtime_error("CodeGen Error: Source array address not found in stack map for update: " + sourceArrayName);
+                    }
                 }
                 else
                 {
@@ -851,7 +872,8 @@ void CodeGen::generateMIR(bool isMain)
                 }
 
                 // Rematerialize element address (e.g., lea finalAddrVReg, [rbp - offset])
-                auto finalAddrVReg = resolveArrayAddress(arrayName, indexOperand);
+                auto finalAddrVReg =
+                    resolveArrayAddress("v_" + arrayName, indexOperand);
 
                 // Create the memory operand [finalAddrVReg + 0]
                 auto memOp = std::make_shared<MemoryMIR>(finalAddrVReg, 0);
@@ -913,11 +935,13 @@ void CodeGen::generateMIR(bool isMain)
         }
     }
 
+    //printMIR();
+
     // Calculate Pinned Size (ONLY Arrays + Pinned Scalars)
     size_t pinned_size = vRegToOffset.size() * 8;
     for (const auto& arrPair : arrVRegToSize)
     {
-      pinned_size += static_cast<size_t>(arrPair.second) * 8;
+        pinned_size += static_cast<size_t>(arrPair.second) * 8;
     }
 
     // Initialize Allocator
@@ -1046,6 +1070,19 @@ void CodeGen::generateAllFunctionsMIR()
     // Global epilogue
     std::cout << "\nnewline_str: .string \"\\n\"\n";
     std::cout << "\n";
+}
+
+void CodeGen::printMIR()
+{
+    for (int i = 0; i < m_mirBlocks.size(); ++i)
+    {
+        for (int j = 0; j < m_mirBlocks[i]->getInstructions().size(); ++j)
+        {
+            auto inst = m_mirBlocks[i]->getInstructions()[j]->getString();
+            std::cout << inst << std::endl;
+        }
+        std::cout << std::endl;
+    }
 }
 
 }  // namespace mina

@@ -138,7 +138,7 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="CMakeLists.txt" />
-    <Text Include="samples\tes.txt" />
+    <Text Include="samples\tes1.txt" />
     <Text Include="samples\tes10.txt" />
     <Text Include="samples\tes2.txt" />
     <Text Include="samples\tes3.txt" />

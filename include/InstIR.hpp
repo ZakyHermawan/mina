@@ -708,7 +708,8 @@ public:
     JumpInst& operator=(JumpInst&&) noexcept = default;
   
     std::shared_ptr<BasicBlock> getJumpTarget();
-  
+    void setTarget(std::shared_ptr<BasicBlock> target);
+
     virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
     virtual void setup_def_use();
@@ -738,6 +739,8 @@ public:
     std::shared_ptr<Inst> getCond();
     std::shared_ptr<BasicBlock> getTargetSuccess();
     std::shared_ptr<BasicBlock> getTargetFailed();
+    void setTargetSuccess(std::shared_ptr<BasicBlock> targetSuccess);
+    void setTargetFailed(std::shared_ptr<BasicBlock> targetFailed);
   
     virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
@@ -768,6 +771,9 @@ public:
     std::shared_ptr<Inst> getCond();
     std::shared_ptr<BasicBlock> getTargetSuccess();
     std::shared_ptr<BasicBlock> getTargetFailed();
+    void setTargetSuccess(std::shared_ptr<BasicBlock> targetSuccess);
+    void setTargetFailed(std::shared_ptr<BasicBlock> targetFailed);
+
   
     virtual std::string getString() override;
     virtual void push_user(std::shared_ptr<Inst> user) override;
@@ -975,6 +981,7 @@ private:
     std::shared_ptr<Inst> m_target;
     std::shared_ptr<BasicBlock> m_block;
     std::vector<std::shared_ptr<Inst>> m_users;
+    std::vector<std::shared_ptr<BasicBlock>> m_operandBBs;
 
 public:
     PhiInst(std::string name, std::shared_ptr<BasicBlock> block);
@@ -985,7 +992,9 @@ public:
     PhiInst& operator=(const PhiInst&) = delete;
     PhiInst& operator=(PhiInst&&) noexcept = default;
 
-    void appendOperand(std::shared_ptr<Inst> operand);
+    void appendOperand(std::shared_ptr<Inst> operand,
+                       std::shared_ptr<BasicBlock> operandBB);
+    std::shared_ptr<BasicBlock> getOperandBB(unsigned index);
 
     virtual std::shared_ptr<Inst> getTarget() override;
     virtual std::shared_ptr<BasicBlock> getBlock();

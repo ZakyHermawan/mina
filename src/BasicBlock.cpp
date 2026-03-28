@@ -8,6 +8,7 @@
 #include <memory>
 #include <algorithm>
 #include <functional>
+#include <stdexcept>
 
 namespace mina
 {
@@ -33,12 +34,34 @@ void BasicBlock::pushInst(std::shared_ptr<Inst> inst)
     m_instructions.push_back(inst);
 }
 
+void BasicBlock::insertInstAtIndex(size_t index, std::shared_ptr<Inst> inst)
+{
+    if (index <= m_instructions.size())
+    {
+        m_instructions.insert(m_instructions.begin() + index, std::move(inst));
+    }
+    else
+    {
+        throw std::runtime_error("Index out of bounds in insertInstAtIndex");
+    }
+}
+
 void BasicBlock::pushInstBegin(std::shared_ptr<Inst> inst)
 {
     m_instructions.insert(m_instructions.begin(), inst);
 }
 
-void BasicBlock::popInst() { m_instructions.pop_back(); }
+void BasicBlock::removeInstAtIndex(size_t index)
+{
+    if (index < m_instructions.size())
+    {
+        m_instructions.erase(m_instructions.begin() + index);
+    }
+    else
+    {
+        throw std::runtime_error("Index out of bounds in removeInstAtIndex");
+    }
+}
 
 void BasicBlock::setPredecessors(
     std::vector<std::shared_ptr<BasicBlock>> predecessors)

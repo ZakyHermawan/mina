@@ -21,7 +21,7 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="CMakeLists.txt" />
-    <Text Include="samples\tes.txt">
+    <Text Include="samples\tes1.txt">
       <Filter>Resource Files</Filter>
     </Text>
     <Text Include="samples\tes2.txt">

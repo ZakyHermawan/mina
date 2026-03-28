@@ -5,7 +5,7 @@
 		put(13, skip)
 	}
 	integer func someFunc(a: boolean, b: integer) {; return b}
-	proc something(x: integer, y: boolean, z: integer) {
+	proc something(x: integer) {
 	;
 		put(x, skip)
 	}

@@ -49,7 +49,7 @@ static void runFile(const char* fileName)
 // other samples. Samples that take user input should be tested separately.
 static void runAllSamples()
 {
-    //runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes.txt");
+    //runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes1.txt");
     runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes2.txt");
     runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes3.txt");
     //runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes4.txt");
@@ -68,6 +68,6 @@ int main(int argc, char* argv[])
 
     //runAllSamples();
 
-    runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes.txt");
+    runFile("E:\\SourceCodes\\mina\\mina\\samples\\tes1.txt");
     return 0;
 }

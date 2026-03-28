@@ -383,7 +383,6 @@ std::shared_ptr<DeclAST> Parser::declaration()
 }
 
 /*
-* allow func funcame and func procName()
 * funcBody           ::= scope
                |   LEFT_PAREN parameters RIGHT_PAREN EQ scope ;
 * */
@@ -435,10 +434,7 @@ std::shared_ptr<FuncDeclAST> Parser::funcBody()
     }
     else
     {
-        arena::vector<std::string> tmp;
-        m_functionTab[(size_t)m_lexical_level + 1][m_funcName] =
-            FunctionBucket(tmp);        
-        scopeAST = scope();
+        exitParse("Expected '(' after procedure name");
     }
 
     m_functionTab[(size_t)m_lexical_level + 1][m_funcName].setLocalNumVar(
@@ -453,7 +449,6 @@ std::shared_ptr<FuncDeclAST> Parser::funcBody()
 }
 
 /*
-* allow proc procName and proc procName()
 * procBody           ::= scope
                |   LEFT_PAREN parameters RIGHT_PAREN scope ;
 * */
@@ -502,10 +497,7 @@ std::shared_ptr<ProcDeclAST> Parser::procBody()
     }
     else
     {
-        arena::vector<std::string> tmp;
-        m_functionTab[(size_t)m_lexical_level + 1][m_procName] =
-            FunctionBucket(tmp);
-        scopeAST = scope();
+        exitParse("Expected '(' after procedure name");
     }
 
     m_functionTab[(size_t)m_lexical_level + 1][m_procName].setLocalNumVar(

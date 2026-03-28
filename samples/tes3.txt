@@ -15,7 +15,7 @@
 	B := 5 + a
 	put(B, skip)
   }
-  integer func satu {
+  integer func satu() {
 	var A: integer;
 	A := 3
 	put(A, skip)

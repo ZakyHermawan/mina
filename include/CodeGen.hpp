@@ -31,6 +31,7 @@ public:
 	void generateMIR(bool isMain = false);
 	void addSSA(std::string funcName, SSA& ssa);
 	void generateAllFunctionsMIR();
+	void printMIR();
 };
 
 
