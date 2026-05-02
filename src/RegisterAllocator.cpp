@@ -1257,7 +1257,7 @@ void RegisterAllocator::livenessAnalysis()
     // Initialize Worklist
     // Using deque for FIFO processing; unordered_set to track membership
     std::deque<std::shared_ptr<BasicBlockMIR>> worklist;
-    std::unordered_set<std::string> inWorklist;
+    std::unordered_set<std::string> inWorklist; // Block names for quick lookup
 
     // Initialize with all blocks. Iterating backwards helps liveness converge faster.
     for (auto it = m_MIRBlocks.rbegin(); it != m_MIRBlocks.rend(); ++it)
@@ -1416,6 +1416,26 @@ void RegisterAllocator::printSpillCosts(std::shared_ptr<InferenceGraph> graph)
         std::cout << "\n";
     }
     std::cout << "------------------------------------------------\n\n";
+}
+
+void RegisterAllocator::iteratedRegisterCoalescing()
+{
+    livenessAnalysis();
+    // Build();
+    // makeWorkList();
+    // Keep iterating until every worklist is empty
+    // do
+    // {
+        // if simplifyWorkList != empty then simplify()
+        // else if workListMoves != empty then coalesce()
+        // else if freezeWorkList != empty then freeze()
+        // else if spillWorkList != empty then selectSpill()
+    // }
+    // while (simplifyWorkList != empty || workListMoves != empty || freezeWorkList != empty || spillWorkList != empty);
+    // assignColors();
+    // if spilledNodes != empty
+    //     rewriteProgram(spilledNodes);
+    //     iteratedRegisterCoalescing();
 }
 
 }  // namespace mina

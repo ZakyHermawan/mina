@@ -141,7 +141,6 @@ void BasicBlockMIR::generateDefUse()
     m_def.clear();
     m_use.clear();
 
-    // Mark use first
     for (const auto& inst : m_instructions)
     {
         auto& operands = inst->getOperands();
@@ -178,6 +177,9 @@ void BasicBlockMIR::generateDefUse()
             }
         };
 
+        // Mark use first because in instructions like "add rax, rbx", rax is
+        // both used and defined, but we want to treat it as a use of the old
+        // value and a def of the new value.
         switch (mirType)
         {
             case MIRType::Add:

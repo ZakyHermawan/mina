@@ -163,6 +163,8 @@ class MemoryMIR : public MachineIR
 {
     std::shared_ptr<Register> m_reg;
     std::shared_ptr<ConstMIR> m_offset;
+    // To store stuff like [rip + literal] for string literals
+    // e.g. lea rcx, QWORD PTR [rip + fmt_str] for printf format string
     std::shared_ptr<LiteralMIR> m_literal;
 
 public:

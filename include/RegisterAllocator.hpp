@@ -209,6 +209,8 @@ private:
     void calculateLoopDepths(
         std::shared_ptr<BasicBlockMIR> entry);
     void printSpillCosts(std::shared_ptr<InferenceGraph> graph);
+
+    void iteratedRegisterCoalescing();
 };
 
 }  // namespace mina
